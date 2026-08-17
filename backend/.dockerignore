@@ -1,0 +1,13 @@
+# Ne jamais embarquer de secret ni d'environnement local dans l'image.
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+tests/
+data/backups/
+data/exports/
+data/logs/
+*.db-wal
+*.db-shm

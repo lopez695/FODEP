@@ -1,0 +1,41 @@
+# Contexte de construction : tout ce qui n'est pas necessaire est exclu, pour
+# ne pas transferer des centaines de mega-octets a chaque mise en ligne.
+.git
+.github
+.build
+dist
+outputs
+modeles_import
+risk_management
+risk_management.zip
+*.zip
+
+# Secrets et environnements locaux : jamais dans une image.
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+backend/.venv
+**/__pycache__
+*.pyc
+
+# Artefacts de construction : refabriques dans l'image.
+frontend/build
+frontend/.dart_tool
+frontend/windows
+frontend/android
+frontend/ios
+frontend/linux
+frontend/macos
+
+# Donnees d'execution : la base de demarrage est copiee separement.
+backend/data/backups
+backend/data/exports
+backend/data/logs
+*.db-wal
+*.db-shm
+
+# Documents et brouillons.
+*.md
+!README_DEPLOIEMENT.md

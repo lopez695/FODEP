@@ -1,0 +1,1 @@
+"""Composants partages du backend."""

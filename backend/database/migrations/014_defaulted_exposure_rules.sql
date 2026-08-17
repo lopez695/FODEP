@@ -1,0 +1,3 @@
+ALTER TABLE exposures ADD COLUMN defaulted_exposure_initial_risk_weight REAL;
+ALTER TABLE exposures ADD COLUMN defaulted_exposure_residential_mortgage_in_default INTEGER;
+ALTER TABLE exposures ADD COLUMN defaulted_exposure_provision_at_least_twenty_percent INTEGER;

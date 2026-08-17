@@ -1,0 +1,42 @@
+# Proxy inverse pour un reseau interne, sans DNS public.
+#
+# Let's Encrypt est inutilisable dans ce cas : il ne peut pas verifier un nom
+# qui n'existe pas sur Internet. Deux options, dans l'ordre de preference.
+#
+# 1. Certificat fourni par la DSI (recommande en production interne)
+#    Deposer les fichiers dans deploy/certs/ puis remplacer « tls internal »
+#    par :
+#        tls /certs/serveur.crt /certs/serveur.key
+#
+# 2. Autorite locale de Caddy (« tls internal », ci-dessous)
+#    Fonctionne immediatement, mais le navigateur affichera un avertissement
+#    tant que l'autorite de Caddy n'est pas installee sur les postes. Suffisant
+#    pour un essai, insuffisant pour une mise a disposition durable.
+
+# Un client qui se connecte a une ADRESSE IP n'annonce pas de nom de site dans
+# la poignee de main TLS (le SNI est reserve aux noms de domaine). Sans cette
+# valeur par defaut, Caddy ne sait pas quel certificat presenter et la
+# connexion echoue avant meme d'atteindre l'application.
+{
+	default_sni {$RWA_DOMAINE:localhost}
+}
+
+{$RWA_DOMAINE:localhost} {
+	tls internal
+
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

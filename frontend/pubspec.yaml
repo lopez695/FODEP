@@ -1,0 +1,192 @@
+name: rwa_calculator
+description: Base Flutter modulaire pour un outil RWA.
+publish_to: "none"
+
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  archive: ^3.6.1
+  desktop_drop: ^0.7.0
+  excel: ^4.0.6
+  file_selector: ^1.0.3
+  http: ^1.2.2
+  intl: ^0.20.2
+  lottie: ^3.1.2
+  pdf: ^3.11.1
+  flutter_svg: ^2.0.10+1
+  flutter_math_fork: ^0.7.4
+  xml: ^6.6.1
+  shared_preferences: ^2.5.5
+  linked_scroll_controller: ^0.2.0
+  fl_chart: ^1.2.0
+  url_launcher: ^6.3.1
+  spreadsheet_decoder: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/heymanns_logo.png
+    - assets/images/logo.png
+    - assets/images/logo_header.png
+    - assets/images/risk_management.png
+    - assets/images/rwa_credit.png
+    - assets/images/manage_money_bro.svg
+    - assets/flags/
+    - assets/lotties/import_loader.json
+    - assets/lotties/Success.json
+    - assets/lotties/rwa_dashboard.json
+    - assets/lotties/yield_curve_no_data.json
+  fonts:
+    - family: Roboto Flex
+      fonts:
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 100
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 200
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 300
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 700
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 800
+        - asset: assets/fonts/RobotoFlex-Variable.ttf
+          weight: 900
+    - family: Cormorant Garamond
+      fonts:
+        - asset: assets/fonts/CormorantGaramond-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/CormorantGaramond-Italic-Variable.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/CormorantGaramond-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/CormorantGaramond-Italic-Variable.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/CormorantGaramond-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/CormorantGaramond-Italic-Variable.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/CormorantGaramond-Variable.ttf
+          weight: 700
+        - asset: assets/fonts/CormorantGaramond-Italic-Variable.ttf
+          weight: 700
+          style: italic
+    - family: Aptos
+      fonts:
+        - asset: assets/fonts/Aptos-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Aptos-Light-Italic.ttf
+          weight: 300
+          style: italic
+        - asset: assets/fonts/Aptos.ttf
+          weight: 400
+        - asset: assets/fonts/Aptos-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Aptos-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Aptos-SemiBold-Italic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/Aptos-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Aptos-Bold-Italic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/Aptos-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Aptos-ExtraBold-Italic.ttf
+          weight: 800
+          style: italic
+        - asset: assets/fonts/Aptos-Black.ttf
+          weight: 900
+        - asset: assets/fonts/Aptos-Black-Italic.ttf
+          weight: 900
+          style: italic
+    - family: Nunito Sans
+      fonts:
+        - asset: assets/fonts/NunitoSans-Variable.ttf
+        - asset: assets/fonts/NunitoSans-Italic-Variable.ttf
+          style: italic
+    - family: Michroma
+      fonts:
+        - asset: assets/fonts/Michroma-Regular.ttf
+          weight: 400
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSans-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSans-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSans-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/IBMPlexSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/IBMPlexSans-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Tenor Sans
+      fonts:
+        - asset: assets/fonts/TenorSans-Regular.ttf
+    - family: General Sans
+      fonts:
+        - asset: assets/fonts/GeneralSans-Extralight.otf
+          weight: 200
+        - asset: assets/fonts/GeneralSans-ExtralightItalic.otf
+          weight: 200
+          style: italic
+        - asset: assets/fonts/GeneralSans-Light.otf
+          weight: 300
+        - asset: assets/fonts/GeneralSans-LightItalic.otf
+          weight: 300
+          style: italic
+        - asset: assets/fonts/GeneralSans-Regular.otf
+          weight: 400
+        - asset: assets/fonts/GeneralSans-Italic.otf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/GeneralSans-Medium.otf
+          weight: 500
+        - asset: assets/fonts/GeneralSans-MediumItalic.otf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/GeneralSans-Semibold.otf
+          weight: 600
+        - asset: assets/fonts/GeneralSans-SemiboldItalic.otf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/GeneralSans-Bold.otf
+          weight: 700
+        - asset: assets/fonts/GeneralSans-BoldItalic.otf
+          weight: 700
+          style: italic

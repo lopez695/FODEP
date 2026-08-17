@@ -1,0 +1,2452 @@
+================================================================================
+MEMOIRE DE FIN D'ETUDES
+================================================================================
+
+THEME :
+Conception d'un outil tactique d'aide au pilotage des exigences en fonds propres
+dans les banques des zones UEMOA et CEMAC : approche fondee sur les piliers 1
+et 2 des accords de Bale II et III
+
+Presente par : Lopez
+Dans le cadre de : Master 2 en Informatique appliquee a la Finance
+Entreprise d'accueil : Heymans Inc.
+Annee academique : 2024-2025
+
+
+================================================================================
+REMERCIEMENTS
+================================================================================
+
+Je tiens a remercier en premier lieu le cabinet Heymans Inc. pour m'avoir
+accueilli dans le cadre de ce stage et pour m'avoir confie un sujet aussi
+riche que la gestion prudentielle bancaire. Les echanges avec les consultants
+de l'entreprise ont ete determinants pour comprendre les besoins reels du
+terrain et construire une solution qui soit veritablement utile.
+
+Je remercie egalement mes encadrants pedagogiques pour leurs orientations et
+leurs conseils tout au long de la redaction de ce memoire.
+
+Mes remerciements vont aussi a tous ceux qui ont pris le temps de relire des
+parties de ce travail, de tester l'application ou de partager leurs remarques.
+
+Enfin, je remercie ma famille pour son soutien constant.
+
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+Remerciements
+Liste des abreviations
+Liste des figures
+Liste des tableaux
+Resume (francais et anglais)
+Introduction generale
+
+Chapitre 1 : Generalites, probleme, entreprise, existant et cahier des charges
+  1.1 Generalites sur le theme
+  1.2 Probleme pose
+  1.3 Objectif general
+  1.4 Objectifs specifiques
+  1.5 Presentation de l'entreprise
+  1.6 Etude de l'existant
+  1.7 Analyse de l'existant
+  1.8 Cahier des charges fonctionnel
+
+Chapitre 2 : Methodes, technologies et etat de l'art
+  2.1 Generalites sur les methodes
+  2.2 Justification de la methode retenue
+  2.3 Technologies utilisees et justification
+  2.4 Etat de l'art
+
+Chapitre 3 : Methode utilisee et conception de la solution
+  3.1 Methode retenue
+  3.2 Regles metier generales
+  3.3 Regles metier specifiques par zone
+  3.4 Regles de calcul
+  3.5 Exemples de calcul
+  3.6 Modelisation UML
+  3.7 Architecture de la solution
+
+Chapitre 4 : Realisation et resultats
+  4.1 Outils retenus et justification
+  4.2 Realisation de la solution (Difficultes rencontrees)
+  4.3 Resultats obtenus
+  4.4 Limites et perspectives
+
+Conclusion generale
+Bibliographie
+Table des matieres
+
+
+================================================================================
+LISTE DES ABREVIATIONS
+================================================================================
+
+- AT1    : Additional Tier 1
+- BEAC   : Banque des Etats de l'Afrique Centrale
+- BCEAO  : Banque Centrale des Etats de l'Afrique de l'Ouest
+- BRI    : Banque des Reglements Internationaux
+- CCF    : Credit Conversion Factor (facteur de conversion du hors bilan)
+- CEMAC  : Communaute Economique et Monetaire de l'Afrique Centrale
+- CRM    : Credit Risk Mitigation (technique de reduction du risque de credit)
+- EAD    : Exposure At Default (exposition en cas de defaut)
+- HQLA   : High Quality Liquid Assets (actifs liquides de haute qualite)
+- ICAAP  : Internal Capital Adequacy Assessment Process
+- LCR    : Liquidity Coverage Ratio
+- LGD    : Loss Given Default
+- LTV    : Loan To Value (ratio pret sur valeur du bien)
+- ORM    : Object-Relational Mapping (correspondance objet-relationnel)
+- UML    : Unified Modeling Language (langage de modelisation objet unifie)
+- NSFR   : Net Stable Funding Ratio
+- PD     : Probability of Default
+- REST   : Representational State Transfer
+- RO     : Risque Operationnel
+- RWA    : Risk-Weighted Assets (actifs ponderes par les risques)
+- UEMOA  : Union Economique et Monetaire Ouest Africaine
+- KRI    : Key Risk Indicator (indicateur cle de risque)
+- BIA    : Basic Indicator Approach (approche indicateur de base - risque operationnel)
+- PNB    : Produit Net Bancaire
+- VaR    : Value at Risk (perte potentielle maximale a un horizon et un
+  niveau de confiance donnes
+- AS     : Approche Standard (risque operationnel, par ligne metier)
+- AIB    : Approche Indicateur de Base (risque operationnel, dispositif UEMOA)
+- CRR3   : Capital Requirements Regulation 3 (dispositif prudentiel europeen
+  post-Bale III)
+- BIC    : Business Indicator Component (methode de calcul du risque
+  operationnel introduite par CRR3)
+- ILDC   : Interest, Lease and Dividends Component (composante du Business
+  Indicator
+
+
+================================================================================
+LISTE DES FIGURES
+================================================================================
+
+Figure 1  : Diagramme de classes de la base de donnees .................. Chap. 3
+Figure 2  : Diagramme de cas d'utilisation (credit + marche) ............. Chap. 3
+Figure 3  : Diagramme d'activite - calcul du RWA credit ................... Chap. 3
+
+
+================================================================================
+LISTE DES TABLEAUX
+================================================================================
+
+(aucun tableau comparatif : les choix de methode et de technologies sont
+justifies directement dans le texte, sans grille de notation - voir 1.7, 2.2
+et 4.1)
+
+
+================================================================================
+RESUME
+================================================================================
+
+Francais
+--------
+
+Ce memoire porte sur la conception et le developpement d'un outil tactique
+d'aide au pilotage des exigences en fonds propres dans les banques des zones
+UEMOA et CEMAC, selon les piliers 1 et 2 des accords de Bale II et III. Le
+point de depart est un constat : dans beaucoup d'etablissements, les calculs
+prudentiels reposent encore sur des tableurs disperses et des procedures
+manuelles, ce qui nuit a la fiabilite et a la traçabilite des resultats.
+
+Pour repondre a ce probleme, nous avons adopte une demarche de modelisation
+orientee objet en UML, en partant des textes prudentiels BCEAO pour identifier
+les objets metier, puis en structurant la base de donnees avant d'implementer
+les calculs. Les outils retenus sont Python 3, FastAPI, SQLite (avec une
+migration en cours vers l'ORM SQLAlchemy, module par module) et Flutter.
+
+Le resultat est une application desktop fonctionnelle qui couvre l'integralite
+des categories prudentielles UEMOA, calcule automatiquement l'EAD, la CRM, les
+RWA et le capital minimum, integre un module de risque operationnel (gestion
+des incidents, des KRI, de la cartographie des risques et des plans d'action)
+et un module de risque de marche (risque de taux, actions, change, VaR
+multi-methodes, stress testing et backtesting), produit des exports Excel et
+PDF, et permet l'import de donnees depuis des fichiers Excel et CSV.
+
+Mots-cles : Bale II, RWA, EAD, CRM, UEMOA, CEMAC, BCEAO, Python, FastAPI,
+Flutter, risque operationnel, risque de marche, VaR, KRI, pilotage prudentiel.
+
+
+English
+-------
+
+This thesis focuses on the design and development of a tactical tool to support
+the management of capital requirements in UEMOA and CEMAC zone banks, based on
+Pillars 1 and 2 of Basel II and III. The starting point is a practical
+observation: many institutions still rely on scattered spreadsheets and manual
+procedures to perform prudential calculations, which undermines reliability and
+traceability.
+
+To address this problem, we adopted a UML-driven object modelling approach,
+starting from BCEAO prudential texts to identify business objects, then
+structuring the database before implementing the calculation engine. The
+technologies chosen are Python 3, FastAPI, SQLite (with an ongoing module-by-
+module migration to the SQLAlchemy ORM) and Flutter.
+
+The result is a functional Windows desktop application that covers all UEMOA
+prudential categories, automatically calculates EAD, CRM, RWA and minimum
+capital, includes an operational risk management module (incident tracking,
+KRI monitoring, risk mapping, and action plans) and a market risk module
+(interest rate, equity and FX risk, multi-method VaR, stress testing and
+backtesting), produces Excel and PDF exports, and supports data import from
+Excel and CSV files.
+
+Keywords: Basel II, RWA, EAD, CRM, UEMOA, CEMAC, BCEAO, Python, FastAPI,
+Flutter, operational risk, market risk, VaR, KRI, prudential management.
+
+
+================================================================================
+INTRODUCTION GENERALE
+================================================================================
+
+Le secteur bancaire est soumis depuis plusieurs decennies a des exigences
+reglementaires de plus en plus precises. Au coeur de ces exigences se trouve
+une obligation fondamentale, disposer d'un niveau suffisant de fonds propres
+pour absorber les pertes potentielles liees aux risques pris. C'est precisement
+ce que mesurent les actifs ponderes par les risques, plus connus sous le sigle
+RWA, et c'est autour de ce calcul que s'articule tout le cadre des accords de
+Bale (le detail de ce mecanisme est presente en 1.1).
+
+Dans les zones UEMOA et CEMAC, les regulateurs BCEAO et BEAC ont progressivement
+adopte ces normes internationales, avec une adoption effective depuis le
+1er janvier 2018 pour la zone UEMOA. Les banques de ces zones doivent desormais
+mesurer leurs expositions, leur attribuer une ponderation reglementaire,
+calculer leurs RWA et s'assurer que leurs fonds propres couvrent au moins 8 %
+de ce montant, tout en respectant des regles propres a chaque zone.
+
+Dans la pratique, beaucoup d'etablissements effectuent encore ces calculs a
+l'aide de tableurs Excel, de fichiers heterogenes et de procedures manuelles.
+Cette situation engendre plusieurs problemes : les donnees sont dispersees,
+les formules sont difficiles a verifier, la traçabilite est insuffisante et
+les erreurs ne se detectent pas facilement. Face a ces limites, le besoin d'un
+outil logiciel structure, fiable et comprenant les specificites des zones UEMOA
+et CEMAC apparait clairement.
+
+C'est dans ce contexte que s'inscrit le present memoire. Le sujet peut se
+reformuler ainsi. Est-il possible de concevoir un outil logiciel capable
+d'aider les banques des zones UEMOA et CEMAC a calculer leurs exigences en
+fonds propres de maniere fiable, traçable et conforme aux regles prudentielles ?
+Cette question touche a la fois a la reglementation, au metier bancaire et au
+developpement logiciel.
+
+Pour y repondre, nous avons adopte une demarche en quatre etapes qui structure
+ce memoire. Le premier chapitre presente le contexte general, le probleme pose,
+les objectifs, l'entreprise d'accueil, l'etude de l'existant et le cahier des
+charges. Le deuxieme chapitre explore les methodes et technologies disponibles
+et justifie les choix retenus pour ce projet. Le troisieme chapitre decrit la
+methode de conception et la modelisation de la solution, en detaillant les
+regles metier, les calculs et l'architecture de l'application. Enfin, le
+quatrieme chapitre presente l'implementation, compare les outils utilises et
+evalue les resultats obtenus par rapport au cahier des charges initial.
+
+
+================================================================================
+CHAPITRE 1 : GENERALITES, PROBLEME, ENTREPRISE, EXISTANT ET CAHIER DES CHARGES
+================================================================================
+
+1.1 Generalites sur le theme
+------------------------------
+
+Pour bien comprendre le sujet de ce memoire, il faut d'abord clarifier quelques
+notions essentielles qui constituent le cadre conceptuel du projet.
+
+Un outil tactique est une solution pratique, legere et directement utilisable,
+qui repond a un besoin metier concret sans viser a remplacer un systeme
+d'information complet. Ici, l'outil est tactique au sens ou il peut etre installe
+sur un poste de travail standard, manipule par un analyste prudentiel, et produire
+des resultats immediatement exploitables. Ce n'est pas une plateforme bancaire
+industrielle, mais un support d'analyse et de verification, utile au quotidien.
+
+Le pilotage des exigences en fonds propres designe l'ensemble des actions qui
+permettent a une banque de suivre, comprendre et anticiper les besoins en capital
+lies a ses engagements. Les fonds propres jouent un role de coussin entre la
+banque et ses risques. Si une perte survient, ce sont eux qui l'absorbent avant
+que les creanciers ne soient touches. C'est pourquoi les regulateurs imposent un
+niveau minimum de fonds propres rapporte aux risques pris.
+
+Les accords de Bale ont structure ce cadre au niveau international, en trois
+etapes successives. Le dispositif de 1988, Bale I, avait pose un premier principe
+simple, les fonds propres doivent couvrir au moins 8 % des engagements ponderes.
+Ce dispositif etait toutefois trop uniforme et ne tenait pas compte de la
+diversite des risques. Le Comite de Bale a donc publie en juin 2006 un nouveau
+cadre, Bale II, articule en trois piliers. Le Pilier 1 fixe les exigences
+minimales de capital, le Pilier 2 organise la supervision interne et le dialogue
+avec le regulateur, et le Pilier 3 impose la transparence et la discipline de
+marche. Bale III a ensuite renforce certains aspects de ce dispositif, notamment
+les coussins de capital et les ratios de liquidite LCR et NSFR. C'est cette
+version consolidee du cadre, Bale II et III, qui sert de reference tout au long
+de ce memoire.
+
+Dans les zones UEMOA et CEMAC, ces normes ont ete adaptees par les regulateurs
+regionaux. La BCEAO, qui supervise les banques de l'espace UEMOA, a publie des
+instructions specifiques entrees en vigueur le 1er janvier 2018. Ces instructions
+definissent douze categories prudentielles, des ponderations propres a certaines
+expositions regionales, et des regles conditionnelles comme les traitements
+preferentiels liees au LTV pour l'immobilier. La BEAC, qui supervise la zone CEMAC,
+a suivi un processus similaire. Ce contexte reglementaire double justifie la
+necessite d'un outil qui separe clairement les deux zones, leurs categories et
+leurs regles de calcul.
+
+Les RWA (Risk-Weighted Assets) sont au centre de ce dispositif. Ils representent
+le montant total des expositions d'une banque, une fois ponderees par leur risque
+respectif. Une exposition a un Etat souverain de bonne notation sera ponderee
+a zero ou a un faible pourcentage, alors qu'une creance a risque eleve sera
+ponderee a 150 %. Le capital minimum est ensuite calcule comme 8 % du total
+des RWA. Comprendre ce mecanisme est indispensable pour comprendre ce que fait
+l'application developpee dans ce memoire.
+
+
+1.2 Probleme pose
+------------------
+
+La question centrale que pose ce memoire est la suivante. Comment les banques
+des zones UEMOA et CEMAC peuvent-elles fiabiliser leurs calculs prudentiels et
+produire des resultats justifiables, alors que ces calculs impliquent des dizaines
+de categories, des conditions reglementaires complexes et des donnees dispersees ?
+
+Dans les organisations que nous avons observees, le traitement des calculs
+prudentiels repose souvent sur des tableurs Excel developpes en interne. Ces
+tableurs peuvent fonctionner correctement dans les cas simples, mais ils montrent
+vite leurs limites des que le portefeuille grossit ou que les regles se complexifient.
+Les formules ne sont pas toujours documentees, les mises a jour manuelles
+introduisent des incoherences, et il devient difficile de verifier si une
+modification dans un fichier a ete correctement repercutee ailleurs.
+
+A cela s'ajoute la specificite des zones UEMOA et CEMAC. Il ne s'agit pas
+seulement d'appliquer les regles generiques de Bale II, il faut aussi connaitre
+les categories prudentielles BCEAO, les cas preferentiels pour les expositions
+souveraines UEMOA, les criteres LTV specifiques et les traitements particuliers
+des BMD ou des organismes publics. Ce niveau de detail rend la gestion manuelle
+encore plus delicate.
+
+Le probleme que ce memoire cherche a resoudre est donc celui de la conception
+d'un outil capable de centraliser ces calculs, de les rendre reproductibles et
+verificables, tout en restant suffisamment simple pour etre utilise par un
+analyste prudentiel sans formation informatique avancee.
+
+
+1.3 Objectif general
+---------------------
+
+L'objectif general de ce projet est de concevoir et de developper une application
+de pilotage prudentiel qui permette de calculer et de suivre les exigences en
+fonds propres dans les banques des zones UEMOA et CEMAC, conformement aux
+piliers 1 et 2 des accords de Bale II et III.
+
+
+1.4 Objectifs specifiques
+--------------------------
+
+Pour atteindre cet objectif, nous avons identifie les cibles suivantes :
+
+- Modeliser entierement la zone reglementaire UEMOA avec ses douze categories
+  prudentielles, ses ponderations et ses regles de calcul specifiques, y compris
+  les conditions hypothecaires basees sur le LTV.
+- Preparer la structure d'accueil pour la zone CEMAC afin de faciliter son
+  implementation complete dans une version ulterieure.
+- Gerer les contreparties, leurs categories prudentielles et leurs notations.
+- Calculer automatiquement l'EAD en integrant les montants au bilan et les
+  engagements hors bilan convertis par le CCF.
+- Gerer la CRM financee (collateral avec decotes) et la CRM non financee
+  (garantie d'un tiers) dans le respect des regles Bale II.
+- Calculer les RWA et les exigences minimales en capital (8 % des RWA).
+- Permettre l'import de donnees depuis des fichiers CSV et Excel.
+- Produire des reportings exportables en Excel et PDF.
+- Gerer le risque operationnel selon trois methodologies paralleles :
+  l'Approche Indicateur de Base (AIB, art. 301), l'Approche Standard par ligne
+  metier (AS, art. 305-311), et, a titre de pilotage interne uniquement, la
+  methode Business Indicator Component du dispositif europeen CRR3 (BIC,
+  art. 315-321), afin d'anticiper une evolution future du referentiel UEMOA.
+  Le module couvre aussi le suivi des incidents de perte, la cartographie des
+  risques, les indicateurs cles de risque (KRI), les plans d'action correctifs,
+  une synthese comparative des trois methodes et un panneau de decision de
+  pilotage qui agrege ces signaux en un verdict argumente.
+- Gerer le risque de marche selon l'approche standard UEMOA/BCEAO :
+  risque de taux (duration, sensibilite, convexite), risque actions et risque
+  de change (charges specifique et generale a 9 %), calcul de la VaR (methodes
+  historique, parametrique et Monte-Carlo), stress testing et backtesting du
+  modele.
+
+
+1.5 Presentation de l'entreprise
+---------------------------------
+
+Heymans Inc. est un cabinet international de formation executive, de conseil
+strategique et d'innovation financiere, present dans les zones UEMOA et CEMAC.
+Il accompagne principalement des banques, des assurances et des acteurs du
+marche financier dans leur transformation et leur mise en conformite.
+
+Le cabinet travaille avec des etablissements qui ont des besoins croissants en
+termes d'outils d'aide a la decision prudentielle. Dans ce contexte, le projet
+developpe dans ce memoire repond a un besoin reel, fournir un outil structure
+qui permet de calculer les RWA, verifier les exigences en capital et produire
+des restitutions claires et professionnelles.
+
+Ce qui est important pour comprendre le projet, c'est que Heymans Inc. evolue
+dans un contexte de conseil et d'accompagnement. L'outil developpe doit donc
+non seulement calculer correctement, mais aussi presenter les resultats de
+facon lisible et explicable, de maniere a ce qu'un interlocuteur bancaire puisse
+comprendre l'origine de chaque indicateur. Cette exigence de lisibilite a guide
+plusieurs choix de conception.
+
+
+1.6 Etude de l'existant
+------------------------
+
+Avant la conception de la solution, il etait important de regarder comment les
+organisations traitent actuellement ce type de probleme. Deux situations coexistent
+en pratique.
+
+La premiere situation, la plus courante dans les etablissements de taille moyenne
+ou les cabinets de conseil, est le recours aux tableurs. Les analystes construisent
+des fichiers Excel avec des onglets pour chaque type d'exposition, des formules
+en dur et des tableaux de synthese. Cette approche est flexible et ne necessite
+aucune infrastructure informatique. Un tableur bien construit peut meme gerer
+des cas prudentiels assez complexes si son auteur connait bien les regles. Le
+probleme, c'est que cette connaissance reste souvent dans la tete d'une seule
+personne. Si elle part, le fichier devient illisible. Si le portefeuille grossit,
+le fichier ralentit. Si la reglementation change, toutes les formules doivent
+etre modifiees une par une.
+
+La deuxieme situation concerne les outils plus structures, qu'il s'agisse de
+solutions internes developpees par des equipes IT, ou de plateformes
+commerciales de reporting prudentiel. Des editeurs comme Axiom SL, FIS ou
+Wolters Kluwer proposent des suites qui integrent directement les regles de
+Bale et se connectent au systeme d'information de la banque. Ce sont de bons
+outils, mais ils sont conçus pour des etablissements europeens ou nord-
+americains, avec des cycles de deploiement qui se comptent en mois et des
+couts de licence hors de portee d'un cabinet de conseil comme Heymans Inc.
+Surtout, aucun d'entre eux ne connait nativement les douze categories
+prudentielles BCEAO ni les cas particuliers des zones UEMOA et CEMAC (la
+ponderation zero pour les Etats UEMOA en FCFA, le LTV specifique a
+l'immobilier, la liste des BMD reconnues) : il faudrait les parametrer
+lourdement, ce qui annule une bonne partie de leur interet pour un usage
+tactique et ponctuel.
+
+Il n'existe pas, a notre connaissance, d'outil libre ou accessible qui couvre
+specifiquement les categories prudentielles BCEAO et les regles propres aux
+zones UEMOA et CEMAC de maniere integree. C'est cet espace que le present
+projet cherche a occuper : pas en concurrençant Axiom SL ou FIS sur leur
+terrain, mais en offrant quelque chose qu'ils ne proposent pas, un outil leger,
+directement aligne sur le referentiel BCEAO, installable sur un poste de
+travail sans mettre en place tout un projet d'integration.
+
+
+1.7 Analyse de l'existant
+--------------------------
+
+Ce que montre cette etude de l'existant peut se resumer simplement. Les
+tableurs Excel se mettent en place rapidement et ne coûtent rien, mais ils
+dependent d'une seule personne qui en connait les formules, ralentissent des
+que le portefeuille grossit, et deviennent difficiles a verifier des que la
+reglementation change. Les outils internes developpes sur mesure par une
+equipe IT peuvent corriger une partie de ces defauts, mais seulement si la
+conception est prise au serieux des le depart ; sinon, ils reproduisent les
+memes problemes de traçabilite sous une forme juste plus difficile a
+inspecter. Les plateformes commerciales comme celles citees plus haut sont
+robustes et conformes, mais leur cout et leur lourdeur de deploiement les
+reservent a de grands etablissements deja dotes d'une infrastructure IT, pas
+a un usage tactique et ponctuel.
+
+Notre outil se situe dans la case laissee vide par ces trois options : un
+outil interne, mais conçu avec la meme rigueur de modelisation qu'une
+plateforme commerciale, et centre des le depart sur le referentiel BCEAO
+plutot que sur un cadre reglementaire generique a parametrer ensuite.
+
+Cette analyse fait aussi ressortir que le probleme n'est pas seulement un
+probleme d'automatisation, mais un probleme de normalisation des donnees.
+Remplacer un tableur par un script qui refait les memes calculs sans structure
+de donnees stable ne fait que deplacer le probleme ; c'est pour cette raison
+que la modelisation UML et le schema relationnel (developpes au chapitre 3)
+ont ete traites comme le vrai point de depart du projet, avant meme d'ecrire
+la premiere ligne de calcul.
+
+
+1.8 Cahier des charges fonctionnel
+------------------------------------
+
+Sur la base de ce qui precede, nous avons defini les exigences fonctionnelles
+suivantes pour la solution a developper :
+
+1. Gerer entierement la zone reglementaire UEMOA avec toutes ses regles
+   prudentielles (douze categories, ponderations, cas conditionnels).
+2. Preparer la structure d'accueil pour la zone CEMAC.
+3. Gerer les contreparties, leurs categories d'exposition et leurs notations.
+4. Calculer l'EAD en integrant les expositions au bilan et les engagements
+   hors bilan convertis par le CCF.
+5. Calculer la CRM reconnue (financee par la methode de la valeur ajustee,
+   non financee par la methode de la ponderation du garant).
+6. Calculer les RWA et les exigences minimales en capital (8 % des RWA).
+7. Permettre l'import de donnees depuis des fichiers CSV et Excel.
+8. Produire des reportings exportables en Excel et PDF.
+9. Afficher de facon transparente les etapes intermediaires du calcul pour
+   faciliter la verification et l'audit.
+10. Implementer le module de risque operationnel : saisie et suivi des
+    incidents de perte, definition et mesure des KRI, cartographie des risques
+    (probabilite x impact), suivi des controles de conformite, plans d'action
+    et journal d'audit, conformement aux exigences du Pilier 2 de Bale II.
+    Calculer la charge en capital selon l'AIB (art. 301) et l'AS par ligne
+    metier (art. 305-311), calculer a titre de comparaison interne la methode
+    CRR3/BIC (art. 315-321), produire une synthese comparative des trois
+    methodes et un panneau de decision de pilotage qui escalade
+    automatiquement vers l'organe competent (interne, direction, conseil
+    d'administration) selon les seuils du Pilier 2.
+11. Implementer le module de risque de marche selon l'approche standard
+    UEMOA/BCEAO (instruction n°026-11-2016) : risque de taux, risque actions,
+    risque de change, VaR multi-methodes, stress testing reglementaire et
+    backtesting du modele avec zones de validation Bale II/III.
+
+
+================================================================================
+CHAPITRE 2 : METHODES, TECHNOLOGIES ET ETAT DE L'ART
+================================================================================
+
+2.1 Generalites sur les methodes
+-----------------------------------
+
+Quand on conçoit une application metier, on peut partir de deux extremes.
+Soit on commence par coder sans vraiment modeliser, soit on passe beaucoup de
+temps a concevoir avant d'ecrire la moindre ligne de code. La realite d'un
+projet comme celui-ci se trouve entre les deux. Il faut une methode assez
+rigoureuse pour garantir la coherence de la base de donnees et des calculs,
+mais suffisamment pragmatique pour produire une application fonctionnelle dans
+un delai raisonnable.
+
+Notre approche a combine deux logiques. La premiere est la modelisation
+orientee objet en UML, un langage de modelisation qui part des objets metier
+identifies dans les textes reglementaires pour construire progressivement les
+diagrammes de classes, de cas d'utilisation et d'activite, puis en deriver le
+schema de donnees relationnel. La deuxieme est le developpement incremental.
+On construit d'abord les fondations (base de donnees, regles de calcul), puis
+on ajoute les couches superieures (API, interface) en testant regulierement la
+conformite des resultats avec les regles prudentielles.
+
+
+2.2 Justification de la methode retenue
+--------------------------------------------------------------
+
+Plusieurs approches de developpement pouvaient etre envisagees pour ce
+projet. Plutot que de les noter sur une grille de criteres abstraits, ce qui
+donnerait une impression de rigueur sans vraiment trancher, il est plus
+honnete d'expliquer directement pourquoi l'application modulaire a ete
+retenue et pourquoi les trois autres options ont ete ecartees.
+
+L'approche par tableur evolue consiste a pousser Excel dans ses derniers
+retranchements (macros VBA, tableaux de reference, formules imbriquees). Cette
+solution a pour avantage d'etre tres rapide a mettre en place et d'etre
+familiere aux analystes. Mais elle presente des risques importants de coherence
+des donnees et ne supporte pas bien la montee en complexite des regles
+prudentielles. Nous l'avons ecartee assez rapidement.
+
+L'approche par outil interne ad hoc, c'est-a-dire developper un script ou une
+application simple sans architecture formalisee, permet d'aller un peu plus loin
+que le tableur. Mais sans modelisation rigoureuse des donnees, on risque de
+reproduire sous forme logicielle les memes problemes que dans les tableurs,
+duplication des regles, incoherences entre modules, difficulte de maintenance.
+
+L'approche par application modulaire est celle que nous avons retenue. Elle
+demande plus de travail en amont (modelisation, schema de base de donnees,
+architecture en couches), mais elle garantit une coherence durable et une
+evolutivite reelle. Dans un domaine comme la prudence bancaire, ou les regles
+evoluent et ou la confiance dans les chiffres est critique, cette rigueur
+initiale est pleinement justifiee.
+
+L'approche par plateforme ERP ou solution industrielle aurait fourni un outil
+tres robuste, mais avec un cout et une complexite de deploiement incompatibles
+avec le contexte tactique de Heymans Inc.
+
+
+2.3 Technologies utilisees et justification
+---------------------------------------------
+
+L'architecture retenue est de type client-serveur, avec une separation nette
+entre le frontend (interface utilisateur) et le backend (moteur de calcul et
+persistance).
+
+Pour le backend, Python 3 s'est impose naturellement. C'est un langage que je
+maîtrise, tres lisible pour des regles metier complexes, et tres bien adapte
+au calcul financier. Dans un domaine ou la lisibilite du code est aussi
+importante que sa correction (pour pouvoir verifier la conformite des calculs
+aux textes prudentiels), Python presente un avantage reel par rapport a des
+langages plus verbeux comme Java ou C#.
+
+FastAPI a ete choisi comme framework web pour le backend. Ce choix s'est impose
+pour trois raisons :
+
+- la validation automatique des donnees par Pydantic garantit qu'aucune valeur
+  incoherente n'atteint le moteur de calcul ;
+- la documentation interactive generee automatiquement facilite les tests ;
+- les performances asynchrones conviennent bien a une API dont les routes
+  peuvent realiser plusieurs jointures SQL en un seul appel.
+
+Pour la base de donnees, SQLite a ete retenu. Cette decision peut surprendre,
+mais elle est parfaitement adaptee au contexte, puisque c'est un outil monoposte
+et que SQLite permet un deploiement sans infrastructure serveur. La
+persistance est en cours de migration vers SQLAlchemy, un ORM tiers qui mappe
+chaque table sur une classe Python declarative. Cette migration se fait
+module par module plutot qu'en un seul bloc : le module des referentiels
+prudentiels a servi de pilote et est entierement porte sur SQLAlchemy, tandis
+que les modules plus volumineux (expositions, CRM, hors bilan, risque
+operationnel) reposent encore sur le pattern Repository ecrit a la main,
+au-dessus du module sqlite3, en attendant d'etre migres selon le meme
+gabarit. La requete qui reconstitue une exposition complete (avec sa
+contrepartie, sa sous-table de type et ses donnees CRM) mobilise une
+quinzaine de jointures ; qu'elle soit exprimee en SQL direct ou via des
+relations ORM, l'objectif reste le meme, garder ce calcul lisible et sous
+controle plutot que de le deleguer a un ORM generique sans lui donner le
+temps d'etre valide module par module.
+
+Pour le frontend, Flutter a ete retenu. Ce framework permet de produire une
+application native Windows a partir d'un seul projet. Son environnement de
+developpement est confortable et l'interface produite est fluide et moderne.
+Le frontend communique avec le backend via des appels HTTP REST, ce qui maintient
+une separation claire des responsabilites.
+
+Enfin, openpyxl gere la production des exports Excel, ce qui est important dans
+un environnement bancaire ou Excel reste l'outil de reference pour l'analyse
+des donnees.
+
+
+2.4 Etat de l'art
+------------------
+
+Les travaux anterieurs sur la gestion prudentielle automatisee se sont
+principalement concentres sur deux types de solutions. D'un cote, les editeurs
+de logiciels bancaires (Axiom SL, FIS, Wolters Kluwer) proposent des plateformes
+integrees qui couvrent l'ensemble des calculs Bale. De l'autre, des equipes
+de recherche ou des etablissements ont publie des implementations partielles
+pour des besoins specifiques, souvent sous forme de scripts ou de modeles
+de simulation.
+
+Ce qui distingue le present projet, c'est son ciblage explicite sur les zones
+UEMOA et CEMAC. La plupart des solutions existantes sont conçues pour les
+regulateurs europeens (EBA) ou americains (Federal Reserve), et leurs baremes
+de ponderation ne correspondent pas aux instructions specifiques de la BCEAO.
+La ponderation preferentielle zero pour les Etats UEMOA libelles en FCFA, les
+criteres LTV particuliers, la liste des BMD reconnues par la BCEAO ou les
+categories prudentielles locales ne font pas partie des reglages standards de
+ces plateformes.
+
+Du point de vue methodologique, plusieurs auteurs ont souligne l'importance de
+separer strictement la couche de calcul de la couche de presentation dans les
+outils de risque (voir notamment les recommandations du Comite de Bale sur la
+gouvernance des modeles de risque). Notre architecture, qui centralise tous les
+calculs dans un service Python independant de l'interface, s'inscrit dans cette
+logique.
+
+L'etat de l'art confirme donc que si les outils generaux existent, il y a un
+vrai besoin pour des solutions specifiques aux zones africaines sub-sahariennes,
+legeres, deployables sur poste de travail et integrant les regles reglementaires
+locales.
+
+
+================================================================================
+CHAPITRE 3 : METHODE UTILISEE ET CONCEPTION DE LA SOLUTION
+================================================================================
+
+3.1 Methode retenue
+--------------------
+
+La conception de la solution a suivi cinq etapes principales que nous avons
+voulu garder dans cet ordre, car chaque etape cree les fondations de la suivante.
+
+La premiere etape a consiste a identifier les objets metier en lisant directement
+les textes prudentiels BCEAO. Cette lecture m'a permis de comprendre quelles
+entites ont un sens dans le domaine (une contrepartie, une exposition, un
+collateral, un engagement hors bilan) et quelles relations existent entre elles.
+
+La deuxieme etape a traduit le diagramme de classes UML en schema de base de
+donnees, en appliquant les formes normales du modele relationnel pour eviter
+les redondances et garantir la coherence.
+
+La troisieme etape a centralise tous les calculs dans un service Python unique,
+ce qui garantit que la meme formule est appliquee a chaque exposition, quelle
+que soit sa source (saisie manuelle, import Excel ou CSV).
+
+La quatrieme etape a mis en place le systeme de migrations versionnes pour faire
+evoluer le schema sans perdre les donnees existantes.
+
+La cinquieme etape a integre les imports, le reporting et la documentation.
+
+
+3.2 Regles metier generales
+-----------------------------
+
+Avant de detailler les regles specifiques a chaque zone, il est utile de rappeler
+les principes generaux qui s'appliquent a toutes les expositions.
+
+Le facteur de conversion du hors bilan (CCF) est applique au montant nominal
+de l'engagement pour obtenir son equivalent en exposition au bilan. Une CRM
+n'est reconnue que si le type de garantie est renseigne et si la garantie est
+eligible selon les criteres reglementaires. Toute exposition classee en
+souffrance ou a risque eleve reçoit automatiquement une ponderation de 150 %.
+Lors de l'import depuis un fichier externe, la categorie prudentielle de chaque
+ligne doit exister dans la zone active et le type de contrepartie doit etre
+compatible avant que l'enregistrement ne soit accepte.
+
+
+3.3 Regles metier specifiques par zone
+----------------------------------------
+
+La zone UEMOA dispose de douze categories prudentielles officielles definies par
+la BCEAO. Chaque exposition doit etre classee dans l'une de ces categories, ce
+qui determine le processus de calcul de la ponderation applicable.
+
+En UEMOA, les douze categories prudentielles BCEAO sont les suivantes :
+
+- (a) Souverains : Etats et banques centrales.
+- (b) Organismes publics hors administrations centrales : entites du secteur
+  public non etatiques.
+- (c) Banques multilaterales de developpement (BMD) : institutions telles que
+  la BIRD, la SFI, la BAsD, la BAD, la BERD et la BEI.
+- (d) Banques et institutions financieres : etablissements de credit et
+  institutions equivalentes.
+- (e) Entreprises : personnes morales du secteur prive non incluses dans
+  les autres categories.
+- (f) Clientele de detail : particuliers et petites structures eligibles au
+  traitement de detail selon les criteres de seuil BCEAO.
+- (g) Prets garantis par l'immobilier residentiel : expositions beneficiant
+  d'une surete hypothecaire sur bien residentiel, avec condition de LTV.
+- (h) Prets garantis par l'immobilier commercial : expositions avec surete
+  hypothecaire sur bien commercial, avec condition de LTV.
+- (i) Creances en souffrance : expositions en defaut, ponderation de 150 %
+  sauf si les provisions constituees atteignent au moins 20 %.
+- (j) Creances a risque eleve : expositions presentant un risque particulier,
+  ponderation fixe de 150 %.
+- (k) Autres actifs : actifs ne relevant pas des categories precedentes,
+  dont les immobilisations, les participations et les encaisses.
+- (l) Hors bilan : engagements hors bilan traites par application du CCF
+  pour la conversion en equivalent bilan.
+
+Parmi ces categories, plusieurs impliquent des regles conditionnelles. Pour
+l'immobilier residentiel (categorie g), la ponderation preferentielle de 35 %
+s'applique uniquement si le LTV est inferieur ou egal a 90 % et si le ratio
+charge sur revenu est inferieur ou egal a 40 %. Pour l'immobilier commercial
+(categorie h), la ponderation preferentielle de 75 % s'applique si le LTV est
+inferieur ou egal a 90 %. Ces conditions sont importantes. Si elles ne sont pas
+remplies, la ponderation est celle de la categorie entreprises, soit 100 %.
+
+Les expositions souveraines (categorie a) beneficient d'un traitement particulier
+selon la notation OCE du pays et selon les criteres BCEAO. Un Etat membre de
+l'UEMOA dont la dette est liberee en FCFA beneficie de la ponderation zero.
+
+Les expositions envers les BMD (categorie c) suivent une hierarchie de criteres :
+haute qualite, cas UEMOA libelle en FCFA, criteres prudentiels specifiques, et
+appartenance a la liste des institutions reconnues par la BCEAO.
+
+La zone CEMAC est presente dans la structure de l'application (tables, routes,
+modules), mais ses regles metier specifiques seront implementees dans une version
+ulterieure.
+
+En ce qui concerne le risque operationnel, les regles retenues s'appuient sur
+les exigences du Pilier 2 de Bale II. Le module couvre plusieurs dimensions
+complementaires. La saisie et le suivi des incidents de perte permettent de
+constituer une base de donnees historique des evenements defavorables, en les
+classant par ligne metier (banque de detail, financement d'entreprises, etc.)
+et par type d'evenement (fraude interne, fraude externe, dysfonctionnement des
+systemes, etc.). Pour chaque incident, la perte brute, la perte recuperee et la
+cause racine sont enregistrees.
+
+Les indicateurs cles de risque (KRI) constituent une couche de surveillance
+prospective. Huit KRI sont pre-configures dans l'outil, parmi lesquels le taux
+de turnover du personnel, le taux d'absenteisme, le nombre d'incidents
+informatiques, le delai moyen de resolution ou le taux d'erreurs de traitement.
+Chaque KRI dispose d'un seuil d'alerte et d'un seuil critique. Lorsqu'une
+valeur mesurement depasse un seuil, l'analyste en est notifie.
+
+La cartographie des risques repose sur une matrice probabilite-impact (echelle
+de 1 a 5 sur chaque axe). Le score residuel tient compte de l'efficacite des
+controles existants, ce qui permet de distinguer le risque brut du risque net.
+Les controles internes sont documentes avec leur frequence et le resultat du
+dernier test, et les plans d'action correctifs ou preventifs sont lies aux
+incidents et aux non-conformites detectes. Enfin, un journal d'audit trace toutes
+les operations du module pour garantir la traçabilite reglementaire.
+
+Le calcul de la charge en capital pour risque operationnel ne repose pas
+sur une seule methode mais sur trois, avec un statut reglementaire different
+pour chacune. L'AIB (Approche Indicateur de Base, art. 301 du dispositif
+UEMOA) et l'AS (Approche Standard par ligne metier, art. 305-311) sont les
+deux methodes que la BCEAO autorise effectivement, l'AS necessitant une
+autorisation prealable et explicite de l'etablissement. La troisieme methode,
+la BIC (Business Indicator Component), est celle du dispositif europeen CRR3
+(art. 315-321) : elle n'est pas exigee par la BCEAO aujourd'hui, mais l'outil
+la calcule a titre de pilotage interne, pour anticiper une eventuelle
+convergence future du referentiel UEMOA vers les standards de Bale III deja
+appliques en Europe. Une synthese comparative rapproche les trois resultats,
+et un panneau de decision agrege ces signaux, avec ceux des incidents, des
+KRI et des controles, en un verdict de pilotage (Maitrise, Sous surveillance,
+Vigilance renforcee ou Critique) qui determine automatiquement l'organe a
+informer, du niveau interne jusqu'au conseil d'administration selon les
+seuils de reporting du Pilier 2.
+
+Pour le risque de marche, les regles retenues suivent l'approche standard
+du dispositif prudentiel UMOA (Titre VI, articles 316 a 442) et l'instruction
+BCEAO n°026-11-2016. Trois sous-risques sont couverts. Le risque de taux
+s'applique aux titres obligataires du portefeuille et combine une charge
+specifique et une charge generale (Art. 349-394). Le risque actions applique
+une charge specifique de 9 % par emetteur et une charge generale de 9 % par
+marche (Art. 398-401). Le risque de change applique une charge de 9 % sur la
+position nette globale de change, definie comme le maximum entre la somme des
+positions longues et la somme des positions courtes (Art. 416-417). Ces trois
+charges s'additionnent pour former l'exigence de fonds propres au titre du
+risque de marche, convertie en RWA marche.
+
+A cote de cette approche standard reglementaire, l'outil calcule egalement
+une Value at Risk (VaR) par trois methodes independantes, la methode
+historique (a partir des variations de valeur observees), la methode
+parametrique (a partir de la volatilite annualisee et de la duration du
+portefeuille) et la methode Monte-Carlo (10 000 simulations). Chaque methode
+est evaluee a plusieurs niveaux de confiance (95 % et 99 %) et sur plusieurs
+horizons (1 et 10 jours), ce qui permet de comparer les trois approches sur un
+meme portefeuille plutot que d'en imposer une seule.
+
+Le modele de VaR est ensuite valide par backtesting, selon l'approche zones
+de Bale II/III : le nombre de depassements (jours ou la perte reelle excede la
+VaR predite) est compare a des seuils qui dependent de la taille de la
+fenetre d'observation. Sur une fenetre de 250 jours a 99 % de confiance, une
+zone verte (modele valide) correspond a 4 depassements ou moins, une zone
+orange (surveillance renforcee) a 5 a 9 depassements, et une zone rouge
+(modele invalide) a 10 depassements ou plus ; les seuils sont ajustes pour
+des fenetres de 500 jours et au-dela. Huit scenarios de stress testing
+reglementaires completent le dispositif, en mesurant l'impact d'un choc de
+marche sur le portefeuille, sur l'exigence de capital et sur le ratio de
+solvabilite apres choc. Chaque calcul, du plus simple au plus complexe, est
+trace dans un journal de calcul horodate, ce qui permet a un auditeur de
+retracer une valeur affichee jusqu'a sa formule d'origine.
+
+
+3.4 Regles de calcul
+----------------------
+
+Les formules de calcul appliquees par l'application sont directement issues du
+cadre Bale II standardise et des instructions BCEAO.
+
+L'EAD (Exposure at Default) se calcule de la facon suivante :
+EAD = montant_bilan + (montant_hors_bilan x CCF)
+
+La CRM financee est calculee par la methode de la valeur ajustee. Cette methode,
+definie dans le Pilier 1 de Bale II, ajuste a la fois la valeur de l'exposition
+et la valeur du collateral par des decotes qui refletent la volatilite potentielle
+des deux grandeurs. Les deux grandeurs intermediaires sont :
+
+- EVA (valeur ajustee de l'exposition) = EAD x (1 + He), ou He est la decote
+  appliquee a l'exposition.
+- CVA (valeur ajustee du collateral) = C x (1 - Hc - Hfx), ou C est la valeur
+  du collateral, Hc est la decote propre a l'actif donne en garantie et Hfx
+  est la decote de risque de change lorsque l'exposition et la garantie ne
+  sont pas libellees dans la meme devise.
+
+La CRM reconnue est alors : E* = max(0, EVA - CVA). Ce resultat represente
+l'exposition residuelle apres prise en compte de la garantie. Pour les paniers
+de surete (OPCVM, fonds d'investissement), la plus forte decote applicable
+parmi les actifs eligibles composant le panier est retenue, conformement aux
+regles Bale II.
+
+La CRM non financee est traitee par la methode de la ponderation du garant.
+La ponderation du garant se substitue a celle de l'emprunteur pour la fraction
+couverte de l'exposition. Le taux de couverture de la garantie determine quelle
+proportion de l'EAD beneficie de cette substitution.
+
+Une fois la CRM calculee, l'exposition nette est : EAD_net = EAD - CRM_reconnue.
+Le RWA est ensuite obtenu par : RWA = EAD_net x ponderation.
+Le capital minimum est enfin : Capital = RWA x 8 %.
+
+Pour le risque operationnel, l'approche retenue est l'approche indicateur de
+base (BIA), qui est la methode la plus accessible parmi celles proposees par
+Bale II. Son principe est simple, la charge en capital pour le risque
+operationnel est proportionnelle au produit net bancaire (PNB) moyen des trois
+dernieres annees, avec un coefficient reglementaire de 15 % :
+
+Capital_RO = PNB_moyen_3ans x 15 %
+
+Le PNB retenu dans ce calcul est la moyenne des PNB annuels positifs. Les
+annees ou le PNB est negatif ou nul sont exclues du calcul de la moyenne.
+Le PNB lui-meme est defini comme la somme des revenus nets d'interets et
+des revenus nets hors interets. C'est l'indicateur choisi par Bale II pour
+approximer le volume d'activite et le profil de risque d'un etablissement.
+
+L'AS (Approche Standard) reprend le meme principe mais ligne metier par
+ligne metier, avec un coefficient beta propre a chacune (12 %, 15 % ou 18 %
+selon la ligne) :
+
+K_AS = somme_lignes_metier (PNB_ligne x beta_ligne)
+
+La BIC (Business Indicator Component, CRR3 art. 315-321) est plus fine encore
+: elle decompose l'activite en trois composantes calculees sur la moyenne
+des trois derniers exercices.
+
+ILDC = min(|interets_percus - interets_verses|, actifs_generateurs x seuil)
+     + dividendes_percus
+SC   = max(autres_produits, autres_charges) + max(commissions_percues, commissions_versees)
+FC   = |resultat_portefeuille_negociation| + |resultat_portefeuille_bancaire|
+BI   = ILDC + SC + FC
+
+Le BI (Business Indicator) est ensuite decoupe en trois tranches, chacune
+ponderee par un coefficient marginal croissant (le coefficient le plus eleve
+ne s'applique qu'a la fraction du BI qui depasse le seuil de la tranche
+precedente) :
+
+BIC = tranche1 x coef1 + tranche2 x coef2 + tranche3 x coef3
+Capital_RO_CRR3 = BIC
+
+Dans l'outil, ce dernier resultat n'est pas utilise comme exigence
+reglementaire UEMOA, seulement compare a l'AIB pour mesurer l'ecart entre les
+deux referentiels.
+
+Une fois le capital retenu (AIB ou AS selon l'autorisation BCEAO) calcule, il
+vient s'ajouter au capital exige pour le risque de credit :
+Capital_total = Capital_risque_credit + Capital_risque_operationnel
+
+Pour le risque de marche, chaque sous-risque a sa propre formule de charge
+en capital, avant addition.
+
+Risque de taux (par ligne obligataire) :
+Duration_modifiee = Duration_Macaulay / (1 + taux_actuariel)
+Sensibilite = -Duration_modifiee x Variation_taux
+Convexite = terme correcteur du second ordre, ajoute a la sensibilite pour
+les chocs de taux importants.
+
+Risque actions et risque de change (par portefeuille) :
+Charge_actions = 9% x somme(|position nette par emetteur|)
+               + 9% x somme(|position nette par marche|)
+Charge_change = 9% x max(somme positions longues, somme positions courtes)
+
+Exigence totale au titre du risque de marche :
+Capital_marche = Charge_taux + Charge_actions + Charge_change
+RWA_marche = Capital_marche / 8%
+
+Cette exigence s'ajoute a son tour aux deux precedentes :
+Capital_total = Capital_risque_credit + Capital_risque_operationnel
+              + Capital_risque_marche
+
+La VaR, elle, n'entre pas dans ce total reglementaire : c'est un indicateur
+de pilotage interne, calcule en parallele pour eclairer la decision, mais qui
+ne remplace pas l'approche standard exigee par la BCEAO.
+
+
+3.5 Exemples de calcul
+-----------------------
+
+Pour illustrer ces regles de calcul, voici quatre exemples concrets tires des
+scenarii que nous avons utilises pour tester et valider l'application.
+
+Exemple 1 - Exposition entreprise standard :
+
+Une entreprise doit 100 000 000 au bilan. Elle a egalement une ligne de credit
+non tiree de 20 000 000, avec un CCF de 50 %. L'EAD est donc de 100 000 000 +
+(20 000 000 x 50 %) = 110 000 000. Une garantie financiere de 30 000 000 est
+accordee, avec une decote totale de 20 %. La CRM reconnue est de 30 000 000 x
+(1 - 0,20) = 24 000 000. L'exposition nette est de 86 000 000. Avec une
+ponderation entreprise standard de 100 %, le RWA est de 86 000 000 et le
+capital minimum est de 6 880 000. Cet exemple illustre bien la chaine complete
+du calcul, de l'engagement brut au besoin en capital.
+
+Exemple 2 - Immobilier residentiel UEMOA :
+
+Un credit immobilier residentiel de 90 000 000, garanti par un bien evalue a
+120 000 000. Le LTV est de 75 %, le ratio charge sur revenu est de 30 %. Les
+deux conditions UEMOA sont remplies, donc la ponderation preferentielle de 35 %
+s'applique. Le RWA est de 31 500 000, ce qui est bien inferieur aux 90 000 000
+qu'on obtiendrait avec une ponderation standard de 100 %. Cet exemple montre
+l'importance des conditions LTV. Si le bien avait ete evalue a 95 000 000
+(LTV de 95 %), la ponderation preferentielle ne s'appliquerait plus.
+
+Exemple 3 - CRM financee avec panier de surete :
+
+Une exposition est garantie par un panier de titres eligibles dont la plus forte
+decote individuelle est de 15 %. La decote He est nulle, la decote Hc est de
+15 % et la decote de change Hfx est nulle car les devises coincident. Si l'EAD
+est de 50 000 000 et la valeur du collateral est de 60 000 000, alors EVA = 50 000 000
+et CVA = 60 000 000 x (1 - 0,15) = 51 000 000. La CRM reconnue est de max(0,
+50 000 000 - 51 000 000) = 0. Dans ce cas, le collateral suffit a couvrir
+entierement l'exposition ajustee. Cet exemple montre que meme avec un collateral
+superieur a l'exposition, le resultat de la methode de la valeur ajustee peut
+etre nul si les decotes font converger les deux grandeurs.
+
+Exemple 4 - Risque operationnel (approche BIA) :
+
+Une banque presente les PNB suivants : 6 000 000 en N-2, 7 200 000 en N-1 et
+8 400 000 en N. Les trois annees sont positives. Le PNB moyen est de
+(6 000 000 + 7 200 000 + 8 400 000) / 3 = 7 200 000. La charge en capital pour
+le risque operationnel est de 7 200 000 x 15 % = 1 080 000.
+
+Sur le plan de la cartographie des risques, la banque a identifie un risque
+"Fraude interne - Detournement de fonds" avec une probabilite de 3 sur 5 et
+un impact de 4 sur 5, soit un score brut de 12. Avec un controle d'efficacite
+notee 4 sur 5, le score residuel est ramene a 3. Ce risque est surveille par
+deux KRI : le nombre de transactions hors plafond (seuil d'alerte : 3, seuil
+critique : 6) et le delai de traitement des anomalies (seuil d'alerte : 10
+jours, seuil critique : 20 jours). Cet exemple montre l'articulation entre
+la mesure quantitative du capital BIA et le suivi qualitatif des risques.
+
+Exemple 4bis - Comparaison AIB / BIC (synthese et pilotage) :
+
+Pour cette meme banque, le Business Indicator (BI) calcule sur les composantes
+ILDC, SC et FC des trois derniers exercices s'eleve a 10 500 000. Avec un
+seuil de premiere tranche fixe a 10 000 000 (coefficient 12 %) et un
+coefficient de deuxieme tranche de 15 %, la BIC est de
+(10 000 000 x 12 %) + (500 000 x 15 %) = 1 275 000. L'ecart avec l'AIB
+(1 080 000) est de +195 000, soit environ +18 % : la methode CRR3 serait ici
+plus exigeante que l'AIB actuellement appliquee. Le panneau de decision de
+pilotage releve cet ecart (critere C2), constate a la fois que l'ecart relatif
+depasse le seuil de tolerance de 10 % et que l'etablissement est sorti de la
+premiere tranche, et classe ce critere en statut "attention", ce qui
+declenche une recommandation de justification aupres de la Commission
+Bancaire plutot qu'un changement immediat de methode reglementaire.
+
+Exemple 5 - Risque de marche (approche standard) :
+
+Une banque detient un portefeuille obligataire de contrepartie CEMAC evalue a
+50 000 000, avec une position nette en devise etrangere de 8 000 000 a
+l'achat (position longue) et 3 000 000 a la vente (position courte) sur une
+autre ligne. La charge de change est de 9 % x max(8 000 000, 3 000 000) =
+720 000. Sur le portefeuille actions, la position nette sur un meme emetteur
+est de 12 000 000 et la position nette de marche de 40 000 000 : la charge
+actions est de (9 % x 12 000 000) + (9 % x 40 000 000) = 4 680 000. En
+supposant une charge de taux de 900 000 sur le portefeuille obligataire, la
+charge totale de marche est de 720 000 + 4 680 000 + 900 000 = 6 300 000, et
+le RWA marche correspondant est de 6 300 000 / 8 % = 78 750 000.
+
+En parallele, le calcul de la VaR historique sur 99 % de confiance et un
+horizon d'un jour, sur les 250 dernieres observations, donne une VaR de
+2 100 000. Le backtesting sur cette meme fenetre releve 3 depassements : le
+modele est en zone verte, donc valide. Cet exemple montre que l'exigence
+reglementaire (6 300 000, basee sur l'approche standard) et l'indicateur de
+pilotage interne (2 100 000, base sur la VaR) repondent a deux logiques
+differentes et ne doivent pas etre confondus.
+
+
+3.6 Modelisation UML
+---------------------
+
+UML est le langage visuel utilise pour concevoir puis documenter l'application.
+Trois diagrammes ont ete retenus, chacun avec un objectif precis et un lecteur
+different en tete. Le diagramme de classes montre a un developpeur ce qui est
+stocke et comment. Le diagramme de cas d'utilisation montre a un non-technicien
+(direction, auditeur) ce que l'analyste peut faire avec l'outil. Le diagramme
+d'activite montre a un connaisseur du referentiel BCEAO que le calcul est
+execute correctement, etape par etape. Ensemble, ils suffisent a repondre aux
+trois questions qui comptent pour ce memoire : quelles donnees, quelles
+fonctions, quel algorithme.
+
+
+────────────────────────────────────────────────────────────────────────────────
+3.6.1 DIAGRAMME DE CLASSES (Figure 1)
+────────────────────────────────────────────────────────────────────────────────
+
+Le diagramme de classes est la representation de la base de donnees et des
+relations entre ses tables. C'est le diagramme central de la solution, car
+toute la logique metier repose sur la structure des donnees. La base compte
+trente-cinq tables, organisees en six groupes fonctionnels.
+
+La table contreparties est la table de reference des entites porteuses de
+risque. Elle enregistre pour chaque contrepartie son identifiant, son nom, son
+pays, la notation souveraine du pays, sa categorie prudentielle et sa notation
+de credit. Toute exposition doit obligatoirement etre rattachee a une contrepartie
+presente dans cette table.
+
+La table expositions est la table principale des engagements au bilan. Elle
+contient l'identifiant de l'exposition, la reference a la contrepartie, les
+montants, le statut, les informations sur la CRM (type, mode, libelle,
+couverture), les ponderations, l'EAD, le RWA et le capital minimum calcules.
+Un champ commentaire et un champ JSON de traçabilite des sources completent
+cette table, ainsi que les horodatages de creation et de modification.
+
+Douze sous-tables de type prudentiel completent la table expositions. Chacune
+est liee a la table principale par une relation un-a-zero-ou-un. Cette
+decomposition garantit que seules les informations pertinentes pour le type
+de l'exposition sont stockees. Les douze sous-tables sont :
+exposition_souveraine (a), exposition_organisme_public (b), exposition_bmd (c),
+exposition_banque (d), exposition_entreprise (e), exposition_clientele_detail
+(f), exposition_immo_residentiel (g), exposition_immo_commercial (h),
+exposition_souffrance (i), exposition_risque_eleve (j), exposition_autre_actif
+(k) et exposition_hors_bilan_detail (l).
+
+Deux tables CRM gerent les garanties. La table crm_financee enregistre les
+caracteristiques d'un collateral financier : valeur, type, decotes He, Hc et
+Hfx, valeurs EVA et CVA, EAD net apres CRM et gain de CRM, ainsi que les
+champs d'eligibilite et le motif d'ineligibilite eventuel. La table
+crm_non_financee enregistre les caracteristiques d'une garantie accordee par
+un tiers : garant, categorie, notation, ponderation et taux de couverture. Une
+troisieme table crm_garanties gere les couvertures multiples.
+
+La table engagements_hors_bilan stocke les engagements hors bilan : contrepartie,
+type d'engagement, montant nominal, CCF, EAD, ponderation, RWA et capital.
+
+Quatre tables de referentiel servent de baremes : baremes_ponderation pour
+les ponderations, baremes_ccf pour les CCF, references_notation pour les
+notations, references_pays_souverains pour les notations pays.
+
+Cinq tables de reporting, d'audit et de systeme completent la base :
+rapports et lignes_rapport pour les restitutions, historique_imports et
+journal_operations pour l'audit, schema_migrations et metadonnees_app pour
+le versionnement et la configuration.
+
+Sept tables constituent le module risque operationnel : ro_incidents pour
+les evenements de perte, ro_kri_definitions et ro_kri_valeurs pour les
+indicateurs cles de risque, ro_risques pour la cartographie des risques,
+ro_controles pour les resultats des controles, ro_plans_action pour les
+plans d'action et ro_historique pour le journal d'audit du module.
+
+Une exposition complete (base + contrepartie + sous-table de type + CRM
+eventuelle) n'est jamais stockee dans une seule table : elle est reconstituee
+par ExposureRepository au moment de la lecture, via une quinzaine de
+jointures SQL exterieures gauches ecrites a la main, puis envoyee au frontend
+en un seul objet JSON. Ce module n'est pas encore migre vers SQLAlchemy (voir
+4.1) : ses jointures nombreuses en font un candidat pour une etape ulterieure
+de la migration, une fois le gabarit valide sur des modules plus simples.
+
+Le risque de marche, a la difference du risque de credit, n'apparait pas
+dans ce schema normalise. Conformement au choix d'architecture explique en
+4.1, ses calculs s'executent cote frontend et son seul besoin de persistance,
+le portefeuille de titres saisi par l'analyste, est stocke tel quel en JSON
+dans la table generique metadonnees_app plutot que dans des tables dediees.
+C'est une difference de conception assumee, pas un oubli : le risque de
+credit a besoin d'un schema relationnel riche parce qu'il est interroge,
+filtre et agrege de multiples facons cote serveur, alors que le risque de
+marche est manipule comme un jeu de donnees unique, charge puis recalcule
+integralement a chaque session par l'analyste.
+
+
+────────────────────────────────────────────────────────────────────────────────
+3.6.2 DIAGRAMME DE CAS D'UTILISATION (Figure 2)
+────────────────────────────────────────────────────────────────────────────────
+
+Le diagramme de cas d'utilisation decrit le perimetre fonctionnel de l'application
+du point de vue de l'utilisateur. Deux acteurs sont identifies : l'Analyste
+Prudentiel et le Systeme d'Import (fichier Excel ou CSV).
+
+Les fonctionnalites sont regroupees en six themes. La gestion du portefeuille
+couvre la saisie manuelle, l'import depuis un fichier, la modification et la
+consultation des expositions. Le calcul prudentiel couvre le calcul de l'EAD,
+la configuration des CRM financees et non financees, le calcul du RWA et du
+capital minimum, ainsi que le suivi operationnel du portefeuille de garanties
+qui en decoule. La gestion du hors bilan couvre la saisie des engagements et
+l'application du CCF. La consultation des referentiels couvre les baremes de
+ponderation, les notations et les CCF par type d'engagement. Le reporting et
+le pilotage couvrent la generation des exports Excel et PDF, la consultation
+du tableau de bord, ainsi que quatre cas d'utilisation d'analyse qui
+exploitent les memes donnees sans persistance supplementaire : l'analyse de
+concentration des grands risques (indice HHI), le suivi des defauts et
+impayes, le diagnostic reglementaire automatise et le pilotage du RWA credit
+par agent economique.
+
+Le sixieme theme couvre le risque de marche : constituer un portefeuille
+obligataire ou actions, calculer le risque de taux (duration, sensibilite,
+convexite), calculer les charges actions et change de l'approche standard,
+analyser le risque de change titre par titre, calculer la VaR selon les
+trois methodes disponibles, lancer un stress test sur les huit scenarios
+reglementaires, backtester le modele de VaR et actualiser les courbes de
+taux souverains CEMAC publiees par la BEAC. Ce theme est independant des
+cinq autres : il ne partage aucun cas d'utilisation avec le risque de
+credit, ce qui reflete leur separation architecturale.
+
+Trois ecrans supplementaires (ICAAP, simulation de crise transversale et
+planification de capital, voir 4.3.23-4.3.25) n'apparaissent pas dans ce
+diagramme : ce sont des maquettes d'interface pour le Pilier 2, sans moteur
+de calcul connecte au portefeuille reel a ce stade, et un diagramme de cas
+d'utilisation ne doit documenter que des capacites reellement implementees.
+
+Les relations entre cas d'utilisation suivent deux logiques : l'inclusion
+(l'import inclut la saisie, la saisie inclut le calcul EAD, etc.) et l'extension
+(la CRM est optionnelle dans la chaine de calcul).
+
+
+────────────────────────────────────────────────────────────────────────────────
+3.6.3 DIAGRAMME D'ACTIVITE (Figure 3)
+────────────────────────────────────────────────────────────────────────────────
+
+Le diagramme d'activite decrit le deroulement du calcul d'un RWA etape par
+etape. Un responsable prudentiel qui connait les regles de Bale peut verifier
+ici que le logiciel applique correctement les etapes.
+
+Le processus demarre par la reception des donnees (saisie ou import). La
+categorie prudentielle est ensuite identifiee parmi les douze categories UEMOA.
+La zone reglementaire et les champs obligatoires sont valides en parallele.
+Si la validation echoue, l'enregistrement est rejete et un message d'erreur
+est inscrit. Si elle reussit, l'EAD est calcule.
+
+La CRM est ensuite verifiee. Si elle est financee, les decotes He, Hc et Hfx
+sont calculees, puis EVA, CVA et l'EAD net. Si elle est non financee, la
+ponderation du garant est identifiee et l'EAD est decompose en fraction couverte
+et fraction non couverte. Si aucune CRM n'est presente, l'EAD net est egal
+a l'EAD brut.
+
+La ponderation est ensuite determinee selon la categorie et les conditions
+propres a chaque type. Le RWA est calcule (EAD net x ponderation), puis le
+capital minimum (RWA x 8 %). Les resultats sont persistes en base et le tableau
+de bord est mis a jour.
+
+@startuml DiagrammeActivite
+
+skinparam activity {
+  BackgroundColor White
+  BorderColor #333333
+  FontSize 11
+  DiamondBackgroundColor White
+  DiamondBorderColor #333333
+}
+skinparam ArrowColor #333333
+
+title Diagramme d'Activite - Calcul RWA pour une exposition au bilan\n(conforme referentiel BCEAO / Bale II)
+
+start
+
+:Recevoir les donnees d'exposition\n(saisie manuelle ou import CSV/Excel);
+
+:Identifier la categorie prudentielle\n(a) Souverains\n(b) Organismes publics\n(c) BMD\n(d) Banques\n(e) Entreprises\n(f) Clientele de detail\n(g) Immo. residentiel\n(h) Immo. commercial\n(i) Creances en souffrance\n(j) Creances risque eleve\n(k) Autres actifs\n(l) Hors bilan;
+
+fork
+  :Verifier zone reglementaire\n(UEMOA / CEMAC);
+fork again
+  :Valider les champs obligatoires\n(Pydantic : types, plages, requis);
+end fork
+
+if (Validation OK ?) then (non)
+  :Rejeter l'enregistrement\n+ enregistrement dans journal d'erreur\n(historique_imports / journal_operations);
+  stop
+endif
+
+:Calculer EAD\n= montant_bilan + (montant_HB * CCF)\nCCF selon engagement_type dans ccf_references;
+
+if (CRM renseignee et garantie eligible ?) then (oui)
+
+  if (CRM financee ?\n(collateral financier)) then (oui)
+    :Calculer decotes :\nHe = haircut exposition (=0 pour bilan)\nHc = haircut collateral (0% a 30%)\nHfx = haircut change (0% ou 8%);
+    :EVA = EAD * (1 + He)\nCVA = collateral * (1 - Hc - Hfx);
+    :EAD_net = max(0, EVA - CVA);
+  else (non - CRM non financee\n(garantie tiers))
+    :Identifier ponderation du garant\n(categorie + notation du garant);
+    :EAD_net_couverte = EAD * coverage_pct * RW_garant\nEAD_net_non_couverte = EAD * (1-coverage_pct) * RW_expo;
+    :RWA_total = EAD_net_couverte + EAD_net_non_couverte;
+  endif
+
+else (non - pas de CRM\nou garantie non eligible)
+  :EAD_net = EAD;
+endif
+
+:Determiner ponderation applicable\nselon categorie et notation;
+
+note right
+  (a) Souverains : 0% - 150%\n      Cases BCEAO/UEMOA -> 0%\n      OCE 0-1 -> 0%, 2 -> 20%, 3 -> 50%\n      4,5,6 -> 100%, 7 -> 150%
+  (b) Org. publics : 20% - 150%\n      UEMOA FCFA non-commercial -> 20%
+  (c) BMD : 0% - 150%\n      Haute qualite / liste reconnue -> 0%
+  (d) Banques : 20% - 250%\n      Cas equivalent UMOA -> 100%\n      Prudentiel faible -> 250%
+  (e) Entreprises : 20% - 150%\n      Degradation BCEAO -> 150%
+  (f) Detail : 75%\n      (si criteres eligibilite OK)
+  (g) Immo. resid. : 35% eligible / 100% sinon
+  (h) Immo. comm. : 75% eligible / reclass. entreprise
+  (i) Souffrance : 100% ou 150%\n      (selon provision et type)
+  (j) Risque eleve : 150% fixe
+  (k) Autres actifs : 0% a 250%\n      (selon type d'actif)
+  (l) Hors bilan : via CCF (10% a 100%)
+end note
+
+:RWA = EAD_net * ponderation;
+
+:Capital_min = RWA * 8%;
+
+:Persister en base\n(expositions + sous-table type prudentiel\n+ crm_financee ou crm_non_financee);
+
+:Mettre a jour agregats\n(tableau de bord : RWA total,\ncapital total, EAD par categorie);
+
+stop
+
+@enduml
+
+
+Le risque de marche suit une logique d'activite analogue, sans reprendre le
+diagramme ci-dessus : reception du portefeuille, identification du sous-risque
+concerne (taux, actions, change), application de la formule correspondante,
+agregation en une exigence de capital, puis calcul en parallele de la VaR et
+du backtesting. La difference tient a l'endroit ou ce flux s'execute, dans le
+frontend Flutter et non dans le backend Python, ce qui evite un second
+diagramme pour un algorithme conceptuellement proche.
+
+
+3.7 Architecture de la solution (synthese)
+-------------------------------------------
+
+L'architecture complete de la solution repose sur une separation nette entre
+trois couches : le backend de calcul, le frontend d'interface et la base de
+donnees de persistance.
+
+Le backend est developpe en Python 3 avec FastAPI et Uvicorn. Il est structure
+en sept modules metier (expositions, hors bilan, CRM, referentiels, rapports,
+tableau de bord et risque operationnel), chacun decoupe en trois niveaux :
+routes, services et repositories. La validation des donnees par Pydantic 2
+garantit qu'aucune valeur incorrecte ne peut atteindre la couche de calcul.
+La base de donnees compte trente-cinq tables et vingt-sept migrations
+versionees. Son acces est en cours de migration du pattern Repository
+ecrit a la main vers SQLAlchemy, module par module : le module referentiels
+est deja entierement porte sur l'ORM, les autres restent pour l'instant en
+SQL direct.
+
+Un huitieme module backend, plus leger, existe pour le risque de marche :
+il ne fait ni routes de calcul ni service metier au sens des sept autres, il
+se limite a persister le portefeuille marche (JSON dans metadonnees_app) et a
+exposer une route d'actualisation des courbes de taux CEMAC depuis les
+publications BEAC. Tout le reste, les moteurs de calcul de taux, actions,
+change, VaR, stress testing et backtesting, vit dans le frontend, comme
+explique en 4.1.
+
+Le frontend est une application desktop native Windows developpee avec Flutter.
+Il communique avec le backend par appels HTTP REST sur l'adresse locale du poste,
+sauf pour le risque de marche ou il embarque directement ses propres moteurs
+de calcul. Cette architecture client-serveur local permet le deploiement sans
+infrastructure serveur externe.
+
+La base de donnees est structuree a partir du diagramme de classes UML
+(Figure 1), avec la troisieme forme normale respectee par la decomposition de
+la table des expositions en douze sous-tables par type prudentiel. Les
+contraintes d'integrite referentielle garantissent la coherence lors des
+suppressions, et plus de vingt-trois index accelerent les jointures frequentes.
+
+
+================================================================================
+CHAPITRE 4 : REALISATION ET RESULTATS
+================================================================================
+
+4.1 Outils retenus et justification
+-------------------------------------
+
+Plusieurs options techniques ont ete envisagees avant d'arreter la combinaison
+finale. Plutot que de presenter une etude comparative formelle, cette section
+explique directement pourquoi chaque outil a ete retenu : le choix decoule des
+contraintes reelles du projet (lisibilite du calcul, deploiement sans
+infrastructure, poste de travail unique), pas d'un classement abstrait entre
+technologies.
+
+La combinaison retenue est Python 3 avec FastAPI et Uvicorn pour le backend,
+SQLite pour la persistance (via un pattern Repository ecrit a la main, en
+cours de migration progressive vers SQLAlchemy), Flutter pour le frontend
+Windows, et openpyxl pour les exports Excel.
+
+Python 3 a ete retenu pour sa lisibilite sur les regles metier complexes et
+son adoption dans les domaines financiers. Les conditions prudentielles UEMOA,
+par exemple le traitement preferentiel de l'immobilier residentiel ou les
+criteres BMD, s'ecrivent en Python de facon tres proche des textes
+reglementaires, ce qui facilite la verification de conformite. Un langage
+d'entreprise comme Java ou C# aurait impose une verbosite inutile pour ce type
+de regles, et Node.js gere les types numeriques de facon trop imprecise pour
+un contexte de calcul prudentiel.
+
+FastAPI a ete retenu pour trois raisons :
+
+- la validation automatique des donnees en entree par Pydantic 2 garantit
+  qu'aucune valeur incoherente n'atteint le moteur de calcul ;
+- la documentation interactive generee automatiquement facilite les tests ;
+- les performances ASGI conviennent bien aux requetes avec jointures SQL
+  complexes.
+
+Face a Django, dont l'ORM impose des conventions assez rigides des qu'on
+s'ecarte du cas d'usage standard, et Flask, qui ne fournit pas de validation
+de donnees native, FastAPI offrait le meilleur compromis entre rigueur et
+controle pour ce projet.
+
+SQLite a ete retenu pour la persistance, avec un choix d'acces aux donnees
+qui evolue dans le temps plutot que fige au demarrage du projet. Le pattern
+Repository ecrit a la main (ExposureRepository, CrmRepository, etc.) a permis
+de garder un controle total sur chaque requete SQL tant que le schema etait
+encore instable, ce qui etait precieux pour une requete comme celle qui
+reconstitue une exposition complete via une quinzaine de jointures
+exterieures gauches. Une fois le schema stabilise, l'interet d'un ORM comme
+SQLAlchemy (moins de code repetitif, relations declarees une seule fois,
+mapping objet plus lisible pour les modules aux jointures simples) l'a
+emporte pour les nouveaux developpements : la migration a demarre par le
+module des referentiels, le plus simple, avant d'etre etendue aux modules
+plus complexes. Contrairement a PostgreSQL ou MySQL, SQLite ne demande ni
+installation ni processus serveur independant, ce qui correspond exactement
+a un outil monoposte, que l'acces se fasse en SQL direct ou via l'ORM.
+
+Flutter a ete retenu pour produire une application native Windows deployable
+sans infrastructure, avec un patron repository centralise pour tous les appels
+a l'API backend. Ce choix a ete prefere a Electron, dont les executables sont
+lourds, a PyQt, moins fluide a l'usage, et a WPF, qui aurait impose
+l'environnement .NET.
+
+openpyxl a ete retenu pour la qualite de ses exports Excel dans un
+environnement bancaire ou ce format reste le standard de reference pour
+l'analyse des donnees.
+
+Pour le risque de marche, un choix d'architecture different a ete fait :
+contrairement au risque de credit, dont tous les calculs sont centralises
+dans le backend Python, les moteurs de calcul du risque de marche (taux,
+actions, change, VaR, stress testing, backtesting) s'executent directement
+dans le frontend Flutter, en Dart. Ce choix n'est pas un compromis subi mais
+une decision deliberee : l'analyse de marche est par nature exploratoire,
+l'analyste modifie en continu les chocs de taux, les niveaux de confiance de
+la VaR ou les horizons de projection, et chaque ajustement doit se recalculer
+instantanement, sans aller-retour reseau vers le backend. Le backend garde
+en revanche exactement le role qui lui revient : persister le portefeuille
+marche saisi (table metadonnees_app, en JSON) et aller chercher des donnees
+qui ne peuvent venir que de l'exterieur, en l'occurrence les courbes de taux
+souverains CEMAC publiees par la BEAC, recuperees automatiquement par une
+route dediee qui peut, si un moteur d'extraction est configure, en extraire
+le contenu depuis les PDF officiels. Le reste du referentiel prudentiel
+(regles UEMOA/BCEAO, ponderations, seuils de backtesting Bale II/III) est
+code directement dans les services Dart, au meme titre que les regles
+prudentielles du risque de credit sont codees dans le service Python.
+
+
+4.2 Realisation de la solution
+--------------------------------
+
+La realisation a suivi les cinq etapes definies dans la methode.
+
+La premiere etape, l'identification des objets metier, a produit la liste des
+entites principales, a savoir la contrepartie, l'exposition (avec ses douze
+types prudentiels), la CRM financee, la CRM non financee, la garantie multiple,
+l'engagement hors bilan, et les entites de referentiel, de reporting et
+d'audit. Cette identification a ete guidee par une lecture directe des textes
+prudentiels BCEAO.
+
+La deuxieme etape, la modelisation de la base de donnees, a produit la
+structure decrite dans le diagramme de classes UML. La decision la plus
+importante est la decomposition de la table des expositions en douze
+sous-tables par type prudentiel. Ce choix respecte la troisieme forme
+normale : chaque information est stockee a un seul endroit et depend
+entierement de la cle primaire de sa table. Il elimine les colonnes nullables
+massives qui auraient apparu si tous les types d'exposition avaient cohabite
+dans une seule table.
+
+La troisieme etape, la centralisation des calculs, a produit le service Python
+principal. Ce service orchestre le calcul de l'EAD, la determination de la
+ponderation selon la categorie et les conditions specifiques, l'application de
+la CRM financee par la methode de la valeur ajustee et de la CRM non financee
+par la methode de la ponderation du garant, puis le calcul du RWA et du capital
+minimum.
+
+La quatrieme etape, le systeme de migrations, a produit une serie de scripts SQL
+numerotes qui versionent l'evolution du schema (vingt-sept a ce jour, le
+schema continuant d'evoluer au fil des modules ajoutes). Ces migrations sont
+executees au demarrage, dans l'ordre de leur numerotation, avec detection
+automatique des migrations deja appliquees, ce qui a permis par exemple de
+renommer integralement le schema de l'anglais vers le francais (migration 021)
+sans jamais recreer la base ni perdre une donnee deja saisie.
+
+La cinquieme etape, l'integration des imports et du reporting, a produit les
+deux validateurs d'import (Excel et CSV), les points d'acces d'import en deux
+temps (inspection puis confirmation), les services de reporting Excel et PDF,
+et le tableau de bord de synthese.
+
+La sixieme etape, le module de risque operationnel, a produit sept nouvelles
+tables (migration 022), les routes et services FastAPI correspondants, les
+modeles Pydantic pour les incidents, KRI, risques, controles, plans d'action
+et historique d'audit, ainsi que l'ecran Flutter dedie. Cette etape a ete
+prolongee par trois migrations supplementaires (023 a 025) qui ont ajoute le
+calcul AS par ligne metier et le calcul BIC selon le dispositif europeen CRR3,
+puis par une quatrieme (028) qui a ajoute la synthese comparative des trois
+methodes et le moteur de decision de pilotage, ce dernier agregeant en un
+seul verdict les signaux deja produits par les etapes precedentes
+(disponibilite des donnees, exposition en capital, pertes du mois, KRI,
+cartographie) plutot que d'introduire une nouvelle source de donnees.
+
+La septieme etape, le module de risque de marche, a suivi une logique
+inverse des six precedentes : au lieu de partir de la base de donnees, elle a
+consiste a ecrire directement les moteurs de calcul Dart (taux, actions,
+change, VaR, stress testing, backtesting), puisque ce module ne stocke pas
+son detail en base. Cote backend, elle s'est limitee a une route de
+persistance du portefeuille et a une route d'actualisation des courbes de
+taux CEMAC. Cote frontend, elle a produit l'ecran risque de marche avec ses
+multiples vues (indicateurs, courbes de taux, VaR, pilotage prudentiel).
+
+Le frontend Flutter a ete developpe en parallele avec ses huit ecrans
+fonctionnels, sa barre de navigation laterale et son service HTTP centralise.
+
+Une huitieme etape, transversale aux precedentes, a consiste a valider le
+moteur de calcul par des tests automatises plutot que par simple relecture.
+Une suite de tests unitaires (pytest), organisee en six classes, verifie les
+ratios prudentiels (CET1, Tier 1, solvabilite, levier), la densite et la
+couverture RWA, la VaR de portefeuille, la concentration (indice HHI),
+l'estimation de la PD a partir de la notation, et des scenarios d'integration
+qui enchainent plusieurs calculs comme le ferait une analyse reelle. Cote
+frontend, une suite equivalente en Dart (flutter test) verifie notamment la
+reconstitution du capital restant du des titres obligataires et le calcul du
+capital reglementaire du risque de marche. Cette double suite ne sert pas a
+produire un chiffre a mettre dans le memoire, mais a detecter les regressions
+quand une formule est modifiee, y compris celles que je ne verrais pas a la
+simple relecture. Deux exemples concrets, rencontres pendant la redaction de
+ce chapitre, sont detailles ci-dessous.
+
+
+Difficultes rencontrees
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Un memoire honnete doit aussi dire ce qui n'a pas ete simple, pas seulement ce
+qui fonctionne. Trois difficultes ont marque cette phase de realisation.
+
+La premiere a ete architecturale. Le risque de credit et le risque de marche
+n'ont pas ete traites de la meme facon (calcul cote backend pour l'un, cote
+frontend pour l'autre, voir 4.1), et il a fallu resister a la tentation de
+"faire pareil partout par coherence". Harmoniser les deux aurait ete plus
+simple a expliquer sur le papier, mais aurait impose soit un aller-retour
+reseau a chaque changement de parametre de VaR ou de choc de taux (mauvais
+pour un usage exploratoire), soit un schema relationnel complet pour un
+portefeuille de marche qui n'en a pas besoin a ce stade. Accepter que les deux
+modules suivent une logique differente, et le documenter comme un choix plutot
+que de le cacher, a pris plus de temps que d'ecrire le code lui-meme.
+
+La deuxieme difficulte a ete la lecture du referentiel BCEAO pour le risque de
+marche. Le dispositif applique un taux de 8 % presque partout (c'est le ratio
+de solvabilite general, present dans quasiment toutes les formules de capital
+minimum), mais l'instruction n°026-11-2016 fixe des taux specifiques de 9 %
+pour la charge actions (specifique et generale, art. 398-401) et pour la
+charge de change (art. 416-417). Les deux pourcentages se ressemblent
+suffisamment pour que j'aie, a un moment, recopie 8 % au lieu de 9 % dans le
+moteur de calcul actions et change du frontend. Le code compilait, l'ecran
+s'affichait normalement, rien ne laissait supposer une erreur a l'usage. C'est
+la suite de tests qui a signale l'ecart, en comparant un montant calcule a un
+montant attendu chiffre a la main a partir de l'instruction. Sans ces tests,
+l'erreur serait passee inaperçue jusqu'a ce qu'un chiffre du tableau de bord
+ne colle pas avec un calcul manuel de controle.
+
+La troisieme difficulte a ete plus insidieuse encore parce qu'elle ne
+dependait pas d'un taux mais d'une date. Le calcul de la maturite residuelle
+d'une obligation utilisait, pour la date d'analyse du portefeuille, la date
+du jour renvoyee par le systeme au lieu de la date d'analyse saisie par
+l'analyste dans son fichier importe. Tant que l'analyste travaillait le jour
+meme sur des donnees du jour meme, les deux dates coïncidaient et rien ne
+paraissait anormal. Le probleme n'apparaissait que pour un portefeuille
+archive ou reouvert un autre jour que celui de sa date d'analyse d'origine :
+la maturite residuelle, et donc la charge de taux qui en depend, se
+recalculait alors silencieusement sur une base fausse, un jour a la fois. Ce
+genre de bug est difficile a attraper par relecture parce que le code semble
+raisonnable ligne a ligne ; c'est un test qui fixe une date d'analyse
+differente de la date du jour, ecrit justement pour couvrir ce cas, qui l'a
+revele.
+
+Ces deux dernieres difficultes ont ete corrigees avant le depot de ce memoire.
+Elles sont neanmoins conservees ici en detail parce qu'elles illustrent mieux
+qu'un long paragraphe methodologique pourquoi la suite de tests automatises
+n'est pas un exercice de style : sans elle, ces deux ecarts auraient
+vraisemblablement ete decouverts par un utilisateur, pas par moi.
+
+
+4.3 Resultats obtenus
+------------------------
+
+Avant de detailler ecran par ecran ce que l'outil permet de faire, il est utile
+de resumer ou en est le projet aujourd'hui, sans grille d'auto-evaluation.
+
+Le risque de credit pour la zone UEMOA est entierement couvert. Les douze
+categories prudentielles, leurs ponderations et leurs cas conditionnels (LTV
+pour l'immobilier, criteres OCE et BCEAO pour les souverains, criteres BMD,
+seuil de degradation pour les entreprises) sont implementes et calculent
+automatiquement l'EAD, la CRM, le RWA et le capital minimum. La gestion des
+contreparties, l'import CSV et Excel en deux temps, les exports Excel et PDF
+et le tableau de bord de synthese sont operationnels. Le risque de marche
+est egalement couvert : constitution du portefeuille, risque de taux, risque
+actions et change, VaR multi-methodes, stress testing et backtesting sont
+tous fonctionnels cote frontend, avec une persistance et une actualisation
+des courbes de taux CEMAC cote backend. Le module de risque operationnel
+est fonctionnel cote backend (base de donnees, moteur de calcul BIA, KRI
+pre-configures) et son interface Flutter est en cours de finalisation. La
+zone CEMAC reste le seul point ouvert pour le risque de credit : elle
+n'existe encore que dans la structure (tables, routes, modules), et ses
+regles metier propres restent a implementer en priorite pour la prochaine
+version.
+
+Ce qui suit presente les resultats sous deux angles complementaires, comme il
+convient a un memoire d'informatique appliquee a la finance. Le premier angle,
+ecran par ecran, montre ce qu'un utilisateur metier voit et decide. Le second,
+en fin de section, revient sur ce que l'ingenierie logicielle a produit
+concretement (tests, migrations, volumetrie de code), pour ne pas laisser
+croire que seul le resultat visible compte.
+
+Pour chaque capture ci-dessous, la question posee est celle d'un decideur qui
+ouvrirait l'ecran pour la premiere fois : qu'est-ce qu'il regarde en priorite,
+et quelle decision cela lui permet-il de prendre ? La numerotation ci-dessous
+suit l'ordre dans lequel un utilisateur les rencontre dans la barre de
+navigation laterale de l'application ; chaque capture d'ecran a inserer
+correspond a un ecran reellement present et navigable dans l'application
+livree, pas a une maquette de principe. Un ecran d'accueil (Welcome)
+precede l'ensemble : purement cosmetique (logo, slogan, presentation de
+l'entreprise d'accueil), il ne contient aucune donnee prudentielle et n'est
+donc pas numerote ci-dessous.
+
+Vue d'ensemble et pilotage transversal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+4.3.1 Vue d'ensemble
+
+[Capture d'ecran a inserer : ecran Vue d'ensemble]
+
+C'est le premier ecran que voit un utilisateur qui vient d'ouvrir
+l'application, avant meme de choisir un domaine de risque particulier. Il
+reprend la meme synthese consolidee que le tableau de bord credit (RWA total,
+ratios, repartition par risque), construite sur le meme instantane de
+portefeuille (DashboardSnapshot) : plutot que de naviguer a l'aveugle entre
+les modules, l'utilisateur sait des l'ouverture si la situation generale
+appelle une attention particuliere avant d'aller consulter le detail d'un
+module precis.
+
+4.3.2 Tableau de bord
+
+[Capture d'ecran a inserer : vue d'ensemble du tableau de bord]
+
+Un directeur des risques qui ouvre cet ecran regarde d'abord le ratio de
+solvabilite et le capital minimum requis face aux fonds propres disponibles :
+si le ratio se rapproche du seuil reglementaire de 8 %, la decision est de
+renforcer les fonds propres ou de ralentir la production de nouveaux
+engagements avant le prochain arrete. La repartition par categorie, par pays
+et par notation sert ensuite a reperer une concentration a corriger.
+
+Ce RWA total n'est pas seulement celui du risque de credit : il agrege les
+trois risques (credit, operationnel, marche), et c'est bien ce total consolide
+qui sert de base au calcul du capital minimum affiche. Concretement, un
+directeur des risques n'a pas besoin d'aller ouvrir trois ecrans separes et
+d'additionner lui-meme trois chiffres pour savoir si la banque est en regle :
+le tableau de bord fait deja cette consolidation, ce qui est precisement le
+niveau de vue qu'attend une direction generale plutot qu'un analyste.
+
+Le tableau de bord n'est pas un ecran unique mais un assemblage d'une
+douzaine de composants independants, chacun conçu pour repondre a une
+question precise plutot que pour simplement decorer la page. Les detailler
+un par un, comme le reste de cette section le fait pour les autres ecrans,
+evite de reduire "le dashboard" a une seule image generale.
+
+Le donut RWA et capital requis montre en un coup d'oeil la part de chaque
+risque, credit, operationnel et marche, dans le RWA total et dans le capital
+minimum qui en decoule. C'est le premier repere visuel pour savoir quel
+risque pese le plus avant d'aller chercher le detail dans l'ecran
+correspondant.
+
+Deux composants repondent a la meme question de l'adequation des fonds
+propres, sous deux formes differentes. Le premier, un graphique a points,
+place pour CET1, Tier 1 et solvabilite un point au seuil minimum
+reglementaire et un point au niveau actuellement detenu : l'ecart visuel
+entre les deux est le surplus de fonds propres, et quand les points se
+rapprochent, c'est le signal de renforcer le capital avant le prochain
+arrete. Le second, un graphique a barres, pose la meme question en montants
+(Md FCFA) plutot qu'en pourcentages, pour un lecteur qui raisonne plus
+naturellement en volume.
+
+Le donut de repartition CRM montre la part du portefeuille couverte par une
+garantie financiere, par une garantie non financiere, ou par aucune garantie.
+Un responsable credit y verifie que la part "aucune garantie" ne progresse
+pas anormalement d'une periode a l'autre, ce qui indiquerait un relachement
+de la politique de garanties.
+
+Le tableau des dix plus grandes expositions, complete par une fenetre de
+detail qui ouvre la liste complete triee par exposition nette decroissante,
+est l'ecran que consulte un comite des grands risques pour verifier qu'aucune
+contrepartie ne depasse seule le seuil de concentration autorise. Un second
+composant agrege ce que montre ce tableau en quelques chiffres de synthese,
+nombre de grands risques, encours net total, nombre de dossiers en alerte
+face aux dossiers conformes, avec un lien vers une vue detaillee par
+categorie prudentielle : c'est le point d'entree naturel pour un dirigeant
+presse, qui n'a besoin du detail que si un chiffre l'alerte.
+
+La modale d'edition des fonds propres reglementaires est le seul endroit de
+l'application ou l'analyste saisit manuellement les composantes CET1, AT1 et
+Tier 2. C'est un point de controle sensible, puisque toute la chaine des
+ratios prudentiels (CET1, Tier 1, solvabilite) en depend directement en
+aval.
+
+Le bloc RWA par secteur decompose le RWA et le capital exige par risque et
+par secteur d'activite, ce qui permet de reperer si la charge en capital se
+concentre sur un secteur particulier et devrait motiver une diversification.
+Deux graphiques en barres complementaires classent ensuite les categories
+prudentielles, l'un par volume d'exposition brute, l'autre par RWA genere :
+les comparer fait ressortir une categorie qui pese peu en volume mais
+beaucoup en capital, signe d'une ponderation elevee a surveiller de pres.
+
+Enfin, l'en-tete du tableau de bord affiche la date de reference de la
+valorisation et donne acces a l'actualisation des donnees et a l'export.
+C'est un detail modeste mais utile pour un auditeur : savoir a quelle date
+se rapportent des chiffres avant de les citer dans un rapport. Sur l'ecran du
+moteur RWA, une jauge de densite RWA vient completer ce tableau de bord en
+rapportant le RWA total a l'exposition totale : une densite qui augmente
+d'une periode a l'autre, a encours a peu pres constant, signale une
+degradation de la qualite du portefeuille avant meme que les ratios
+reglementaires ne s'en ressentent.
+
+4.3.3 Importations
+
+[Capture d'ecran a inserer : ecran Gestion des importations, avec ses trois
+cartes credit / marche / operationnel]
+
+C'est le point d'entree centralise pour charger un portefeuille : trois
+cartes ouvrent chacune le dialogue d'import propre a son domaine (expositions
+credit, portefeuille de marche, pertes operationnelles), plutot que de
+disperser ces trois entrees dans chaque module separement. Un analyste qui
+recoit un nouveau fichier n'a qu'un seul endroit a connaitre pour savoir ou
+l'importer, quel que soit le type de risque concerne.
+
+Risque de credit
+~~~~~~~~~~~~~~~~~~
+
+4.3.4 Expositions
+
+[Capture d'ecran a inserer : ecran de saisie ou de consultation d'une exposition]
+
+Ici, l'analyste verifie ligne par ligne que la ponderation retenue correspond
+bien a la categorie et aux conditions declarees (LTV, notation, cas special
+BCEAO). C'est le seul ecran ou l'on peut remonter du RWA affiche jusqu'au
+calcul intermediaire qui l'a produit, ce qui est precisement ce qu'un
+auditeur cherche a controler avant de valider un portefeuille.
+
+4.3.5 Hors bilan
+
+[Capture d'ecran a inserer : ecran de gestion des engagements hors bilan]
+
+Le point a surveiller ici est le CCF applique a chaque engagement : un
+mauvais facteur de conversion sous-estime silencieusement l'EAD et donc le
+capital requis. L'analyste doit s'assurer, avant validation, que le type
+d'engagement saisi correspond bien au niveau de risque attendu par la BCEAO.
+
+4.3.6 CRM
+
+[Capture d'ecran a inserer : ecran de configuration d'une garantie]
+
+Cet ecran repond a une question tres concrete pour un decideur credit : de
+combien la garantie proposee reduit-elle reellement le capital exige ? En
+configurant une CRM financee ou non financee, l'analyste voit l'EAD net et le
+RWA se recalculer immediatement, ce qui permet de decider si la garantie
+proposee est suffisante pour accepter le dossier.
+
+4.3.7 Garanties
+
+[Capture d'ecran a inserer : ecran de gestion des garanties]
+
+La ou l'ecran CRM montre le resultat du calcul (EAD net, RWA apres garantie),
+l'ecran Garanties est le carnet de suivi operationnel des suretes elles-memes
+: valeur active, taux de couverture moyen, echeances de renouvellement a
+venir. Un gestionnaire de garanties y repere en priorite les suretes qui
+arrivent a echeance sans renouvellement programme, avant qu'une garantie ne
+devienne caduque sans que personne ne s'en rende compte.
+
+4.3.8 Concentration
+
+[Capture d'ecran a inserer : ecran de concentration des grands risques,
+avec repartition secteur / pays / region et indice HHI]
+
+Cet ecran va plus loin que la synthese "grands risques" du tableau de bord :
+il decompose l'encours net par secteur, par pays, par region, par categorie
+prudentielle et par tranche de ponderation, et calcule un indice de
+concentration HHI reel a partir du portefeuille importe. Des seuils d'alerte
+(part sectorielle superieure a 25 %, exposition individuelle superieure a
+40 % des fonds propres, HHI au-dessus de 1800) signalent automatiquement une
+concentration excessive. Un directeur des risques s'en sert pour justifier
+aupres du regulateur une decision de diversification, avec un chiffre
+verifiable plutot qu'une impression qualitative.
+
+4.3.9 Defauts et impayes
+
+[Capture d'ecran a inserer : ecran de suivi des defauts et impayes]
+
+Cet ecran classe automatiquement les expositions les plus a risque de
+basculer en souffrance, a partir d'un score qui combine le RWA reel, la
+notation et la couverture CRM de chaque ligne. Le nombre de jours de retard
+associe a chaque dossier est en revanche une estimation, pas une donnee
+d'incident reellement saisie : c'est une limite assumee (voir 4.4), utile
+pour prioriser une revue de portefeuille mais pas encore pour un reporting
+reglementaire de defaut au sens strict.
+
+4.3.10 Analyse (moteur reglementaire)
+
+[Capture d'ecran a inserer : tableau de bord analytique, diagnostics et
+recommandations]
+
+Cet ecran va au-dela de l'affichage des ratios : il fait tourner un moteur de
+diagnostic qui compare chaque indicateur (CET1, Tier 1, solvabilite, bande de
+coussin de conservation, ratio de grand risque) aux seuils UEMOA/CEMAC et
+genere des recommandations textuelles classees par gravite. C'est l'ecran
+qu'un analyste ouvre quand il veut une explication ecrite de "pourquoi ce
+chiffre pose probleme", plutot qu'un simple ratio a interpreter seul.
+Certaines composantes (part du RWA marche et operationnel dans le total,
+quand elles ne sont pas encore disponibles ligne a ligne) reposent sur une
+approximation documentee plutot que sur un recalcul complet, ce qui est
+signale dans l'interface elle-meme.
+
+4.3.11 Pilotage RWA Credit
+
+[Capture d'ecran a inserer : ecran Pilotage RWA Credit, onglet Analyse RWA]
+
+Cet ecran decompose le RWA credit par agent economique (Etat, banques,
+entreprises, menages...) a partir des expositions reelles, avec les
+variations mensuelle et annuelle, et une jauge de densite RWA (RWA rapporte
+a l'EAD) qui resume en un seul indicateur le niveau moyen de risque du
+portefeuille. Un controle de reconciliation integre verifie que le total du
+tableau detaille correspond bien au total affiche, et signale un ecart
+sinon. Les deux autres onglets de cet ecran ("Alertes et decisions",
+"Ponderation reglementaire") sont pour l'instant des vues d'intention, sans
+donnees calculees : le premier onglet est le seul pleinement operationnel a
+ce stade, ce qui est precise ici plutot que laisse a decouvrir.
+
+4.3.12 Reporting credit
+
+[Capture d'ecran a inserer : ecran Reporting credit avec historique des exports]
+
+Distinct du "Rapports" transversal (4.3.14), cet ecran produit un export
+Excel et PDF specifiquement construit a partir des expositions, garanties et
+defauts reels du module credit, et conserve un historique des exports deja
+generes. Un interlocuteur externe qui demande "le dernier reporting credit
+envoye" le retrouve ici sans avoir a regenerer un nouveau fichier a chaque
+fois.
+
+4.3.13 Parametres
+
+[Capture d'ecran a inserer : ecran Parametres]
+
+Cet ecran regroupe les preferences globales de l'application : langue,
+theme clair/sombre, devise d'affichage, police et couleur principale. Un
+utilisateur qui change de contexte de travail (analyse en dollars plutot
+qu'en FCFA, par exemple) y ajuste l'affichage sans que cela touche aux
+donnees ni aux calculs sous-jacents.
+
+Cet emplacement portait a l'origine un tout autre role. L'ecran
+"Referentiels" affichait les baremes de ponderation, les CCF et l'echelle
+des notations utilises par le moteur de calcul, pour qu'un auditeur ou un
+regulateur puisse verifier leur conformite au referentiel BCEAO sans lire le
+code. Il a ete entierement vide puis remplace par l'ecran Parametres actuel
+lors d'un refactor anterieur, sans que la fonction de consultation soit
+recreee ailleurs. Le repository backend qui alimente ces baremes
+(ReferentialRepository, deja migre vers SQLAlchemy, voir 4.1) reste
+pleinement fonctionnel et expose desormais une route de lecture ET
+d'ecriture (GET et PUT /referentiels), mais plus aucun ecran ne l'utilise.
+
+Cette regression a une consequence concrete au-dela de l'interface : les
+quatre tables de baremes sont aujourd'hui vides, et le moteur de calcul du
+hors bilan (seul consommateur de ces baremes cote credit ; les ponderations
+au bilan sont saisies directement par l'analyste, voir 3.6.1) en dependait
+silencieusement, avec un repli a 100 % de CCF et 100 % de ponderation quand
+la table etait vide. Ce repli a ete corrige avant le depot de ce memoire :
+la tentative de calcul echoue desormais explicitement (erreur HTTP 400) tant
+que les baremes ne sont pas configures via la route PUT, plutot que de
+produire un chiffre faux sans avertissement. Reconstruire un ecran Flutter
+dedie a la consultation et a la configuration de ces baremes reste un axe
+d'evolution prioritaire (voir 4.4).
+
+4.3.14 Rapports
+
+[Capture d'ecran a inserer : ecran de generation d'un rapport]
+
+C'est l'ecran que consulte un interlocuteur externe (regulateur, commissaire
+aux comptes) : il regarde si les exports Excel et PDF reprennent bien les
+memes chiffres que le tableau de bord, condition necessaire pour que le
+rapport soit accepte comme restitution officielle du portefeuille.
+
+Risque operationnel
+~~~~~~~~~~~~~~~~~~~~~
+
+4.3.15 Risque operationnel
+
+[Capture d'ecran a inserer : ecran de suivi des incidents ou de la
+cartographie des risques]
+
+Un responsable conformite y regarde en priorite les KRI qui ont franchi leur
+seuil d'alerte et les risques dont le score residuel reste eleve malgre les
+controles existants : c'est ce qui declenche l'ouverture ou la relance d'un
+plan d'action.
+
+4.3.16 Synthese comparative AIB / AS / BIC
+
+[Capture d'ecran a inserer : tableau comparatif des trois methodes de calcul
+du capital risque operationnel]
+
+Un controleur de gestion des risques regarde ici l'ecart entre la methode
+reglementaire retenue (AIB ou AS) et la methode CRR3 calculee a titre de
+comparaison : un ecart qui se creuse d'un exercice a l'autre est un signal
+avance qu'une revision de methode ou une provision supplementaire pourrait
+devenir necessaire avant que le regulateur ne l'impose.
+
+4.3.17 Panneau de decision de pilotage
+
+[Capture d'ecran a inserer : panneau de decision avec verdict global et
+criteres detailles]
+
+C'est l'ecran destine a la direction plutot qu'a l'analyste : il affiche un
+verdict unique (Maitrise, Sous surveillance, Vigilance renforcee ou Critique)
+et l'organe a informer en consequence. Un dirigeant n'a pas besoin d'ouvrir
+les huit autres ecrans du module pour savoir si le risque operationnel
+justifie une remontee au conseil d'administration : ce panneau agrege deja
+la reponse, avec le detail des criteres qui la justifient.
+
+Risque de marche
+~~~~~~~~~~~~~~~~~~~~~
+
+4.3.18 Indicateurs de risque de marche
+
+[Capture d'ecran a inserer : vue indicateurs du risque de marche - taux,
+actions, change]
+
+Un gestionnaire de portefeuille regarde ici la sensibilite et la duration
+modifiee du portefeuille obligataire, et la position nette par emetteur et
+par devise. Une sensibilite elevee sur une ligne donnee est le signal pour
+reduire ou couvrir cette position avant un mouvement de taux anticipe.
+
+4.3.19 Analyse du risque de change (FX)
+
+[Capture d'ecran a inserer : ecran d'analyse titre par titre du risque de change]
+
+Cet ecran complete la vue d'ensemble du 4.3.18 par un detail titre par titre
+: taux d'acquisition contre taux courant, gain ou perte de change latent, et
+position nette globale utilisee pour la charge reglementaire de change (9 %,
+Art. 416-417). Les cotations peuvent etre actualisees en ligne. Un
+gestionnaire y identifie quelle ligne, precisement, degrade ou ameliore la
+position de change globale, plutot que de se contenter d'un chiffre agrege.
+
+4.3.20 VaR et backtesting
+
+[Capture d'ecran a inserer : comparaison des trois methodes de VaR et
+resultat du backtesting]
+
+La question posee ici est celle de la fiabilite du modele autant que de son
+resultat : si le backtesting place le modele en zone orange ou rouge, la VaR
+affichee ne doit pas etre utilisee telle quelle pour fixer des limites de
+risque, et la decision est de revoir les parametres du modele avant de s'y
+fier a nouveau.
+
+4.3.21 Stress testing reglementaire (risque de marche)
+
+[Capture d'ecran a inserer : resultats des huit scenarios de stress
+reglementaires du risque de marche]
+
+Le decideur y identifie le scenario le plus defavorable et son impact sur le
+ratio de solvabilite apres choc : si ce ratio stresse tombe sous le minimum
+reglementaire, il faut constituer un coussin de capital supplementaire des
+maintenant, avant qu'un choc reel ne se produise. Ce stress testing est
+specifique au portefeuille de marche ; il ne doit pas etre confondu avec le
+module transversal "Simulation de crise" presente en 4.3.24, qui couvre un
+perimetre plus large mais reste a ce stade une maquette.
+
+4.3.22 Courbes de taux CEMAC
+
+[Capture d'ecran a inserer : courbes de taux souverains par pays CEMAC]
+
+Cet ecran sert a verifier que la donnee de marche utilisee par tous les
+autres calculs (taux, VaR parametrique) est a jour et coherente entre pays,
+avant de lancer une analyse qui en depend.
+
+Maquettes non connectees au moteur de calcul
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Trois ecrans supplementaires existent dans l'application et sont accessibles
+depuis la barre de navigation, mais il serait malhonnete de les presenter au
+meme titre que les vingt-deux precedents : ce sont des maquettes visuelles,
+construites pour valider a l'avance la disposition et le contenu d'un ecran
+avant d'investir dans le moteur de calcul correspondant, une pratique
+courante de conception d'interface mais qui doit etre annoncee comme telle
+dans un memoire honnete. Dans les trois cas, l'ecran ne consulte jamais le
+portefeuille reel : les montants affiches sont des constantes ecrites dans
+le code Dart, pas des valeurs recalculees.
+
+4.3.23 ICAAP (maquette)
+
+[Capture d'ecran a inserer : dashboard ICAAP - capital economique, appetence
+au risque, buffers prudentiels]
+
+Cet ecran illustre a quoi pourrait ressembler un dispositif ICAAP complet
+(capital economique et reglementaire, appetence au risque, coussins
+prudentiels, projection de capital, specificites UEMOA/CEMAC), mais les
+chiffres affiches sont fixes. Il sert aujourd'hui de support de discussion
+avec un jury ou un commanditaire sur le perimetre souhaite pour le Pilier 2
+(voir 4.4), pas encore d'outil de pilotage reel.
+
+4.3.24 Simulation de crise transversale (maquette)
+
+[Capture d'ecran a inserer : dashboard Stress Test - scenarios macroeconomiques]
+
+Quatre scenarios (recession, sectoriel, systemique, marche) illustrent le
+principe d'un stress testing transversal a l'ensemble de la banque, avec un
+calcul de ratio post-choc mathematiquement correct mais applique a un
+capital et un RWA de depart fixes, jamais rafraichis depuis le portefeuille
+importe. A ne pas confondre avec le stress testing reglementaire du risque
+de marche (4.3.21), qui lui est pleinement fonctionnel.
+
+4.3.25 Capital Planning (maquette)
+
+[Capture d'ecran a inserer : dashboard Capital Planning - projection RWA sur
+cinq ans]
+
+L'algorithme de projection (croissance composee sur cinq ans selon un
+scenario optimiste, central ou pessimiste, calcul du gap de capital) est reel
+et correctement implemente, mais il part d'un capital et d'un RWA de
+reference fixes plutot que des valeurs actuelles du portefeuille. C'est donc
+le calcul qui est pret ; ce qui manque est le branchement sur les donnees
+reelles pour que la projection ait une valeur decisionnelle.
+
+Pris ensemble, ces vingt-cinq ecrans, dont vingt-deux sont pleinement
+connectes au moteur de calcul et le tableau de bord lui-meme regroupe une
+douzaine de composants detailles en 4.3.2, couvrent tout le perimetre
+fonctionnel defini dans le cahier des charges pour le risque de credit, le
+risque operationnel (y compris la comparaison AIB/AS/BIC et le pilotage) et
+le risque de marche. Les trois derniers, explicitement identifies comme des
+maquettes, montrent que le perimetre du Pilier 2 (ICAAP, stress testing
+transversal, planification de capital) a deja ete reflechi cote interface
+avant meme d'etre chiffre au chapitre 4.4. Ensemble, ils constituent la
+preuve concrete que l'architecture presentee au chapitre 3 produit un outil
+utilisable au quotidien, et pas seulement un modele theorique.
+
+Ce que l'ingenierie logicielle a produit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Les ecrans precedents montrent ce qu'un utilisateur metier voit. Cette
+derniere partie revient sur des resultats qui ne s'affichent nulle part a
+l'ecran, mais qui mesurent le travail d'informatique effectue, ce qu'attend
+naturellement un jury pour un memoire d'informatique appliquee a la finance.
+
+Le premier resultat est la volumetrie et l'organisation du code. Le moteur de
+calcul du risque de credit (RwaCalculationService) compte 1540 lignes, le
+repository qui reconstruit une exposition complete (ExposureRepository) en
+compte 1001, celui qui gere les garanties (CrmRepository) 306. Ce qui compte
+n'est pas le nombre de lignes en soi, mais qu'aucune de ces classes ne
+melange requete SQL et regle prudentielle : la separation routes / services /
+repositories decrite au chapitre 3 se verifie concretement en lisant le code,
+pas seulement sur le diagramme.
+
+Le deuxieme resultat est la suite de tests automatises presentee au 4.2 : elle
+permet de savoir, apres modification d'une formule, si les autres calculs se
+sont casses silencieusement, ce qu'une relecture manuelle ne garantit jamais.
+Le fait qu'elle ait revele une anomalie plutot que d'etre passee sous silence
+est en soi un resultat de la demarche technique adoptee.
+
+Le troisieme resultat est le systeme de migrations, mis a l'epreuve en
+conditions reelles a deux reprises : le renommage integral du schema de
+l'anglais vers le francais (migration 021, une operation a haut risque sur
+une base de production) et l'ajout des sept tables du risque operationnel
+(migration 022), tous deux executes sans recreer la base ni perdre une seule
+donnee deja saisie.
+
+Le quatrieme resultat est le choix d'architecture differenciee entre le
+risque de credit (calcul backend) et le risque de marche (calcul frontend),
+justifie au 4.1. Que les deux approches produisent des resultats corrects et
+conformes aux referentiels reglementaires demontre que ce choix n'etait pas
+un compromis subi faute de temps, mais une adaptation deliberee a deux
+besoins differents, assumee et documentee plutot que decouverte a posteriori.
+
+
+4.4 Limites et perspectives
+-----------------------------
+
+Il serait malhonnete de presenter ce projet sans reconnaitre ses limites.
+
+La premiere et principale limite est l'absence d'implementation complete des
+regles metier de la zone CEMAC. La structure est en place, mais les categories
+prudentielles BEAC, les ponderations et les regles de calcul specifiques restent
+a faire. C'est l'axe de developpement prioritaire pour la prochaine version.
+
+La deuxieme limite est l'absence de gestion multi-utilisateurs. C'est un outil
+monoposte. Dans un usage institutionnel reel, il faudrait ajouter une couche
+d'authentification et une gestion des droits pour que plusieurs analystes puissent
+travailler sur la meme base sans se bloquer mutuellement.
+
+La troisieme limite concerne les ratios de liquidite LCR et NSFR. Ces ratios
+sont importants pour un pilotage prudentiel complet mais leur implementation
+necessiterait de nouvelles tables (HQLA, entrees/sorties nettes, financement
+stable) et de nouveaux modules de calcul qui n'ont pas pu etre developpes dans
+le cadre de ce memoire.
+
+La quatrieme limite porte sur le Pilier 2. La version actuelle ne couvre pas
+un dispositif ICAAP complet, un stress testing transversal a la banque ni une
+planification de capital pluriannuelle. Les ecrans ICAAP, Simulation de
+crise transversale et Capital Planning presentes en 4.3.23-4.3.25 existent
+deja et donnent une idee assez precise de l'interface visee, mais ils
+tournent sur des montants fixes plutot que sur le portefeuille reel : le
+travail restant n'est pas de concevoir ces ecrans, c'est de les brancher sur
+un veritable moteur de calcul Pilier 2 (coussins de capital internes,
+scenarios de stress parametrables, fonction de reporting pour le dialogue
+avec le superviseur).
+
+La cinquieme limite concerne la persistance du risque de marche. Comme
+explique au chapitre 4.1, ses calculs vivent dans le frontend et son
+portefeuille est stocke en JSON plutot que dans des tables normalisees.
+Ce choix convient a un usage monoposte, mais il devient une limite si
+l'outil doit un jour interroger, filtrer ou agreger cote serveur les
+positions de marche au meme titre que les expositions de credit : il
+faudrait alors migrer ce portefeuille vers un schema relationnel dedie.
+
+La sixieme limite concerne l'etat d'avancement de la migration vers
+SQLAlchemy. Le passage du pattern Repository ecrit a la main a l'ORM se fait
+module par module plutot qu'en un seul bloc, pour limiter le risque de
+regression sur un moteur de calcul deja en production chez l'utilisateur. Le
+module des referentiels prudentiels (baremes de ponderation, CCF, notations)
+a servi de pilote et est entierement port sur SQLAlchemy ; les modules plus
+volumineux et davantage a base de jointures (expositions, CRM, hors bilan,
+risque operationnel) restent a ce stade sur l'acces SQL direct d'origine et
+seront migres progressivement selon le meme gabarit.
+
+La septieme limite est une regression identifiee pendant la redaction de ce
+chapitre : l'ecran Flutter qui donnait acces aux baremes de ponderation, aux
+CCF et aux notations (voir 4.3.13) a ete supprime lors d'un refactor
+anterieur et remplace par l'ecran Parametres actuel, sans que la fonction de
+consultation/configuration soit reconstruite ailleurs. Consequence directe,
+les quatre tables de baremes sont vides et le module hors bilan, qui est le
+seul a en dependre, ne peut plus calculer de CCF ni de ponderation fiables.
+Le repli silencieux a 100 % qui en resultait a ete corrige (le calcul echoue
+desormais explicitement tant que les baremes ne sont pas configures), et une
+route PUT /referentiels a ete ajoutee pour permettre cette configuration,
+mais uniquement via l'API pour le moment. Reconstruire l'ecran Flutter
+correspondant est necessaire pour que cette configuration redevienne
+accessible sans passer par la documentation interactive de l'API.
+
+Parmi les perspectives d'evolution, on peut citer : la reconstruction de
+l'ecran Flutter de consultation et de configuration des baremes prudentiels
+(regression identifiee et partiellement corrigee cote backend, voir 4.3.13
+et 4.4), la poursuite de la migration ORM vers SQLAlchemy pour les modules
+restants (expositions, CRM, hors bilan, risque operationnel), amorcee avec
+le module des referentiels, la finalisation de l'interface du module risque
+operationnel, la migration du portefeuille de risque de marche vers un
+schema relationnel si des besoins d'agregation cote serveur apparaissent,
+l'extension du dispositif ICAAP, l'ajout des ratios de liquidite LCR et
+NSFR, et la gestion multi-utilisateurs.
+
+
+================================================================================
+CONCLUSION GENERALE
+================================================================================
+
+Ce memoire avait pour objectif la conception et le developpement d'un outil
+tactique d'aide au pilotage des exigences en fonds propres dans les banques
+des zones UEMOA et CEMAC. Comme rappele en introduction, ce projet repond a un
+constat de terrain, celui de calculs prudentiels encore trop souvent conduits
+sur des tableurs disperses et des procedures manuelles peu fiables.
+
+Rappel de la methode utilisee
+-------------------------------
+
+La methode retenue a combine une modelisation orientee objet en UML avec un
+developpement incremental. Nous avons commence par lire directement les
+textes prudentiels BCEAO pour identifier les objets metier, puis nous avons
+construit les diagrammes de classes, de cas d'utilisation et d'activite avant
+d'en deriver le schema de base de donnees et d'implementer les calculs. Cette
+approche a permis de produire une architecture ou chaque concept prudentiel
+(exposition, contrepartie, CRM, ponderation, hors bilan) trouve sa place dans
+un ensemble coherent de classes, de tables et de relations explicites,
+accedees selon les modules via le pattern Repository ou, pour le module
+referentiels deja migre, via l'ORM SQLAlchemy. La decomposition de la table
+des expositions en douze
+sous-tables par type prudentiel illustre concretement l'application de la
+troisieme forme normale du modele relationnel.
+
+Rappel des technologies et outils utilises
+--------------------------------------------
+
+Le backend est developpe en Python 3 avec FastAPI et Uvicorn. La validation des
+donnees est assuree par Pydantic 2 sur chaque point d'acces. La base de donnees
+SQLite est accedee via un pattern Repository ecrit a la main pour la plupart
+des modules, migre progressivement vers SQLAlchemy (le module referentiels
+est deja entierement porte sur l'ORM). Le schema est versionne par vingt-sept
+migrations numerotees et couvre trente-cinq tables. Le frontend est une
+application desktop native Windows developpee avec Flutter, qui communique
+avec le backend par appels HTTP REST pour le risque de credit, et qui
+embarque ses propres moteurs de calcul pour le risque de marche. Les exports
+sont produits en Excel via openpyxl et en PDF par le backend.
+
+Resume des resultats obtenus
+------------------------------
+
+L'application livree couvre l'essentiel du perimetre defini dans le cahier
+des charges : gestion des contreparties et de leurs categories, saisie et import
+des expositions selon les douze types prudentiels UEMOA, engagements hors bilan
+avec CCF, calcul de l'EAD, gestion de la CRM financee (decotes He, Hc, Hfx,
+paniers de surete) et non financee (ponderation du garant), calcul des RWA et
+du capital a 8 %, exports Excel et PDF, transparence des calculs intermediaires,
+un module de risque operationnel dont le backend est pleinement fonctionnel et
+dont l'interface est en cours de finalisation, et un module de risque de
+marche entierement fonctionnel (risque de taux, actions, change, VaR
+multi-methodes, stress testing, backtesting). Le point qui reste ouvert est
+la zone CEMAC, presente dans la structure de l'application mais dont les
+regles metier propres restent a implementer.
+
+Bilan des competences acquises
+--------------------------------
+
+Ce projet a ete tres formateur a plusieurs niveaux. Sur le plan reglementaire,
+j'ai du apprendre les textes prudentiels BCEAO, comprendre les categories UEMOA,
+les regles de ponderation conditionnelles et les mecanismes de CRM tels qu'ils
+sont definis dans Bale II. Ce n'est pas un domaine que l'on apprend en quelques
+jours. La comprehension des cas particuliers (ponderations preferentielles
+hypothecaires, criteres BMD, traitement des expositions en defaut) a demande
+un travail d'analyse approfondi. Sur le plan de la modelisation, l'application
+d'UML a un domaine aussi structure que la prudence bancaire a consolide ma
+maitrise des diagrammes de classes et de la conception de schemas relationnels.
+Sur le plan technique, j'ai approfondi FastAPI, Pydantic 2, l'ORM SQLAlchemy,
+les migrations SQLite, Flutter desktop et la structuration d'une API REST avec
+validation metier integree.
+
+Insuffisances et perspectives d'evolution
+-------------------------------------------
+
+L'insuffisance principale reste l'absence de la zone CEMAC en termes de regles
+metier. La structure est en place, mais le travail de formalisation des categories
+et des ponderations BEAC reste a faire. C'est le premier axe d'evolution prevu.
+Parmi les autres axes, on peut citer la reconstruction de l'ecran Flutter de
+consultation et de configuration des baremes prudentiels (regression
+identifiee et partiellement corrigee cote backend, voir 4.3.13 et 4.4), la
+poursuite de la migration ORM vers SQLAlchemy pour les modules restants
+(expositions, CRM, hors bilan, risque operationnel), amorcee avec le module
+des referentiels, la finalisation de l'interface du module risque
+operationnel, la migration du portefeuille de risque de marche vers un
+schema relationnel si des besoins d'agregation cote serveur apparaissent,
+l'extension du dispositif ICAAP, l'ajout des ratios de liquidite LCR et
+NSFR, et la gestion multi-utilisateurs.
+
+Ce projet montre qu'il est possible, en partant des textes prudentiels et en
+appliquant une methode de conception rigoureuse, de developper un outil logiciel
+fiable, maintenable et adapte aux besoins reels des zones UEMOA et CEMAC. La
+rigueur de la modelisation est la condition sine qua non pour que les calculs
+soient non seulement corrects, mais aussi verificables et evolutifs dans la duree.
+
+
+================================================================================
+BIBLIOGRAPHIE
+================================================================================
+
+Comite de Bale sur le controle bancaire, "International Convergence of Capital
+Measurement and Capital Standards : A Revised Framework", document de travail,
+Banque des Reglements Internationaux, juin 2006, 347 pages.
+Disponible a l'adresse : https://www.bis.org/publ/bcbs128.htm
+[consulte le 15 mars 2025]
+
+BCEAO, "Dispositif prudentiel applicable aux etablissements de credit et aux
+compagnies financieres de l'UEMOA", instruction reglementaire, Banque Centrale
+des Etats de l'Afrique de l'Ouest, 2016, entree en vigueur au 1er janvier 2018.
+Disponible sur le site officiel de la BCEAO : https://www.bceao.int
+[consulte le 10 janvier 2025]
+
+Martin Fowler, "Patterns of Enterprise Application Architecture", livre,
+Addison-Wesley, 2002, 560 pages.
+
+UML - Unified Modeling Language Specification, document de travail, version
+2.5.1, Object Management Group (OMG), 2017.
+Disponible a l'adresse : https://www.omg.org/spec/UML
+[consulte le 5 fevrier 2025]
+
+FastAPI - Documentation officielle, document de travail en ligne, Tiangolo,
+disponible a l'adresse : https://fastapi.tiangolo.com
+[consulte le 5 fevrier 2025]
+
+Flutter - Documentation officielle, document de travail en ligne, Google,
+disponible a l'adresse : https://flutter.dev/docs
+[consulte le 5 fevrier 2025]
+
+SQLite - Documentation officielle, document de travail en ligne, D. Richard Hipp,
+disponible a l'adresse : https://sqlite.org/docs.html
+[consulte le 5 fevrier 2025]
+
+SQLAlchemy - Documentation officielle, document de travail en ligne,
+disponible a l'adresse : https://docs.sqlalchemy.org
+[consulte le 5 fevrier 2025]
+
+Comite de Bale sur le controle bancaire, "Basel III : A global regulatory framework
+for more resilient banks and banking systems", document de travail, Banque des
+Reglements Internationaux, decembre 2010, 77 pages.
+Disponible a l'adresse : https://www.bis.org/publ/bcbs189.htm
+[consulte le 20 mars 2025]
+
+
+================================================================================
+TABLE DES MATIERES
+================================================================================
+
+Remerciements
+Sommaire
+Liste des abreviations
+Liste des figures
+Liste des tableaux
+Resume (francais et anglais)
+Introduction generale
+
+Chapitre 1 : Generalites, probleme, entreprise, existant et cahier des charges
+  1.1 Generalites sur le theme
+  1.2 Probleme pose
+  1.3 Objectif general
+  1.4 Objectifs specifiques
+  1.5 Presentation de l'entreprise
+  1.6 Etude de l'existant
+  1.7 Analyse de l'existant
+  1.8 Cahier des charges fonctionnel
+
+Chapitre 2 : Methodes, technologies et etat de l'art
+  2.1 Generalites sur les methodes
+  2.2 Justification de la methode retenue
+  2.3 Technologies utilisees et justification
+  2.4 Etat de l'art
+
+Chapitre 3 : Methode utilisee et conception de la solution
+  3.1 Methode retenue
+  3.2 Regles metier generales
+  3.3 Regles metier specifiques par zone
+  3.4 Regles de calcul
+  3.5 Exemples de calcul
+  3.6 Modelisation UML
+    3.6.1 Diagramme de classes (Figure 1)
+    3.6.2 Diagramme de cas d'utilisation (Figure 2)
+    3.6.3 Diagramme d'activite (Figure 3)
+  3.7 Architecture de la solution
+
+Chapitre 4 : Realisation et resultats
+  4.1 Outils retenus et justification
+  4.2 Realisation de la solution (Difficultes rencontrees)
+  4.3 Resultats obtenus (captures d'ecran commentees, ecran par ecran)
+  4.4 Limites et perspectives
+
+Conclusion generale
+Bibliographie
+Table des matieres
+
+
+================================================================================
+PLAN DE TRAVAIL
+================================================================================
+
+Date de depot du memoire : 10 juillet 2026
+Date de debut de reference : 22 mai 2026
+Duree restante : 7 semaines
+
+Ce plan distingue deux phases : les travaux deja realises (phase 1) et les
+travaux restant a accomplir avant le depot du 10 juillet (phase 2). La phase 2
+est la seule actionnable a partir d'aujourd'hui.
+
+
+------------------------------------------------------------------------
+PHASE 1 - TRAVAUX REALISES (avant le 22 mai 2026)                  DONE
+------------------------------------------------------------------------
+
++------------------+------------------------------------------------------+
+| Domaine          | Ce qui a ete fait                                    |
++------------------+------------------------------------------------------+
+| Reglementation   | Lecture des textes prudentiels BCEAO et BRI,         |
+|                  | comprehension des 12 categories UEMOA, des           |
+|                  | ponderations, du LTV, de la CRM et du Pilier 1       |
++------------------+------------------------------------------------------+
+| Base de donnees  | Schema SQLite : 35 tables, 22 migrations versionees, |
+|                  | decomposition en 12 sous-tables par type prudentiel  |
++------------------+------------------------------------------------------+
+| Moteur de calcul | Service Python : calcul EAD, CRM financee (EVA/CVA), |
+|                  | CRM non financee, RWA, capital minimum (8 % RWA),    |
+|                  | traitement des 12 categories prudentielles UEMOA     |
++------------------+------------------------------------------------------+
+| Import / Export  | Validateurs Excel et CSV (inspection + confirmation),|
+|                  | exports Excel (openpyxl) et PDF                      |
++------------------+------------------------------------------------------+
+| Frontend         | Application Flutter Windows : ecrans expositions,    |
+|                  | hors bilan, CRM, referentiels, rapports, dashboard,  |
+|                  | risque operationnel et risque de marche              |
++------------------+------------------------------------------------------+
+| Risque de marche | Moteurs de calcul Dart : taux, actions, change, VaR  |
+|                  | (3 methodes), stress testing, backtesting ; backend  |
+|                  | limite a la persistance et aux courbes de taux CEMAC |
++------------------+------------------------------------------------------+
+| Memoire          | Chapitres 1 a 4 complets (credit, operationnel,      |
+|                  | marche), Conclusion, Resume FR/EN, Bibliographie     |
++------------------+------------------------------------------------------+
+| UML              | 3 diagrammes PlantUML (fichier diagrams_uml.txt)     |
++------------------+------------------------------------------------------+
+
+
+------------------------------------------------------------------------
+PHASE 2 - TRAVAUX RESTANTS (22 mai → 10 juillet 2026)           A FAIRE
+------------------------------------------------------------------------
+
++-----+------------------------+------------------------------------------+
+| Sem | Dates                  | Taches a realiser                        |
++-----+------------------------+------------------------------------------+
+|  1  | 22 mai - 28 mai        | [DONE] Risque de marche - moteurs :      |
+|     |                        | Etude de l'approche standard UEMOA/BCEAO |
+|     |                        | (instruction n°026-11-2016), ecriture    |
+|     |                        | des services Dart taux/actions/change,   |
+|     |                        | route backend de persistance JSON        |
++-----+------------------------+------------------------------------------+
+|  2  | 29 mai - 4 juin        | [DONE] Risque de marche - suite :        |
+|     |                        | Services VaR (historique/parametrique/   |
+|     |                        | Monte-Carlo), stress testing 8 scenarios,|
+|     |                        | backtesting Bale II/III, integration     |
+|     |                        | dans l'ecran Flutter risque de marche    |
++-----+------------------------+------------------------------------------+
+|  3  | 5 juin - 11 juin       | [DONE] Risque operationnel - backend :   |
+|     |                        | Migration 022 (7 tables), service Python,|
+|     |                        | routes FastAPI, modeles Pydantic,        |
+|     |                        | KRI pre-configures, journal d'audit      |
++-----+------------------------+------------------------------------------+
+|  4  | 12 juin - 18 juin      | [DONE] Capital total consolide :         |
+|     |                        | agregation RWA credit + operationnel +   |
+|     |                        | marche dans le tableau de bord, capital  |
+|     |                        | minimum recalcule sur cette base unique. |
+|     |                        | [EN COURS] Risque operationnel - suite : |
+|     |                        | Integration frontend Flutter             |
+|     |                        | (ecran risque operationnel),             |
+|     |                        | sections RO dans le memoire              |
++-----+------------------------+------------------------------------------+
+|  5  | 19 juin - 25 juin      | [MEMOIRE] Redaction des sections sur     |
+|     |                        | le risque de marche et le risque         |
+|     |                        | operationnel dans le Chapitre 3          |
+|     |                        | (regles de calcul, exemples chiffres),   |
+|     |                        | mise a jour du Chapitre 4 (resultats     |
+|     |                        | CDC, nouvelles fonctionnalites livrees)  |
++-----+------------------------+------------------------------------------+
+|  6  | 26 juin - 2 juillet    | [MEMOIRE] Relecture complete du memoire, |
+|     |                        | coherence entre chapitres et diagrammes, |
+|     |                        | verification de tous les chiffres,       |
+|     |                        | mise en forme finale (justification,     |
+|     |                        | interlignes, titres figures/tableaux)    |
++-----+------------------------+------------------------------------------+
+|  7  | 3 juillet - 9 juillet  | [DEPOT] Corrections de derniere minute,  |
+|     |                        | impression ou finalisation du fichier,   |
+|     |                        | preparation du support de soutenance     |
++-----+------------------------+------------------------------------------+
+| DEP | 10 juillet 2026        | DEPOT DU MEMOIRE                         |
++-----+------------------------+------------------------------------------+
+
+
+Priorites par semaine
+----------------------
+
+Semaine 1-2 (risque de marche) : c'etait le module le plus conceptuel des
+deux. L'approche standard UEMOA/BCEAO distingue plusieurs sous-risques (taux
+d'interet, change, actions). Le choix retenu, calculer chaque charge en
+capital directement dans le frontend plutot que dans le backend, a permis de
+livrer un resultat clair et documentable sans alourdir l'architecture serveur
+existante, comme explique au chapitre 4.
+
+Semaine 3-4 (risque operationnel) : l'approche indicateur de base (BIA) est
+la plus simple et la plus adaptee a ce stade. Elle consiste a appliquer un
+coefficient de 15 % au produit net bancaire (PNB) moyen des trois dernieres
+annees pour obtenir la charge en capital pour le risque operationnel. C'est
+une approche reconnue par Bale II et facilement implementable.
+
+Semaine 5 (memoire) : ne pas ecrire ces sections a la fin a la hate. Documenter
+les regles de calcul retenues, les choix faits et les exemples numeriques
+pendant que le code est encore frais. C'est plus fiable et plus convaincant.
+
+Semaine 6 (relecture) : lire le memoire en entier comme si on ne l'avait pas
+ecrit. Verifier que chaque figure est annoncee dans le texte avant d'apparaitre,
+que chaque tableau a son titre au-dessus, que les abreviations du lexique
+sont bien toutes utilisees dans le texte, et que la conclusion repond bien
+aux six points requis.
+
+
+Repartition du temps restant (7 semaines)
+-------------------------------------------
+
+- Developpement risque operationnel (backend + frontend) ............. 25 %
+- Redaction memoire (sections risque de marche et operationnel) ...... 30 %
+- Relecture et mise en forme finale du memoire ...................... 30 %
+- Preparation depot et soutenance ................................... 15 %
+
+
+Livrables au 10 juillet 2026
+------------------------------
+
+[x] Application desktop Windows fonctionnelle
+    - Risque de credit (12 categories UEMOA, CRM, EAD, RWA) : DONE
+    - Risque de marche (taux, actions, change, VaR, stress testing,
+      backtesting) : DONE
+    - Risque operationnel (approche BIA : PNB x 15 %) : DONE (migration 022)
+    - Capital total consolide (credit + operationnel + marche) : DONE
+
+[x] Base de donnees SQLite (35 tables, 22 migrations) : DONE
+
+[x] Diagrammes UML (3 diagrammes PlantUML retenus) : DONE
+
+[x] Memoire de fin d'etudes (present document) : partiellement DONE
+    - Chapitres 1, 2, 3, 4 (risque credit + risque de marche +
+      risque operationnel) : DONE
+    - Relecture finale et captures d'ecran a inserer : A FAIRE
+
+[ ] Support de soutenance : A PREPARER apres le depot

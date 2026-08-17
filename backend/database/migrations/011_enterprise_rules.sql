@@ -1,0 +1,3 @@
+ALTER TABLE exposures ADD COLUMN enterprise_exceeds_bceao_degradation_threshold INTEGER;
+ALTER TABLE exposures ADD COLUMN enterprise_prudential_procedure INTEGER;
+ALTER TABLE exposures ADD COLUMN enterprise_investment_firm_without_banking_law INTEGER;

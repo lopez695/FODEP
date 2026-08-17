@@ -1,0 +1,421 @@
+// Ce fichier decrit les donnees du module rapports.
+import 'dart:typed_data';
+
+import '../../../core/utils/currency_conversion.dart';
+
+/// Ligne détaillée d'un rapport exportable.
+class ReportLine {
+  const ReportLine({
+    required this.source,
+    required this.itemId,
+    required this.counterparty,
+    required this.amount,
+    required this.ead,
+    required this.rwa,
+    required this.capital,
+  });
+
+  final String source;
+  final String itemId;
+  final String counterparty;
+  final double amount;
+  final double ead;
+  final double rwa;
+  final double capital;
+
+  factory ReportLine.fromJson(Map<String, dynamic> json) {
+    return ReportLine(
+      source: json['source'] as String,
+      itemId: json['item_id'] as String,
+      counterparty: json['counterparty'] as String,
+      amount: (json['amount'] as num).toDouble(),
+      ead: (json['ead'] as num).toDouble(),
+      rwa: (json['rwa'] as num).toDouble(),
+      capital: (json['capital'] as num).toDouble(),
+    );
+  }
+}
+
+/// Représente un rapport généré et stocké.
+class ReportRecord {
+  const ReportRecord({
+    required this.id,
+    required this.createdAt,
+    required this.period,
+    required this.reportType,
+    required this.currency,
+    required this.exposureScope,
+    required this.includeCategoryChart,
+    required this.includeRatingChart,
+    required this.exports,
+    required this.lines,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final String period;
+  final String reportType;
+  final String currency;
+  final String exposureScope;
+  final bool includeCategoryChart;
+  final bool includeRatingChart;
+  final Map<String, String> exports;
+  final List<ReportLine> lines;
+
+  factory ReportRecord.fromJson(Map<String, dynamic> json) {
+    return ReportRecord(
+      id: json['id'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      period: json['period'] as String,
+      reportType: json['report_type'] as String,
+      currency: normalizeCurrencyCode(json['currency'] as String),
+      exposureScope: json['exposure_scope'] as String,
+      includeCategoryChart: json['include_category_chart'] as bool,
+      includeRatingChart: json['include_rating_chart'] as bool,
+      exports: (json['exports'] as Map<String, dynamic>).map(
+        (key, value) => MapEntry(key, value as String),
+      ),
+      lines: (json['lines'] as List<dynamic>? ?? [])
+          .map((item) => ReportLine.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// Données complètes de l'écran rapports.
+class ReportsModuleData {
+  const ReportsModuleData({
+    required this.reports,
+  });
+
+  final List<ReportRecord> reports;
+}
+
+/// Paramètres saisis avant génération d'un rapport.
+class ReportDraft {
+  const ReportDraft({
+    required this.period,
+    required this.reportType,
+    required this.currency,
+    required this.exposureScope,
+    required this.includeCategoryChart,
+    required this.includeRatingChart,
+  });
+
+  final String period;
+  final String reportType;
+  final String currency;
+  final String exposureScope;
+  final bool includeCategoryChart;
+  final bool includeRatingChart;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'period': period,
+      'report_type': reportType,
+      'currency': currency,
+      'exposure_scope': exposureScope,
+      'include_category_chart': includeCategoryChart,
+      'include_rating_chart': includeRatingChart,
+    };
+  }
+}
+
+/// Classeur FODEP renvoyé par le backend, avec ses réserves de lecture.
+///
+/// [anomalies] liste les postes que l'application ne sait pas encore
+/// alimenter, ou dont la règle du formulaire s'écarte de celle retenue
+/// ailleurs dans l'outil. Elles doivent être lues avant de transmettre la
+/// déclaration à la plate-forme de reporting de la BCEAO.
+class FodepExport {
+  const FodepExport({
+    required this.bytes,
+    required this.fileName,
+    this.anomalies = const [],
+  });
+
+  final Uint8List bytes;
+  final String fileName;
+  final List<String> anomalies;
+}
+
+/// Une cellule du formulaire, avec ce qu'il faut pour la redessiner.
+class CelluleFodep {
+  const CelluleFodep({
+    this.texte = '',
+    this.gras = false,
+    this.droite = false,
+    this.colonnes = 1,
+  });
+
+  final String texte;
+
+  /// Le formulaire met ses intitulés et ses totaux en gras.
+  final bool gras;
+
+  /// Les montants et les ratios y sont cadrés à droite.
+  final bool droite;
+
+  /// Colonnes couvertes, reprises des fusions du formulaire.
+  final int colonnes;
+
+  factory CelluleFodep.fromJson(Map<String, dynamic> json) => CelluleFodep(
+        texte: json['texte'] as String? ?? '',
+        gras: json['gras'] == true,
+        droite: json['droite'] == true,
+        colonnes: (json['colonnes'] as num?)?.toInt() ?? 1,
+      );
+}
+
+/// Une ligne du formulaire.
+class LigneFodep {
+  const LigneFodep({this.cellules = const []});
+
+  final List<CelluleFodep> cellules;
+
+  factory LigneFodep.fromJson(Map<String, dynamic> json) => LigneFodep(
+        cellules: [
+          for (final cellule in (json['cellules'] as List<dynamic>?) ?? const [])
+            CelluleFodep.fromJson(cellule as Map<String, dynamic>),
+        ],
+      );
+}
+
+/// Un état du FODEP, réduit à ses lignes porteuses de valeur.
+class EtatFodep {
+  const EtatFodep({
+    required this.nom,
+    this.largeurs = const [],
+    this.lignes = const [],
+  });
+
+  final String nom;
+
+  /// Largeurs des colonnes dans l'unité d'Excel. Les conserver évite un PDF aux
+  /// colonnes égales, où l'intitulé d'un poste serait aussi étroit que la
+  /// colonne d'un code DISPRU.
+  final List<double> largeurs;
+
+  final List<LigneFodep> lignes;
+
+  factory EtatFodep.fromJson(Map<String, dynamic> json) => EtatFodep(
+        nom: json['nom'] as String? ?? '',
+        largeurs: [
+          for (final largeur in (json['largeurs'] as List<dynamic>?) ?? const [])
+            (largeur as num).toDouble(),
+        ],
+        lignes: [
+          for (final ligne in (json['lignes'] as List<dynamic>?) ?? const [])
+            LigneFodep.fromJson(ligne as Map<String, dynamic>),
+        ],
+      );
+}
+
+/// Le FODEP renseigné, rendu lisible pour en faire un PDF.
+///
+/// Le classeur reste la pièce déclarative ; ceci en est la lecture. L'extraction
+/// est faite par le backend : la bibliothèque Excel du poste de travail échoue à
+/// décoder ce formulaire, qu'openpyxl vient pourtant d'écrire.
+class ContenuFodep {
+  const ContenuFodep({
+    required this.nomFichier,
+    required this.dateArrete,
+    required this.anomalies,
+    required this.etats,
+  });
+
+  final String nomFichier;
+  final DateTime? dateArrete;
+
+  /// Mêmes réserves que celles de [FodepExport] : elles doivent être lues avant
+  /// de transmettre, et figurent donc aussi sur le PDF.
+  final List<String> anomalies;
+
+  final List<EtatFodep> etats;
+
+  factory ContenuFodep.fromJson(Map<String, dynamic> json) => ContenuFodep(
+        nomFichier: json['nom_fichier'] as String? ?? 'FODEP.xlsx',
+        dateArrete: DateTime.tryParse('${json['date_arrete']}'),
+        anomalies: [
+          for (final anomalie in (json['anomalies'] as List<dynamic>?) ?? const [])
+            '$anomalie',
+        ],
+        etats: [
+          for (final etat in (json['etats'] as List<dynamic>?) ?? const [])
+            EtatFodep.fromJson(etat as Map<String, dynamic>),
+        ],
+      );
+}
+
+/// Une case du FODEP que le déclarant renseigne lui-même.
+///
+/// L'adresse — l'état et la cellule — est la clé : elle ne bouge pas avec
+/// l'ordre des lignes du formulaire. Le code DISPRU, l'intitulé de la ligne et
+/// l'en-tête de colonne l'accompagnent pour que l'écran désigne la case comme
+/// le formulaire la désigne, et non par une coordonnée Excel nue.
+class CaseFodep {
+  const CaseFodep({
+    required this.etat,
+    required this.cellule,
+    required this.ligne,
+    required this.code,
+    required this.libelle,
+    required this.colonne,
+    this.typeSaisie = 'nombre',
+    this.valeur,
+    this.texte,
+    this.commentaire,
+  });
+
+  final String etat;
+  final String cellule;
+  final int ligne;
+
+  /// Code DISPRU de la ligne, tel que la BCEAO l'identifie.
+  final String code;
+
+  final String libelle;
+  final String colonne;
+
+  /// Ce que la case attend, tel que son libellé le dit : `nombre` pour un
+  /// montant, `texte` pour un nom, puis `code`, `telephone`, `email` et `date`
+  /// pour l'attestation. L'écran en tire le clavier, les caractères qu'il
+  /// laisse passer et le contrôle qu'il applique.
+  final String typeSaisie;
+
+  /// Seul un montant est conservé en valeur numérique. Tout le reste est du
+  /// texte, y compris ce qui n'est fait que de chiffres : un numéro de
+  /// téléphone ou un CIB commençant par zéro le perdrait en devenant un
+  /// nombre. Un type inconnu est traité comme du texte : mieux vaut conserver
+  /// la frappe telle quelle que la filtrer sur une règle qu'on ne connait pas.
+  bool get estTexte => typeSaisie != 'nombre';
+
+  /// Valeur portée par le déclarant. `null` signifie « non renseignée » : la
+  /// case retombera au zéro automatique de l'export.
+  final double? valeur;
+
+  /// Contenu textuel, pour les champs de l'attestation.
+  final String? texte;
+
+  final String? commentaire;
+
+  bool get renseignee => valeur != null || (texte != null && texte!.isNotEmpty);
+
+  CaseFodep copyWith({
+    double? valeur,
+    String? texte,
+    String? commentaire,
+    bool effacer = false,
+  }) {
+    return CaseFodep(
+      etat: etat,
+      cellule: cellule,
+      ligne: ligne,
+      code: code,
+      libelle: libelle,
+      colonne: colonne,
+      typeSaisie: typeSaisie,
+      valeur: effacer ? null : (valeur ?? this.valeur),
+      texte: effacer ? null : (texte ?? this.texte),
+      commentaire: commentaire ?? this.commentaire,
+    );
+  }
+
+  factory CaseFodep.fromJson(Map<String, dynamic> json) => CaseFodep(
+        etat: json['etat'] as String? ?? '',
+        cellule: json['cellule'] as String? ?? '',
+        ligne: (json['ligne'] as num?)?.toInt() ?? 0,
+        code: json['code'] as String? ?? '',
+        libelle: json['libelle'] as String? ?? '',
+        colonne: json['colonne'] as String? ?? '',
+        typeSaisie: json['type_saisie'] as String? ?? 'nombre',
+        valeur: (json['valeur'] as num?)?.toDouble(),
+        texte: json['texte'] as String?,
+        commentaire: json['commentaire'] as String?,
+      );
+
+  Map<String, dynamic> toPayload() => {
+        'etat': etat,
+        'cellule': cellule,
+        'ligne': ligne,
+        'code': code,
+        'libelle': libelle,
+        'colonne': colonne,
+        'type_saisie': typeSaisie,
+        'valeur': valeur,
+        'texte': texte,
+        if (commentaire != null && commentaire!.isNotEmpty)
+          'commentaire': commentaire,
+      };
+}
+
+/// Un état que l'application n'alimente pas, et ses cases à saisir.
+class EtatASaisir {
+  const EtatASaisir({
+    required this.etat,
+    required this.intitule,
+    required this.cases,
+    required this.renseignees,
+    this.obligatoire = false,
+  });
+
+  final String etat;
+  final String intitule;
+  final List<CaseFodep> cases;
+  final int renseignees;
+
+  /// Vrai pour ce que l'outil ne produira jamais — l'identité de
+  /// l'établissement et les signatures. Les autres feuilles sont déjà
+  /// déclarées à zéro et ne se complètent que si l'établissement est concerné.
+  final bool obligatoire;
+
+  /// Champs groupés par bloc du formulaire, pour l'attestation.
+  Map<String, List<CaseFodep>> get parGroupe {
+    final groupes = <String, List<CaseFodep>>{};
+    for (final case_ in cases) {
+      groupes.putIfAbsent(case_.code, () => []).add(case_);
+    }
+    return groupes;
+  }
+
+  /// Cases groupées par ligne du formulaire : une ligne DISPRU porte souvent
+  /// plusieurs colonnes, et les séparer les rendrait illisibles.
+  Map<int, List<CaseFodep>> get parLigne {
+    final groupes = <int, List<CaseFodep>>{};
+    for (final case_ in cases) {
+      groupes.putIfAbsent(case_.ligne, () => []).add(case_);
+    }
+    return groupes;
+  }
+
+  factory EtatASaisir.fromJson(Map<String, dynamic> json) => EtatASaisir(
+        etat: json['etat'] as String? ?? '',
+        intitule: json['intitule'] as String? ?? '',
+        cases: ((json['cases'] as List<dynamic>?) ?? const [])
+            .map((item) => CaseFodep.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        renseignees: (json['renseignees'] as num?)?.toInt() ?? 0,
+        obligatoire: json['obligatoire'] == true,
+      );
+}
+
+/// Catalogue des cases du FODEP restant à la charge du déclarant.
+class SaisiesFodep {
+  const SaisiesFodep({
+    required this.etats,
+    required this.totalCases,
+    required this.totalRenseignees,
+  });
+
+  final List<EtatASaisir> etats;
+  final int totalCases;
+  final int totalRenseignees;
+
+  factory SaisiesFodep.fromJson(Map<String, dynamic> json) => SaisiesFodep(
+        etats: ((json['etats'] as List<dynamic>?) ?? const [])
+            .map((item) => EtatASaisir.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        totalCases: (json['total_cases'] as num?)?.toInt() ?? 0,
+        totalRenseignees: (json['total_renseignees'] as num?)?.toInt() ?? 0,
+      );
+}

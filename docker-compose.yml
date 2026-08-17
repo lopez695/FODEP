@@ -1,0 +1,86 @@
+# Deploiement web de l'outil RWA : backend FastAPI, application Flutter Web,
+# proxy inverse HTTPS.
+#
+# Prealable : construire l'application web AVANT `docker compose build`.
+#     cd frontend && flutter build web --release
+#
+# Demarrage :
+#     docker compose up -d --build
+#
+# Toute la configuration sensible vient du fichier .env, jamais du depot.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      # Authentification obligatoire : c'est tout l'objet du deploiement web.
+      RWA_AUTH_ENABLED: "1"
+      # Secret de signature. Aucune valeur par defaut : l'API refuse de
+      # demarrer s'il est absent ou trop court.
+      RWA_JWT_SECRET: ${RWA_JWT_SECRET:?definissez RWA_JWT_SECRET dans .env}
+      RWA_ACCESS_TOKEN_MINUTES: ${RWA_ACCESS_TOKEN_MINUTES:-60}
+      RWA_REFRESH_TOKEN_HOURS: ${RWA_REFRESH_TOKEN_HOURS:-12}
+      # Le cookie de session n'est transmis qu'en HTTPS.
+      RWA_REFRESH_COOKIE_SECURE: "1"
+      # Chemin vu par le navigateur : le proxy prefixe l'API par /api.
+      RWA_REFRESH_COOKIE_PATH: "/api/auth"
+      # Application et API partagent le domaine : aucune origine croisee a
+      # declarer. Renseigner uniquement si le frontend est ailleurs.
+      RWA_ALLOWED_ORIGINS: ${RWA_ALLOWED_ORIGINS:-}
+      LOCALAPPDATA: /donnees
+    volumes:
+      # Base SQLite, sauvegardes, exports et journaux. Seul etat persistant :
+      # c'est ce volume qu'il faut sauvegarder.
+      - rwa_donnees:/donnees
+    # Aucun port publie : le backend n'est joignable que par le proxy, jamais
+    # directement depuis le reseau.
+    expose:
+      - "8000"
+    networks:
+      - rwa
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - rwa
+
+  proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RWA_DOMAINE: ${RWA_DOMAINE:-localhost}
+      RWA_EMAIL: ${RWA_EMAIL:-}
+    volumes:
+      # Choisir la configuration dans .env :
+      #   RWA_CADDYFILE=./deploy/Caddyfile.public   (serveur public + Let's Encrypt)
+      #   RWA_CADDYFILE=./deploy/Caddyfile.interne  (reseau interne)
+      - ${RWA_CADDYFILE:-./deploy/Caddyfile.interne}:/etc/caddy/Caddyfile:ro
+      # Certificats fournis par la DSI, le cas echeant.
+      - ./deploy/certs:/certs:ro
+      # Certificats obtenus par Caddy : a conserver entre deux redemarrages,
+      # sinon chaque relance redemande un certificat a l'autorite.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - rwa
+
+volumes:
+  rwa_donnees:
+  caddy_data:
+  caddy_config:
+
+networks:
+  rwa:
+    driver: bridge

@@ -1,0 +1,1026 @@
+================================================================================
+DIAGRAMMES UML - OUTIL RWA
+Format : PlantUML (https://plantuml.com)
+Rendu : coller chaque bloc @startuml...@enduml sur plantuml.com
+        ou utiliser l'extension VS Code "PlantUML"
+================================================================================
+
+================================================================================
+INTRODUCTION GENERALE AUX DIAGRAMMES
+================================================================================
+
+Ce document regroupe trois (3) diagrammes UML 2.5 produits dans le cadre de la
+conception de l'FODEP, application de calcul des actifs ponderes par le
+risque (RWA - Risk-Weighted Assets) selon le referentiel prudentiel BCEAO /
+Bale II pour le risque de credit, et selon l'approche standard UEMOA/BCEAO
+pour le risque de marche. Le choix s'est porte sur trois diagrammes, pas plus,
+parce qu'ils suffisent a repondre aux trois questions qui comptent pour ce
+memoire : quelles donnees sont stockees, que peut faire l'utilisateur, et
+comment le calcul est execute.
+
+Les trois diagrammes se completent selon la logique suivante :
+
+  3.6.1 Diagramme de classes       -> Quoi est stocke (modele de donnees, risque de credit)
+  3.6.2 Cas d'utilisation           -> Qui fait quoi (risque de credit ET risque de marche)
+  3.6.3 Diagramme d'activite        -> Comment le calcul RWA credit est execute (algorithme)
+
+Tous les noms de tables et colonnes sont en francais, conformement au schema
+SQL de la base de donnees locale (SQLite, fichier rwa_data.db). Le risque de
+marche n'a pas de schema relationnel dedie : ses donnees sont persistees en
+JSON (voir 3.6.1) parce que ses calculs s'executent entierement cote frontend,
+un choix d'architecture explique au chapitre 4.
+
+
+================================================================================
+3.6.1 - DIAGRAMME DE CLASSES
+================================================================================
+
+DESCRIPTION ET ROLE
+-------------------
+Le diagramme de classes est le diagramme central de la conception. Il represente
+la structure statique de la base de donnees relationnelle de l'application, en
+montrant les 29 tables, leurs attributs et les relations entre elles. Il est
+construit selon la methode MERISE (Methode d'Etude et de Realisation Informatique
+pour les Systemes d'Entreprise) normalisee en 3NF (troisieme forme normale), ce
+qui garantit l'absence de redondance et l'integrite des donnees.
+
+ORGANISATION DES TABLES (6 groupes - 35 tables au total)
+----------------------------------------------------------
+1. ENTITES CENTRALES (2 tables) :
+   - contreparties : enregistre chaque entite economique (banque, entreprise,
+     Etat, organisme public, etc.) avec sa categorie prudentielle et sa notation.
+   - expositions : enregistre chaque credit ou engagement bilan accorde a une
+     contrepartie, avec le montant brut, la devise, les resultats de calcul
+     (EAD, RWA, capital) et le discriminant de type prudentiel.
+
+2. SOUS-TABLES DE SPECIALISATION MERISE (12 tables) :
+   Chaque exposition appartient a exactement un (1) des 12 types prudentiels
+   definis par le referentiel BCEAO. Pour eviter une table unique avec 30+
+   colonnes dont la plupart seraient NULL, le modele applique la specialisation
+   MERISE : une sous-table par type, liee par cle primaire/etrangere partagee
+   (exposition_id = FK vers expositions.id).
+   Le champ type_prudentiel dans expositions joue le role de DISCRIMINANT : il
+   indique quelle unique sous-table est active pour cette exposition, ce qui
+   interdit toute ambiguite et toute double appartenance.
+     a) exposition_souveraine       : Etats et banques centrales
+     b) exposition_organisme_public : Organismes publics et collectivites
+     c) exposition_bmd              : Banques multilaterales de developpement
+     d) exposition_banque           : Etablissements de credit
+     e) exposition_entreprise       : Entreprises du secteur prive
+     f) exposition_clientele_detail : Petites creances (< seuil reglementaire)
+     g) exposition_immo_residentiel : Prets immobiliers residentiel occupant
+     h) exposition_immo_commercial  : Financements immobilier commercial
+     i) exposition_souffrance       : Creances en situation de defaut
+     j) exposition_risque_eleve     : Placements a risque eleve (150% fixe)
+     k) exposition_autre_actif      : Autres actifs (cash, immobilisations, etc.)
+     l) exposition_hors_bilan_detail: Engagements hors bilan (via CCF)
+
+3. TABLES CRM (3 tables) :
+   CRM signifie Credit Risk Mitigation (attenuation du risque de credit).
+   - crm_financee    : collateral financier (depot, titre, OPCVM) avec calcul
+     des decotes reglementaires He, Hc, Hfx et du ratio EVA/CVA.
+   - crm_non_financee: garantie personnelle d'un tiers (banque, Etat) avec la
+     ponderation du garant substituee a celle de l'emprunteur.
+   - crm_garanties   : table de garanties multiples permettant des scenarios
+     de couverture partielle ou de paniers de garants.
+
+4. REFERENTIELS REGLEMENTAIRES (4 tables) :
+   Ces tables sont censees porter les valeurs du referentiel BCEAO
+   (ponderations, CCF, notations), mais ne sont pre-chargees par aucun
+   script : elles ne sont peuplees que si quelqu'un les configure via la
+   route PUT /referentiels. Une regression du frontend (ecran Referentiels
+   retire, voir memoire 4.3.13/4.4) les laisse aujourd'hui vides ; le
+   moteur de calcul echoue desormais explicitement plutot que d'appliquer
+   silencieusement une ponderation ou un CCF de repli a 100 %.
+   - baremes_ponderation      : correspondance segment x notation -> ponderation (%)
+   - baremes_ccf              : facteurs de conversion credit par type d'engagement
+   - references_notation      : nomenclature officielle des echelons de notation
+   - references_pays_souverains: notation souveraine et ponderation par pays
+
+5. REPORTING, AUDIT ET SYSTEME (7 tables) :
+   - rapports / lignes_rapport   : historique des rapports Excel/PDF generes
+   - engagements_hors_bilan      : module dedie aux engagements hors bilan
+   - historique_imports          : traçabilite de chaque import CSV/Excel
+   - journal_operations          : journal de toutes les operations (CREATE,
+     UPDATE, DELETE) pour l'audit
+   - schema_migrations           : versionnement du schema de la base de donnees
+   - metadonnees_app             : parametres et metadonnees de l'application
+
+6. MODULE RISQUE OPERATIONNEL (7 tables) :
+   Module de gestion du risque operationnel (Basel II - Pilier 1 & 2).
+   - ro_incidents      : incidents et evenements de perte operationnelle
+   - ro_kri_definitions: definition des indicateurs cles de risque (KRI)
+   - ro_kri_valeurs    : valeurs mesurees des KRI dans le temps
+   - ro_risques        : cartographie des risques (probabilite x impact)
+   - ro_controles      : resultats des controles de conformite
+   - ro_plans_action   : plans d'action corrective ou preventive
+   - ro_historique     : journal d'audit du module risque operationnel
+
+POINT CLE : LE DISCRIMINANT MERISE
+------------------------------------
+Le champ type_prudentiel (valeurs a..l) dans la table expositions est le
+point architectural le plus important du modele. Sans lui, rien n'empecherait
+une exposition d'avoir simultanement une ligne dans exposition_souveraine ET
+dans exposition_entreprise, ce qui serait une incoh'erence metier grave. Avec
+ce discriminant, le code applicatif garantit qu'une seule sous-table est
+alimentee par exposition, et le diagramme le documente explicitement avec le
+stereotype <<discriminant>>.
+
+COMMENT UNE EXPOSITION COMPLETE EST RECONSTITUEE
+---------------------------------------------------
+Aucune de ces tables ne contient a elle seule une "fiche exposition complete".
+Le backend la reconstruit a la lecture, via ExposureRepository, en joignant en
+une seule requete SQL la table expositions, la table contreparties, l'unique
+sous-table de type prudentiel active (parmi les douze) et, le cas echeant, la
+table crm_financee ou crm_non_financee, soit une quinzaine de jointures
+exterieures gauches. Le resultat est serialise en un seul objet JSON envoye
+au frontend, qui n'a donc jamais besoin de faire plusieurs requetes pour
+afficher une exposition.
+
+POURQUOI LE RISQUE DE MARCHE N'APPARAIT PAS ICI
+----------------------------------------------------
+Ce diagramme documente uniquement le risque de credit. Le risque de marche
+(portefeuille obligataire et actions, resultats de VaR, scenarios de stress)
+n'a pas de tables dediees : il est persiste tel quel, en JSON, dans la table
+generique metadonnees_app. Ce n'est pas un oubli mais un choix coherent avec
+l'architecture du module (detaillee au chapitre 4) : le risque de credit est
+interroge, filtre et agrege de multiples facons cote serveur, ce qui justifie
+un schema relationnel riche, alors que le risque de marche est charge une
+fois par session et recalcule integralement cote client.
+
+@startuml DiagrammeDeClasses
+
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor White
+  BorderColor #333333
+  ArrowColor #333333
+  FontSize 11
+}
+skinparam linetype ortho
+hide circle
+
+title Diagramme de Classes - FODEP (schema normalise MERISE, 3NF)
+
+' ── Entite centrale : Contrepartie ───────────────────────────────────────────
+
+class contreparties as "contreparties\n(Contreparties)" {
+  +id : TEXT <<PK>>
+  +nom : TEXT
+  +pays : TEXT
+  +notation_pays : TEXT
+  +categorie_standard : TEXT
+  +categorie_prudentielle : TEXT
+  +notation : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+' ── Entite centrale : Exposition ─────────────────────────────────────────────
+
+class expositions as "expositions\n(Expositions)" {
+  +id : TEXT <<PK>>
+  +contrepartie_id : TEXT <<FK>>
+  +type_prudentiel : TEXT <<discriminant>>
+  +date_analyse : TEXT
+  +date_octroi : TEXT
+  +date_echeance : TEXT
+  +montant_brut : REAL
+  +devise : TEXT
+  +statut : TEXT
+  +crm_existe : INTEGER
+  +crm_type : TEXT
+  +crm_mode : TEXT
+  +crm_libelle : TEXT
+  +crm_couverture_pct : REAL
+  +ponderation_initiale : REAL
+  +ponderation_finale : REAL
+  +ead : REAL
+  +rwa : REAL
+  +capital : REAL
+  +commentaire : TEXT
+  +champs_source_json : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+note bottom of expositions
+  type_prudentiel = discriminant MERISE (a..l).
+  Garantit exactement 1 sous-table active
+  par exposition. Source de verite unique
+  pour le type, independante de la contrepartie
+  (permet la reclassification en souffrance, etc.).
+end note
+
+' ── 12 Sous-tables de type prudentiel (1:0..1) ───────────────────────────────
+
+class exposition_souveraine as "exposition_souveraine\n(cat. a : Souverains)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +cas_particulier : TEXT
+  +ponderation_zero_preferentiel : INTEGER
+  +oce_etabli : INTEGER
+  +oce_note : TEXT
+}
+
+class exposition_organisme_public as "exposition_organisme_public\n(cat. b : Organismes publics)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +cas_uemoa_fcfa : INTEGER
+  +activite_non_publique : INTEGER
+}
+
+class exposition_bmd as "exposition_bmd\n(cat. c : BMD)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +cas_haute_qualite : INTEGER
+  +cas_uemoa_fcfa : INTEGER
+  +criteres_uemoa_satisfaits : INTEGER
+  +cas_institution_listee_fcfa : INTEGER
+}
+
+class exposition_banque as "exposition_banque\n(cat. d : Banques)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +cas_institution : TEXT
+}
+
+class exposition_entreprise as "exposition_entreprise\n(cat. e : Entreprises)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +depasse_seuil_degradation_bceao : INTEGER
+  +procedure_prudentielle : INTEGER
+  +sfi_hors_loi_bancaire : INTEGER
+}
+
+class exposition_clientele_detail as "exposition_clientele_detail\n(cat. f : Clientele detail)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +criteres_eligibilite_satisfaits : INTEGER
+}
+
+class exposition_immo_residentiel as "exposition_immo_residentiel\n(cat. g : Immo. residentiel)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +eligible : INTEGER
+}
+
+class exposition_immo_commercial as "exposition_immo_commercial\n(cat. h : Immo. commercial)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +eligible : INTEGER
+}
+
+class exposition_souffrance as "exposition_souffrance\n(cat. i : Creances souffrance)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +ponderation_initiale : REAL
+  +immo_residentiel_en_defaut : INTEGER
+  +provision_au_moins_vingt_pct : INTEGER
+}
+
+class exposition_risque_eleve as "exposition_risque_eleve\n(cat. j : Creances risque eleve)" {
+  +exposition_id : TEXT <<PK/FK>>
+}
+
+class exposition_autre_actif as "exposition_autre_actif\n(cat. k : Autres actifs)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +type_actif : TEXT
+}
+
+class exposition_hors_bilan_detail as "exposition_hors_bilan_detail\n(cat. l : Hors bilan)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +niveau_risque : TEXT
+}
+
+' ── CRM : Garanties financees et non financees ───────────────────────────────
+
+class crm_financee as "crm_financee\n(CRM Financee - Collateral)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +valeur_collateral : REAL
+  +devise_collateral : TEXT
+  +type_collateral : TEXT
+  +type_emetteur : TEXT
+  +notation_emetteur : TEXT
+  +tranche_maturite : TEXT
+  +convertible_indice_principal : INTEGER
+  +opcvm_decote_max : REAL
+  +elements_panier_json : TEXT
+  +decote_change : REAL
+  +decote : REAL
+  +devise_exposition : TEXT
+  +ponderation : REAL
+  +collateral_eligible : INTEGER
+  +motif_ineligibilite : TEXT
+  +he : REAL
+  +hc : REAL
+  +hfx : REAL
+  +eva : REAL
+  +cva : REAL
+  +ead_apres_crm_financee : REAL
+  +rwa_final : REAL
+  +gain_crm : REAL
+}
+
+class crm_non_financee as "crm_non_financee\n(CRM Non Financee - Garantie)" {
+  +exposition_id : TEXT <<PK/FK>>
+  +nom_garant : TEXT
+  +categorie_garant : TEXT
+  +notation_garant : TEXT
+  +pays_garant : TEXT
+  +notation_pays_garant : TEXT
+  +ponderation_pays_garant : REAL
+  +ponderation_garant : REAL
+  +taux_couverture : REAL
+}
+
+class crm_garanties as "crm_garanties\n(Garanties multiples)" {
+  +id : TEXT <<PK>>
+  +exposition_id : TEXT <<FK>>
+  +nom_garant : TEXT
+  +categorie_garant : TEXT
+  +notation_garant : TEXT
+  +montant_couverture : REAL
+  +type_garantie : TEXT
+  +type_scenario : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+' ── Engagements hors bilan (module dedie) ────────────────────────────────────
+
+class engagements_hors_bilan as "engagements_hors_bilan\n(Engagements hors bilan)" {
+  +id : TEXT <<PK>>
+  +contrepartie_id : TEXT <<FK>>
+  +date_analyse : TEXT
+  +type_engagement : TEXT
+  +montant_nominal : REAL
+  +ccf : REAL
+  +ead : REAL
+  +ponderation : REAL
+  +rwa : REAL
+  +capital : REAL
+  +commentaire : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+' ── Tables de referentiel (baremes reglementaires) ───────────────────────────
+
+class baremes_ponderation as "baremes_ponderation\n(Baremes de ponderation)" {
+  +id : TEXT <<PK>>
+  +segment : TEXT
+  +notation : TEXT
+  +ponderation : REAL
+  +approche : TEXT
+}
+
+class baremes_ccf as "baremes_ccf\n(Baremes CCF)" {
+  +id : TEXT <<PK>>
+  +type_engagement : TEXT
+  +ccf : REAL
+}
+
+class references_notation as "references_notation\n(Nomenclature notations)" {
+  +id : TEXT <<PK>>
+  +libelle : TEXT
+  +description : TEXT
+  +ordre_tri : INTEGER
+}
+
+class references_pays_souverains as "references_pays_souverains\n(Notations souveraines pays)" {
+  +pays : TEXT <<PK>>
+  +notation_souveraine : TEXT
+  +ponderation : REAL
+}
+
+' ── Tables de reporting ───────────────────────────────────────────────────────
+
+class rapports as "rapports\n(Rapports generes)" {
+  +id : TEXT <<PK>>
+  +cree_le : TEXT
+  +periode : TEXT
+  +type_rapport : TEXT
+  +devise : TEXT
+  +perimetre_exposition : TEXT
+  +inclure_graphe_categorie : INTEGER
+  +inclure_graphe_notation : INTEGER
+  +chemin_export_excel : TEXT
+  +chemin_export_pdf : TEXT
+}
+
+class lignes_rapport as "lignes_rapport\n(Lignes de rapport)" {
+  +id : INTEGER <<PK>>
+  +rapport_id : TEXT <<FK>>
+  +ordre_ligne : INTEGER
+  +source : TEXT
+  +element_id : TEXT
+  +contrepartie : TEXT
+  +montant : REAL
+  +ead : REAL
+  +rwa : REAL
+  +capital : REAL
+}
+
+' ── Tables d'audit ───────────────────────────────────────────────────────────
+
+class historique_imports as "historique_imports\n(Historique imports)" {
+  +id : INTEGER <<PK>>
+  +type_source : TEXT
+  +nom_source : TEXT
+  +importe_le : TEXT
+  +total_lignes : INTEGER
+  +lignes_importees : INTEGER
+  +lignes_rejetees : INTEGER
+  +statut : TEXT
+  +details_json : TEXT
+}
+
+class journal_operations as "journal_operations\n(Journal des operations)" {
+  +id : INTEGER <<PK>>
+  +type_entite : TEXT
+  +entite_id : TEXT
+  +operation : TEXT
+  +payload_json : TEXT
+  +cree_le : TEXT
+}
+
+' ── Tables systeme (versionnement et metadonnees) ────────────────────────────
+
+class schema_migrations as "schema_migrations\n(Versionnement schema)" {
+  +version : INTEGER <<PK>>
+  +name : TEXT
+  +applied_at : TEXT
+}
+
+class metadonnees_app as "metadonnees_app\n(Metadonnees application)" {
+  +cle : TEXT <<PK>>
+  +valeur : TEXT
+}
+
+' ── Module Risque Operationnel (6 tables) ─────────────────────────────────────
+
+class ro_incidents as "ro_incidents\n(Incidents RO)" {
+  +id : TEXT <<PK>>
+  +reference : TEXT
+  +date_occurrence : TEXT
+  +description : TEXT
+  +ligne_metier : TEXT
+  +type_evenement : TEXT
+  +cause_racine : TEXT
+  +perte_brute : REAL
+  +perte_recuperee : REAL
+  +statut : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+class ro_kri_definitions as "ro_kri_definitions\n(Definitions KRI)" {
+  +id : TEXT <<PK>>
+  +nom : TEXT
+  +unite : TEXT
+  +formule : TEXT
+  +seuil_alerte : REAL
+  +seuil_critique : REAL
+  +sens : TEXT
+  +frequence : TEXT
+}
+
+class ro_kri_valeurs as "ro_kri_valeurs\n(Valeurs KRI)" {
+  +id : TEXT <<PK>>
+  +kri_id : TEXT <<FK>>
+  +date_mesure : TEXT
+  +valeur : REAL
+  +commentaire : TEXT
+  +cree_le : TEXT
+}
+
+class ro_risques as "ro_risques\n(Cartographie risques)" {
+  +id : TEXT <<PK>>
+  +nom : TEXT
+  +categorie : TEXT
+  +ligne_metier : TEXT
+  +probabilite : INTEGER
+  +impact : INTEGER
+  +controle_existant : TEXT
+  +efficacite_controle : INTEGER
+  +plan_action_ref : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+class ro_controles as "ro_controles\n(Controles conformite)" {
+  +id : TEXT <<PK>>
+  +reference : TEXT
+  +perimetre : TEXT
+  +type_controle : TEXT
+  +frequence : TEXT
+  +date_dernier_test : TEXT
+  +resultat : TEXT
+  +points_conformes : INTEGER
+  +points_controles : INTEGER
+  +non_conformites : TEXT
+  +validateur : TEXT
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+class ro_plans_action as "ro_plans_action\n(Plans d'action)" {
+  +id : TEXT <<PK>>
+  +reference : TEXT
+  +titre : TEXT
+  +description : TEXT
+  +type_action : TEXT
+  +source : TEXT
+  +source_ref : TEXT
+  +responsable : TEXT
+  +date_debut : TEXT
+  +date_echeance : TEXT
+  +priorite : TEXT
+  +statut : TEXT
+  +avancement : INTEGER
+  +cree_le : TEXT
+  +modifie_le : TEXT
+}
+
+class ro_historique as "ro_historique\n(Journal audit RO)" {
+  +id : INTEGER <<PK>>
+  +date_evenement : TEXT
+  +utilisateur : TEXT
+  +menu : TEXT
+  +type_action : TEXT
+  +element : TEXT
+  +ancienne_valeur : TEXT
+  +nouvelle_valeur : TEXT
+  +commentaire : TEXT
+}
+
+' ── Relations ────────────────────────────────────────────────────────────────
+
+contreparties "1" --> "0..*" expositions : contrepartie_id
+contreparties "1" --> "0..*" engagements_hors_bilan : contrepartie_id
+
+expositions "1" --> "0..1" exposition_souveraine
+expositions "1" --> "0..1" exposition_organisme_public
+expositions "1" --> "0..1" exposition_bmd
+expositions "1" --> "0..1" exposition_banque
+expositions "1" --> "0..1" exposition_entreprise
+expositions "1" --> "0..1" exposition_clientele_detail
+expositions "1" --> "0..1" exposition_immo_residentiel
+expositions "1" --> "0..1" exposition_immo_commercial
+expositions "1" --> "0..1" exposition_souffrance
+expositions "1" --> "0..1" exposition_risque_eleve
+expositions "1" --> "0..1" exposition_autre_actif
+expositions "1" --> "0..1" exposition_hors_bilan_detail
+
+expositions "1" --> "0..1" crm_financee
+expositions "1" --> "0..1" crm_non_financee
+expositions "1" --> "0..*" crm_garanties : exposition_id
+
+rapports "1" --> "1..*" lignes_rapport : rapport_id
+
+ro_kri_definitions "1" --> "0..*" ro_kri_valeurs : kri_id
+
+@enduml
+
+
+================================================================================
+3.6.2 - DIAGRAMME DE CAS D'UTILISATION
+================================================================================
+
+DESCRIPTION ET ROLE
+-------------------
+Le diagramme de cas d'utilisation (Use Case Diagram) decrit le systeme du
+point de vue de ses utilisateurs. Il repond a la question : "Que peut faire
+l'utilisateur avec ce systeme ?". Contrairement aux autres diagrammes qui
+s'adressent aux developpeurs, celui-ci est comprehensible par les parties
+prenantes non techniques (direction, auditeurs, responsables conformite).
+
+Il identifie deux acteurs et trente-trois cas d'utilisation regroupes en six
+domaines fonctionnels : cinq pour le risque de credit, un pour le risque de
+marche. Sept de ces cas d'utilisation (UC26 a UC32) ont ete ajoutes lors
+d'une revue du perimetre reellement livre, decrite ecran par ecran au
+chapitre 4.3 du memoire : ils correspondent a des ecrans de suivi et
+d'analyse construits sur les donnees deja modelisees ci-dessus (aucune
+nouvelle table n'a ete necessaire, voir 3.6.1). Un dernier (UC33) a ete
+ajoute a la suite d'une regression identifiee sur le module referentiels
+(voir DOMAINE 4 ci-dessous et memoire, 4.3.13/4.4) : une route de
+configuration des baremes a ete restauree cote API pour compenser la
+disparition de l'ecran Flutter correspondant. Trois ecrans supplementaires
+existent par ailleurs dans l'application (ICAAP, simulation de crise
+transversale, planification de capital) mais n'apparaissent pas dans ce
+diagramme : ce sont des maquettes d'interface pour le Pilier 2, sans moteur
+de calcul connecte a ce stade (detail au chapitre 4.3 et 4.4 du memoire), et
+un diagramme de cas d'utilisation ne doit documenter que des capacites
+reellement implementees, pas des intentions.
+
+ACTEURS
+--------
+- Analyste Prudentiel : utilisateur principal du systeme. C'est le charge
+  d'etudes ou l'auditeur interne qui saisit les expositions, configure les
+  garanties, lance les calculs et produit les rapports reglementaires. C'est
+  le meme acteur qui pilote le risque de credit et le risque de marche.
+- Systeme d'Import : acteur secondaire representant un fichier Excel ou CSV
+  fourni de maniere automatisee (export d'un systeme core banking, par
+  exemple). Il declenche le cas "Importer expositions" sans intervention
+  humaine directe.
+
+DOMAINE 1 - GESTION DU PORTEFEUILLE (UC1 a UC5)
+-------------------------------------------------
+Fonctions CRUD (Create, Read, Update, Delete) sur les expositions. L'analyste
+peut saisir manuellement une exposition en choisissant parmi les 12 types
+prudentiels, la modifier, la supprimer ou consulter l'ensemble du portefeuille.
+L'import par fichier (UC2) inclut automatiquement la creation (UC1) via la
+relation <<include>>.
+
+DOMAINE 2 - CALCUL PRUDENTIEL PILIER 1 (UC6 a UC10)
+-----------------------------------------------------
+Ces cas d'utilisation implementent le moteur de calcul du ratio de solvabilite
+(Pilier 1 de Bale II). Le calcul de l'EAD (Exposure At Default) est inclus
+dans chaque saisie, lui-meme inclus dans le calcul du RWA (Risk-Weighted
+Assets), lui-meme inclus dans le calcul du capital minimum reglementaire
+(RWA * 8%). Les CRM financees et non financees etendent le calcul du RWA
+en reduisant l'exposition nette avant application de la ponderation.
+
+DOMAINE 3 - HORS BILAN (UC11 a UC12)
+--------------------------------------
+Module specifique aux engagements hors bilan (lettres de credit, cautions,
+lignes de credit confirmees). L'application d'un facteur de conversion credit
+(CCF, selon 5 niveaux de risque) convertit le montant nominal en EAD
+equivalent bilan, qui entre ensuite dans le calcul RWA.
+
+DOMAINE 4 - REFERENTIELS REGLEMENTAIRES (UC13 a UC15, UC33)
+-------------------------------------------------------------
+Ces cas d'utilisation portent sur les tables de reference (baremes de
+ponderation par segment et notation, nomenclature des echelons de notation
+AAA a < B-, facteurs CCF par type d'engagement hors bilan), pas sur des
+valeurs pre-chargees par defaut : la consultation (UC13-UC15) et la
+configuration (UC33, ajoutee lors de la correction documentee au chapitre 4)
+sont aujourd'hui possibles uniquement via l'API (route GET puis PUT
+/referentiels), pas via un ecran Flutter dedie. L'ecran qui exposait
+autrefois UC13-UC15 a l'analyste a ete retire lors d'un refactor anterieur
+et remplace par l'ecran Parametres (voir memoire, 4.3.13 et 4.4) ; tant
+qu'aucun ecran de remplacement n'est reconstruit, un analyste ne peut plus
+executer ces trois cas d'utilisation depuis l'application elle-meme, et le
+module hors bilan (UC11-UC12) qui depend de ces baremes echoue explicitement
+si UC33 n'a pas ete execute au prealable.
+
+DOMAINE 5 - REPORTING, ANALYSE ET PILOTAGE (UC16 a UC18, UC26 a UC31)
+-----------------------------------------------------------------------
+Generation des rapports reglementaires en formats Excel et PDF, et
+consultation du tableau de bord synthetique affichant les KPIs prudentiels :
+RWA total, capital minimum, EAD par categorie prudentielle, distribution
+des ponderation. Ce domaine regroupe egalement six cas d'utilisation qui
+etendent la simple consultation du tableau de bord (UC18) par des vues
+d'analyse plus specialisees, toutes construites sur les memes donnees
+d'exposition sans persistance supplementaire : le suivi operationnel des
+garanties actives (echeances de renouvellement, taux de couverture moyen),
+l'analyse de concentration des grands risques (repartition secteur / pays /
+region, indice HHI, seuils d'alerte reglementaires), le suivi des defauts et
+impayes (score de risque calcule a partir du RWA, de la notation et de la
+couverture CRM reels), le diagnostic reglementaire automatise qui compare
+chaque ratio aux seuils UEMOA/CEMAC et genere des recommandations, la
+decomposition du RWA credit par agent economique avec sa jauge de densite,
+et un reporting credit specifique conservant un historique des exports deja
+generes.
+
+DOMAINE 6 - RISQUE DE MARCHE (UC19 a UC25, UC32)
+----------------------------------------------------
+Domaine independant des cinq precedents, qui ne partage aucun cas
+d'utilisation avec le risque de credit (aucune relation <<include>> ou
+<<extend>> ne traverse la frontiere entre les deux domaines), ce qui reflete
+leur separation architecturale (calcul cote serveur pour le credit, cote
+client pour le marche, cf. chapitre 4). L'analyste constitue un portefeuille
+de titres (obligations, actions), puis declenche independamment le calcul du
+risque de taux, du risque actions et change (approche standard 9%/9%), le
+calcul de la VaR (au choix, methode historique, parametrique ou Monte-Carlo),
+un stress test sur 8 scenarios reglementaires, ou le backtesting du modele de
+VaR (zones vertes/orange/rouge Bale II/III). Un cas d'utilisation permet
+d'actualiser les courbes de taux souverains CEMAC publiees par la BEAC, et un
+dernier etend le calcul du risque de change par une analyse titre par titre
+(taux d'acquisition contre taux courant, gain ou perte latent).
+
+@startuml DiagrammeCasUtilisation
+
+left to right direction
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor White
+  BorderColor #333333
+  FontSize 11
+}
+
+title Diagramme de Cas d'Utilisation - FODEP
+
+actor "Analyste\nPrudentiel" as AP
+actor "Systeme\nd Import" as SI
+
+rectangle "FODEP - Perimetre fonctionnel" {
+
+  package "Gestion du portefeuille" {
+    usecase "Saisir une exposition\n(12 types prudentiels)" as UC1
+    usecase "Importer expositions\n(CSV / Excel)" as UC2
+    usecase "Modifier une exposition" as UC3
+    usecase "Supprimer une exposition" as UC4
+    usecase "Consulter le portefeuille" as UC5
+  }
+
+  package "Calcul prudentiel (Pilier 1)" {
+    usecase "Calculer EAD\n(bilan + hors bilan * CCF)" as UC6
+    usecase "Configurer CRM financee\n(collateral + decotes He/Hc/Hfx)" as UC7
+    usecase "Configurer CRM non financee\n(garantie + ponderation garant)" as UC8
+    usecase "Calculer RWA\n(exposition nette * ponderation)" as UC9
+    usecase "Calculer capital minimum\n(RWA * 8%)" as UC10
+  }
+
+  package "Hors bilan" {
+    usecase "Saisir engagement\nhors bilan" as UC11
+    usecase "Appliquer CCF\n(5 niveaux de risque)" as UC12
+  }
+
+  package "Referentiels reglementaires" {
+    usecase "Consulter baremes\nde ponderation" as UC13
+    usecase "Consulter notations\n(AAA a < B-)" as UC14
+    usecase "Consulter CCF\npar type d engagement" as UC15
+    usecase "Configurer les baremes\nprudentiels (PUT)" as UC33
+  }
+
+  note bottom of UC13
+    UC13, UC14, UC15, UC33 :
+    accessibles uniquement via l'API
+    (/referentiels), aucun ecran Flutter
+    dedie depuis le retrait de l'ancien
+    ecran Referentiels (voir memoire 4.3.13)
+  end note
+
+  package "Reporting, analyse et pilotage" {
+    usecase "Generer rapport Excel" as UC16
+    usecase "Generer rapport PDF" as UC17
+    usecase "Consulter tableau\nde bord (KPIs)" as UC18
+    usecase "Suivre le portefeuille\nde garanties" as UC26
+    usecase "Analyser la concentration\ndes grands risques (HHI)" as UC27
+    usecase "Suivre les defauts\net impayes" as UC28
+    usecase "Executer le diagnostic\nreglementaire automatise" as UC29
+    usecase "Piloter le RWA credit\npar agent economique" as UC30
+    usecase "Generer le reporting\ncredit (historique)" as UC31
+  }
+
+  package "Risque de marche (independant, calcul cote client)" {
+    usecase "Constituer le portefeuille\n(obligations / actions)" as UC19
+    usecase "Calculer le risque de taux\n(duration, sensibilite, convexite)" as UC20
+    usecase "Calculer risque actions/change\n(approche standard 9%/9%)" as UC21
+    usecase "Calculer la VaR\n(historique / parametrique / Monte-Carlo)" as UC22
+    usecase "Lancer un stress test\n(8 scenarios reglementaires)" as UC23
+    usecase "Backtester le modele de VaR\n(zones Bale II/III)" as UC24
+    usecase "Actualiser les courbes\nde taux CEMAC (BEAC)" as UC25
+    usecase "Analyser le risque de change\ntitre par titre (FX)" as UC32
+  }
+}
+
+AP --> UC1
+AP --> UC2
+AP --> UC3
+AP --> UC4
+AP --> UC5
+AP --> UC7
+AP --> UC8
+AP --> UC11
+AP --> UC13
+AP --> UC14
+AP --> UC15
+AP --> UC33
+AP --> UC16
+AP --> UC17
+AP --> UC18
+AP --> UC19
+AP --> UC20
+AP --> UC21
+AP --> UC22
+AP --> UC23
+AP --> UC24
+AP --> UC25
+AP --> UC26
+AP --> UC27
+AP --> UC28
+AP --> UC29
+AP --> UC30
+AP --> UC31
+AP --> UC32
+
+SI --> UC2
+
+UC2  ..> UC1  : <<include>>
+UC1  ..> UC6  : <<include>>
+UC6  ..> UC9  : <<include>>
+UC9  ..> UC10 : <<include>>
+UC7  ..> UC9  : <<extend>>
+UC8  ..> UC9  : <<extend>>
+UC11 ..> UC12 : <<include>>
+UC19 ..> UC20 : <<extend>>
+UC19 ..> UC21 : <<extend>>
+UC19 ..> UC22 : <<extend>>
+UC22 ..> UC24 : <<extend>>
+UC7  ..> UC26 : <<extend>>
+UC8  ..> UC26 : <<extend>>
+UC18 ..> UC27 : <<extend>>
+UC18 ..> UC28 : <<extend>>
+UC18 ..> UC29 : <<extend>>
+UC18 ..> UC30 : <<extend>>
+UC21 ..> UC32 : <<extend>>
+
+@enduml
+
+
+================================================================================
+3.6.3 - DIAGRAMME D'ACTIVITE
+================================================================================
+
+DESCRIPTION ET ROLE
+-------------------
+Le diagramme d'activite modelise le flux de traitement d'une exposition depuis
+sa reception jusqu'a sa persistance en base, en passant par toutes les etapes
+de validation et de calcul prudentiel. Il repond a la question : "Comment le
+calcul RWA est-il execute, etape par etape ?". C'est la traduction algorithmique
+du referentiel BCEAO (Banque Centrale des Etats de l'Afrique de l'Ouest) /
+Bale II en diagramme de flux.
+
+ETAPE 1 - RECEPTION ET IDENTIFICATION (entree)
+-----------------------------------------------
+Les donnees d'une exposition arrivent soit par saisie manuelle de l'analyste
+via l'interface Flutter, soit par import d'un fichier Excel/CSV. La premiere
+action est d'identifier parmi les 12 categories prudentielles (a a l) a quelle
+categorie appartient cette exposition, car la ponderation de risque et les
+parametres de calcul different selon la categorie.
+
+ETAPE 2 - VALIDATION EN PARALLELE (fork)
+-----------------------------------------
+Deux verifications sont effectuees simultanement (representees par le fork) :
+- Verification de la zone reglementaire (UEMOA ou CEMAC) qui peut modifier
+  certaines ponderation (exemple : creances libellees en FCFA sur des emetteurs
+  UEMOA peuvent beneficier de ponderation preferentielles).
+- Validation Pydantic des champs obligatoires : types de donnees, plages de
+  valeurs acceptables, presence des champs requis selon la categorie.
+Si la validation echoue, l'enregistrement est rejete et tracabilise dans les
+tables historique_imports et journal_operations, puis le traitement s'arrete.
+
+ETAPE 3 - CALCUL DE L'EAD (Exposure At Default)
+-------------------------------------------------
+L'EAD represente le montant d'exposition au moment du defaut. Pour les
+expositions au bilan, l'EAD = montant brut. Pour les engagements hors bilan,
+l'EAD = montant nominal * CCF (Credit Conversion Factor), le CCF etant lu dans
+la table baremes_ccf selon le type d'engagement.
+
+ETAPE 4 - APPLICATION DE LA CRM (Credit Risk Mitigation)
+----------------------------------------------------------
+Si une garantie eligible est associee a l'exposition, deux cas se presentent :
+
+a) CRM financee (collateral financier : depot bancaire, titre d'Etat, OPCVM) :
+   On calcule les decotes reglementaires :
+   - He : decote sur l'exposition (0% pour les credits au bilan)
+   - Hc : decote sur le collateral selon son type (0% a 30%)
+   - Hfx : decote supplementaire si devise du collateral differente (8%)
+   Puis : EVA = EAD * (1 + He)  et  CVA = Valeur_collateral * (1 - Hc - Hfx)
+   L'EAD net = max(0, EVA - CVA), soit l'exposition non couverte residuelle.
+
+b) CRM non financee (garantie personnelle d'un tiers : Etat, banque, institution) :
+   La portion garantie beneficie de la ponderation du garant (substituee a
+   celle de l'emprunteur). Le RWA total est la somme de la portion garantie
+   (EAD * taux_couverture * ponderation_garant) et de la portion non garantie
+   (EAD * (1-taux_couverture) * ponderation_emprunteur).
+
+ETAPE 5 - DETERMINATION DE LA PONDERATION
+-------------------------------------------
+Selon la categorie prudentielle et la notation de la contrepartie, la
+ponderation applicable est determinee en consultant la table baremes_ponderation.
+Les ponderation varient de 0% (creances sur Etats OCDE bien notes) a 250%
+(etablissements bancaires sous procedure prudentielle). La note laterale du
+diagramme resume les regles de ponderation pour chacune des 12 categories.
+
+ETAPE 6 - CALCUL FINAL ET PERSISTANCE
+----------------------------------------
+RWA = EAD_net * ponderation (en fraction, ex: 0.75 pour 75%)
+Capital_minimum = RWA * 8% (ratio de solvabilite minimum Bale II)
+Ces resultats sont persistes dans les tables expositions, la sous-table du
+type prudentiel correspondant, et eventuellement crm_financee ou
+crm_non_financee. Le tableau de bord est ensuite mis a jour.
+
+@startuml DiagrammeActivite
+
+skinparam activity {
+  BackgroundColor White
+  BorderColor #333333
+  FontSize 11
+  DiamondBackgroundColor White
+  DiamondBorderColor #333333
+}
+skinparam ArrowColor #333333
+
+title Diagramme d'Activite - Calcul RWA pour une exposition au bilan\n(conforme referentiel BCEAO / Bale II)
+
+start
+
+:Recevoir les donnees d'exposition\n(saisie manuelle ou import CSV/Excel);
+
+:Identifier la categorie prudentielle\n(a) Souverains\n(b) Organismes publics\n(c) BMD\n(d) Banques\n(e) Entreprises\n(f) Clientele de detail\n(g) Immo. residentiel\n(h) Immo. commercial\n(i) Creances en souffrance\n(j) Creances risque eleve\n(k) Autres actifs\n(l) Hors bilan;
+
+fork
+  :Verifier zone reglementaire\n(UEMOA / CEMAC);
+fork again
+  :Valider les champs obligatoires\n(Pydantic : types, plages, requis);
+end fork
+
+if (Validation OK ?) then (non)
+  :Rejeter l'enregistrement\n+ enregistrement dans journal d'erreur\n(historique_imports / journal_operations);
+  stop
+endif
+
+:Calculer EAD\n= montant_bilan + (montant_HB * CCF)\nCCF selon engagement_type dans ccf_references;
+
+if (CRM renseignee et garantie eligible ?) then (oui)
+
+  if (CRM financee ?\n(collateral financier)) then (oui)
+    :Calculer decotes :\nHe = haircut exposition (=0 pour bilan)\nHc = haircut collateral (0% a 30%)\nHfx = haircut change (0% ou 8%);
+    :EVA = EAD * (1 + He)\nCVA = collateral * (1 - Hc - Hfx);
+    :EAD_net = max(0, EVA - CVA);
+  else (non - CRM non financee\n(garantie tiers))
+    :Identifier ponderation du garant\n(categorie + notation du garant);
+    :EAD_net_couverte = EAD * coverage_pct * RW_garant\nEAD_net_non_couverte = EAD * (1-coverage_pct) * RW_expo;
+    :RWA_total = EAD_net_couverte + EAD_net_non_couverte;
+  endif
+
+else (non - pas de CRM\nou garantie non eligible)
+  :EAD_net = EAD;
+endif
+
+:Determiner ponderation applicable\nselon categorie et notation;
+
+note right
+  (a) Souverains : 0% - 150%\n      Cases BCEAO/UEMOA -> 0%\n      OCE 0-1 -> 0%, 2 -> 20%, 3 -> 50%\n      4,5,6 -> 100%, 7 -> 150%
+  (b) Org. publics : 20% - 150%\n      UEMOA FCFA non-commercial -> 20%
+  (c) BMD : 0% - 150%\n      Haute qualite / liste reconnue -> 0%
+  (d) Banques : 20% - 250%\n      Cas equivalent UMOA -> 100%\n      Prudentiel faible -> 250%
+  (e) Entreprises : 20% - 150%\n      Degradation BCEAO -> 150%
+  (f) Detail : 75%\n      (si criteres eligibilite OK)
+  (g) Immo. resid. : 35% eligible / 100% sinon
+  (h) Immo. comm. : 75% eligible / reclass. entreprise
+  (i) Souffrance : 100% ou 150%\n      (selon provision et type)
+  (j) Risque eleve : 150% fixe
+  (k) Autres actifs : 0% a 250%\n      (selon type d'actif)
+  (l) Hors bilan : via CCF (10% a 100%)
+end note
+
+:RWA = EAD_net * ponderation;
+
+:Capital_min = RWA * 8%;
+
+:Persister en base\n(expositions + sous-table type prudentiel\n+ crm_financee ou crm_non_financee);
+
+:Mettre a jour agregats\n(tableau de bord : RWA total,\ncapital total, EAD par categorie);
+
+stop
+
+@enduml
+
+POURQUOI IL N'Y A PAS DE SECOND DIAGRAMME POUR LE RISQUE DE MARCHE
+-----------------------------------------------------------------------
+Le risque de marche suit un flux d'activite analogue sans necessiter un
+second diagramme : reception du portefeuille, identification du sous-risque
+(taux, actions, change), application de la formule de charge correspondante,
+agregation en une exigence de capital, puis calcul en parallele de la VaR et
+de son backtesting. La seule difference structurelle est l'endroit ou ce flux
+s'execute, le frontend Flutter plutot que le backend Python (cf. chapitre 4),
+ce qui ne change pas la nature de l'algorithme.
+
+================================================================================
+FIN DES DIAGRAMMES RETENUS (3.6.1 A 3.6.3)
+================================================================================
+
+Les diagrammes de composants, de sequence, de structure composite et de
+paquetage produits lors des versions precedentes de ce document ont ete
+retires de la version deposee, pour ne garder que les trois diagrammes qui
+repondent directement aux questions posees par le memoire (quelles donnees,
+quelles fonctions, quel algorithme). Le contenu utile qu'ils documentaient a
+ete integre en prose : l'architecture en couches est resumee au chapitre 4,
+la reconstruction d'une exposition complete par jointures est expliquee dans
+la section 3.6.1 ci-dessus, et l'organisation des dossiers du code source
+n'est pas indispensable a la comprehension fonctionnelle du memoire.
+
+================================================================================
+NOTE D'UTILISATION
+================================================================================
+
+Pour rendre ces diagrammes :
+
+1. En ligne : https://plantuml.com/plantuml
+   - Copier le bloc @startuml...@enduml
+   - Coller dans l'editeur et cliquer "Submit"
+
+2. VS Code :
+   - Installer l'extension "PlantUML" (jebbs.plantuml)
+   - Ouvrir ce fichier, placer le curseur dans un bloc
+   - Alt+D pour previsualiser
+
+3. IntelliJ / PyCharm :
+   - Installer le plugin PlantUML Integration
+   - Meme principe : ouvrir le fichier et previsualiser
+
+4. En ligne de commande :
+   - Telecharger plantuml.jar depuis plantuml.com
+   - java -jar plantuml.jar diagrams_uml.txt
+   - Produit des fichiers PNG dans le meme dossier
+
+Logiciels compatibles : PlantUML, StarUML (import), Lucidchart (import),
+draw.io (import via plugin), Visual Paradigm.
+
+================================================================================

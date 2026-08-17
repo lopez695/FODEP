@@ -1,0 +1,1 @@
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.

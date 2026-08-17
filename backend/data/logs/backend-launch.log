@@ -1,0 +1,16 @@
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+Authentification desactivee (RWA_AUTH_ENABLED absent ou a 0). N'exposez jamais cette API en dehors de la boucle locale.
+C:\DOSSIER TRAVAIL\DOSSIER TRAVAIL\OUTIL_FODEP\FODEP\backend\app\var_marche\routes.py:204: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+  serie_pnl = _serie_ou_422(type_portefeuille, fenetre_jours, horizon_jours)

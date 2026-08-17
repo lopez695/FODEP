@@ -1,0 +1,17 @@
+ALTER TABLE crm_financed ADD COLUMN collateral_currency TEXT NOT NULL DEFAULT 'XOF';
+ALTER TABLE crm_financed ADD COLUMN collateral_type TEXT NOT NULL DEFAULT 'Liquidités dans la même devise';
+ALTER TABLE crm_financed ADD COLUMN convertible_main_index INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE crm_financed ADD COLUMN opcvm_highest_haircut REAL NOT NULL DEFAULT 0.30;
+ALTER TABLE crm_financed ADD COLUMN basket_items_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE crm_financed ADD COLUMN exposure_currency TEXT NOT NULL DEFAULT 'XOF';
+ALTER TABLE crm_financed ADD COLUMN risk_weight REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN collateral_eligible INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE crm_financed ADD COLUMN ineligibility_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE crm_financed ADD COLUMN he REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN hc REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN hfx REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN eva REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN cva REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN ead_after_financed_crm REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN rwa_final REAL NOT NULL DEFAULT 0;
+ALTER TABLE crm_financed ADD COLUMN crm_gain REAL NOT NULL DEFAULT 0;

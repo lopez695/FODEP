@@ -1,0 +1,80 @@
+diff a/frontend/lib/modules/risque_marche/screens/risque_marche_screen.dart b/frontend/lib/modules/risque_marche/screens/risque_marche_screen.dart	(rejected hunks)
+@@ -30499,3 +32198,78 @@ RWA Marché = Exigence FP Marché × 11,111111''',
+     ];
+   }
+ }
++class _TrianglePainter extends CustomPainter {
++  final Color color;
++  _TrianglePainter(this.color);
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    final path = Path();
++    final h = size.height;
++    final w = size.width;
++    path.moveTo(w / 2, 0); // Top
++    path.lineTo(0, h); // Bottom left
++    path.lineTo(w, h); // Bottom right
++    path.close();
++    canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
++  }
++
++  @override
++  bool shouldRepaint(covariant _TrianglePainter oldDelegate) => oldDelegate.color != color;
++}
++
++class FlDotTrianglePainter extends FlDotPainter {
++  FlDotTrianglePainter({
++    required this.color,
++    this.size = 8.0,
++    this.strokeWidth = 0.0,
++    this.strokeColor = Colors.transparent,
++  });
++
++  final Color color;
++  final double size;
++  final double strokeWidth;
++  final Color strokeColor;
++
++  @override
++  void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
++    final path = Path();
++    final height = size * 0.866;
++    path.moveTo(offsetInCanvas.dx, offsetInCanvas.dy - height / 2);
++    path.lineTo(offsetInCanvas.dx - size / 2, offsetInCanvas.dy + height / 2);
++    path.lineTo(offsetInCanvas.dx + size / 2, offsetInCanvas.dy + height / 2);
++    path.close();
++
++    final paint = Paint()
++      ..color = color
++      ..style = PaintingStyle.fill;
++    canvas.drawPath(path, paint);
++
++    if (strokeWidth > 0) {
++      final strokePaint = Paint()
++        ..color = strokeColor
++        ..style = PaintingStyle.stroke
++        ..strokeWidth = strokeWidth;
++      canvas.drawPath(path, strokePaint);
++    }
++  }
++
++  @override
++  Size getSize(FlSpot spot) => Size(size, size);
++
++  @override
++  Color get mainColor => color;
++
++  @override
++  FlDotPainter lerp(FlDotPainter a, FlDotPainter b, double t) {
++    return this; 
++  }
++
++  @override
++  List<Object?> get props => [
++        color,
++        size,
++        strokeWidth,
++        strokeColor,
++      ];
++}

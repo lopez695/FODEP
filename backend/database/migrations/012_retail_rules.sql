@@ -1,0 +1,1 @@
+ALTER TABLE exposures ADD COLUMN retail_eligibility_criteria_satisfied INTEGER;

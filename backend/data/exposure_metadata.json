@@ -1,0 +1,813 @@
+{
+  "exposures": {
+    "CP001": {
+      "currency": "EUR",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 10039850000.0,
+        "issuer_type": "autre",
+        "issuer_rating": "autres_actions",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.0,
+      "final_rw": 0.0,
+      "ead": 0.0,
+      "rwa": 0.0,
+      "capital": 0.0
+    },
+    "CP002": {
+      "currency": "USD",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 3000000000.0,
+        "issuer_type": "souverain",
+        "issuer_rating": "garanti_brvm",
+        "maturity_bucket": ">10 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.0,
+      "final_rw": 0.0,
+      "ead": 0.0,
+      "rwa": 0.0,
+      "capital": 0.0
+    },
+    "CP003": {
+      "currency": "USD",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "non_financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 1811913720.0,
+        "issuer_type": "souverain",
+        "issuer_rating": "autres_actions",
+        "maturity_bucket": "5-10 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 0.0,
+      "final_rw": 0.0,
+      "ead": 45050000.0,
+      "rwa": 45050000.0,
+      "capital": 3604000.0
+    },
+    "CP009": {
+      "currency": "EUR",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "non_financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 200000000.0,
+        "issuer_type": "autre",
+        "issuer_rating": "AA-",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.0,
+      "final_rw": 1.0,
+      "ead": 8600000.0,
+      "rwa": 8600000.0,
+      "capital": 688000.0
+    },
+    "CP010": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM non financee",
+        "label": "Non éligible",
+        "coverage_percent": 0.0,
+        "guarantor_name": "VRIDI",
+        "guarantor_category": "(a) souverains",
+        "guarantor_rating": "B-"
+      },
+      "original_rw": 0.0,
+      "final_rw": 0.0,
+      "ead": 20000000.0,
+      "rwa": 20000000.0,
+      "capital": 1600000.0
+    },
+    "CP011": {
+      "currency": "EUR",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "non_financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 5841698020.0,
+        "issuer_type": "souverain",
+        "issuer_rating": "garanti_brvm",
+        "maturity_bucket": "1-3 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.0,
+      "final_rw": 1.0,
+      "ead": 6070000.0,
+      "rwa": 6070000.0,
+      "capital": 485600.0
+    },
+    "CP016": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "non_financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 4229784300.0,
+        "issuer_type": "autre",
+        "issuer_rating": "autres_actions",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 0.5,
+      "final_rw": 0.5,
+      "ead": 45000200.0,
+      "rwa": 45000200.0,
+      "capital": 3600016.0
+    },
+    "CP017": {
+      "currency": "USD",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 5841698020.0,
+        "issuer_type": "souverain",
+        "issuer_rating": "liquidite",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 0.35,
+      "final_rw": 0.0,
+      "ead": 0.0,
+      "rwa": 0.0,
+      "capital": 0.0
+    },
+    "CP007": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "financee",
+        "coverage_percent": 0.0,
+        "collateral_value": 74655164890.6667,
+        "issuer_type": "autre",
+        "issuer_rating": "A",
+        "maturity_bucket": ">10 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 0.0,
+      "final_rw": 0.0,
+      "ead": 0.0,
+      "rwa": 0.0,
+      "capital": 0.0
+    },
+    "CP008": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM non financee",
+        "label": "Non éligible",
+        "coverage_percent": 0.0,
+        "guarantor_name": "Heymann's Inc.",
+        "guarantor_category": "(e) entreprises",
+        "guarantor_rating": "B"
+      },
+      "original_rw": 0.75,
+      "final_rw": 0.75,
+      "ead": 30000047500.0,
+      "rwa": 30000047500.0,
+      "capital": 2400003800.0
+    },
+    "CP012": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.0,
+      "crm_details": {
+        "mode": "CRM non financee",
+        "label": "Non éligible",
+        "coverage_percent": 0.0,
+        "guarantor_name": "TECHNO",
+        "guarantor_category": "(a) souverains",
+        "guarantor_rating": "BB-"
+      },
+      "original_rw": 0.75,
+      "final_rw": 0.75,
+      "ead": 300056600435.0,
+      "rwa": 300056600435.0,
+      "capital": 24004528034.8
+    },
+    "CP013": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.95565612789525,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "non_financee",
+        "coverage_percent": 0.95565612789525,
+        "collateral_value": 7453611740.0,
+        "issuer_type": "souverain",
+        "issuer_rating": "non_note_etat_umoa",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.5,
+      "final_rw": 1.5,
+      "ead": 300056600436.0,
+      "rwa": 300056600436.0,
+      "capital": 24004528034.88
+    },
+    "CP018": {
+      "currency": "XOF",
+      "status": "Active",
+      "comment": "",
+      "crm_coverage_percent": 0.808610066,
+      "crm_details": {
+        "mode": "CRM financee",
+        "label": "financee",
+        "coverage_percent": 0.808610066,
+        "collateral_value": 11483396040.0,
+        "issuer_type": "autre",
+        "issuer_rating": "liquidite",
+        "maturity_bucket": "3-5 ans",
+        "fx_haircut": 0.0
+      },
+      "original_rw": 1.0,
+      "final_rw": 1.0,
+      "ead": 48516603960.0,
+      "rwa": 48516603960.0,
+      "capital": 3881328316.8
+    }
+  },
+  "off_balance": {
+    "HB016": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB017": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB018": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB019": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB020": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB021": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB022": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB023": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB024": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB025": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB026": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB027": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB028": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB029": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB030": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB031": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB032": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB033": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB034": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB035": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB036": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB037": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB038": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB039": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB040": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB041": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB042": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB043": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB044": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB045": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB046": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB047": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB048": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB049": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB050": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB051": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB052": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB053": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB054": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB055": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB056": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB057": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB058": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB059": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB060": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB061": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB062": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB063": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB064": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB065": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB066": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB067": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB068": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB069": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB070": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB071": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB072": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB073": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB074": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB075": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB076": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB077": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB078": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB079": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB080": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB081": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB082": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB083": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB084": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB085": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB086": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB087": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB088": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB089": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB090": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB091": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB092": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB093": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB094": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB095": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB096": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB097": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB098": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB099": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB100": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB101": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB102": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB103": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB104": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB105": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB106": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB107": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB108": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB109": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB110": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB111": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB112": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB113": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB114": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB115": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB116": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB117": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB118": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB119": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB120": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB121": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB122": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB123": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB124": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB125": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB126": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB127": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB128": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB129": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB130": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB131": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB132": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB133": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB134": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB135": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB136": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB137": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB138": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB139": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB140": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB141": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB142": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB143": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB144": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB145": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB146": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB147": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB148": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB149": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB150": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB151": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB152": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB153": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB154": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB155": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB156": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB157": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB158": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB159": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB160": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB161": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB162": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB163": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB164": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB165": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB166": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB167": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB168": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB169": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB170": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB171": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB172": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB173": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB174": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB175": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB176": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB177": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB178": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB179": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB180": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers-21-04-2026.xlsx"
+    },
+    "HB181": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB182": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB183": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB184": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB185": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB186": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB187": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB188": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB189": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB190": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB191": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB192": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB193": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB194": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    },
+    "HB195": {
+      "comment": "Import Excel BASE_CALCUL_RWA_v2_pers.xlsx"
+    }
+  }
+}

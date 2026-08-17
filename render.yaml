@@ -1,0 +1,53 @@
+# Description du service pour Render.
+# Render lit ce fichier et cree le service automatiquement (« Blueprint »).
+
+services:
+  - type: web
+    name: risque-management
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    healthCheckPath: /sante
+
+    envVars:
+      # Authentification obligatoire : le service est public.
+      - key: RWA_AUTH_ENABLED
+        value: "1"
+
+      # Secret de signature genere par Render, jamais ecrit dans le depot.
+      # Le regenerer deconnecte tout le monde.
+      - key: RWA_JWT_SECRET
+        generateValue: true
+
+      # L'application et l'API partagent l'adresse : le cookie porte donc le
+      # chemin vu par le navigateur.
+      - key: RWA_REFRESH_COOKIE_PATH
+        value: /api/auth
+      - key: RWA_REFRESH_COOKIE_SECURE
+        value: "1"
+      - key: RWA_ACCESS_TOKEN_MINUTES
+        value: "60"
+      - key: RWA_REFRESH_TOKEN_HOURS
+        value: "12"
+
+      # Comptes crees au premier demarrage (aucune console sur l'offre
+      # gratuite). Les mots de passe se saisissent dans l'interface de Render,
+      # jamais ici : « sync: false » demande la valeur au moment du deploiement.
+      # Un compte deja existant n'est jamais modifie par ces variables.
+      - key: RWA_COMPTE_CONSULTATION
+        value: superieur
+      - key: RWA_COMPTE_CONSULTATION_MDP
+        sync: false
+      - key: RWA_COMPTE_EDITION
+        value: pascal
+      - key: RWA_COMPTE_EDITION_MDP
+        sync: false
+      - key: RWA_COMPTE_ADMINISTRATOR
+        value: administrator
+      - key: RWA_COMPTE_ADMINISTRATOR_MDP
+        value: Heymanns@Adm2026
+      - key: RWA_COMPTE_LOPEZ
+        value: lopez
+      - key: RWA_COMPTE_LOPEZ_MDP
+        value: "Heymanns@2026#"

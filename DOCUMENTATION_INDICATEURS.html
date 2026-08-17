@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Guide des Indicateurs Prudentiels & Risques - Risk Management</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@300;400;500;600;700;800&display=swap');
+    
+    :root {
+      --primary: #0B192C;
+      --primary-light: #1E3E62;
+      --accent: #1E88E5;
+      --success: #05CD99;
+      --warning: #FFB547;
+      --danger: #EE5D50;
+      --bg: #F4F7FE;
+      --card: #FFFFFF;
+      --border: #E6EAF5;
+      --text: #0F172A;
+      --muted: #64748B;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Roboto Flex', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.6;
+      -webkit-print-color-adjust: exact;
+    }
+
+    /* Cover Header - Deep Blue */
+    .cover-page {
+      background: linear-gradient(135deg, #0A192F 0%, #002147 50%, #1E3E62 100%);
+      color: white;
+      padding: 50px 40px;
+      border-radius: 2px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 15px rgba(11, 25, 44, 0.15);
+    }
+    .cover-header {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFB547; font-weight: 800;
+      margin-bottom: 15px;
+    }
+    .cover-title {
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 12px;
+      color: #FFFFFF;
+    }
+    .cover-subtitle {
+      font-size: 14px;
+      font-weight: 300;
+      opacity: 0.9;
+      max-width: 750px;
+      margin-bottom: 35px;
+      color: #E2E8F0;
+    }
+    .cover-meta {
+      display: flex;
+      gap: 40px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 12px;
+    }
+    .meta-item label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 2px;
+      color: #93C5FD; font-weight: 700; opacity: 0.95;
+    }
+    .meta-item span {
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 30px 0 15px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--primary-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* Note Box */
+    .exec-note {
+      background: white;
+      border-left: 4px solid var(--primary-light);
+      border-radius: 2px;
+      padding: 15px 20px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 6px rgba(11, 25, 44, 0.04);
+    }
+    .exec-note h4 {
+      color: var(--primary);
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .exec-note p {
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    /* Indicator Cards */
+    .indicator-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(11, 25, 44, 0.03);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .indicator-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 2px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: #E3F2FD; color: #1565C0; }
+    .badge-success { background: #E6F9F5; color: #00897B; }
+    .badge-warning { background: #FFF7E6; color: #D97706; }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+      margin-top: 10px;
+    }
+    .grid-box {
+      background: var(--bg);
+      border-radius: 2px;
+      padding: 12px;
+    }
+    .grid-box-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .grid-box-content {
+      font-size: 12px;
+      color: var(--text);
+    }
+    .formula-text {
+      font-family: 'Courier New', monospace;
+      background: #0B192C;
+      color: #FFFFFF;
+      padding: 8px 10px;
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      word-break: break-all;
+    }
+
+    /* Clean Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      background: white;
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: #0B192C;
+      color: white;
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) { background-color: #F8FAFC; }
+
+    .footer {
+      text-align: center;
+      padding: 30px 0;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Cover Page -->
+  <div class="cover-page">
+    <div class="cover-header">DOCUMENTATION TECHNIQUE & FONCTIONNELLE</div>
+    <div class="cover-title">Guide des Indicateurs Prudentiels & Risques</div>
+    <div class="cover-subtitle">
+      Présentation synthétique des mécanismes de calcul, des exigences de fonds propres et des données d'entrée de l'application Risk Management.
+    </div>
+    <div class="cover-meta">
+      <div class="meta-item">
+        <label>Auteur</label>
+        <span>Équipe IT Finance</span>
+      </div>
+      <div class="meta-item">
+        <label>Référentiel</label>
+        <span>BCEAO / Dispositif Prudentiel UMOA</span>
+      </div>
+      <div class="meta-item">
+        <label>Application</label>
+        <span>Risk Management</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note d'orientation -->
+  <div class="exec-note">
+    <h4>Note d'orientation</h4>
+    <p>
+      Cet ouvrage rassemble l'intégralité des métriques de pilotage intégrées dans l'outil Risk Management. 
+      Chaque indicateur y est expliqué selon 3 axes fondamentaux : 
+      son <strong>utilité financière</strong>, sa <strong>formule réglementaire</strong> et les <strong>données nécessaires</strong> à sa production.
+    </p>
+  </div>
+
+  <!-- SECTION 1 : FONDS PROPRES & RATIOS DE SOLVABILITÉ -->
+  <div class="section-title">
+    1. Fonds Propres Réglementaires & Ratios Prudentiels
+    <span class="section-subtitle">Titre II - Dispositif Prudentiel BCEAO</span>
+  </div>
+
+  <!-- Structure FPE Card -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">Fonds Propres Effectifs (FPE) - Capital Réglementaire</span>
+      <span class="badge badge-primary">Structure du Capital</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Constitue la réserve globale de capital de la banque dédiée à l'absorption des pertes non anticipées et au maintien de la confiance des déposants.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">FPE = Tier 1 + Tier 2</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Tier 1 = CET1 (Capital dur) + AT1 (Additionnel)<br>
+          Tier 2 = Dettes subordonnées & provisions générales
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Capital social & réserves légales<br>
+          - Report à nouveau & résultat éligible<br>
+          - Instruments hybrides AT1<br>
+          - Emprunts subordonnés T2<br>
+          - Déductions prudentielles (goodwill, etc.)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratio 1: CET1 -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">Ratio CET1 (Common Equity Tier 1)</span>
+      <span class="badge badge-success">Min : 5.0% | Coussin : 2.5%</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Mesure la couverture des risques uniquement par les fonds propres de la plus haute qualité (actions ordinaires et réserves), capables d'absorber les pertes en continuité d'exploitation.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Ratio CET1 = CET1 / RWA Total</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Exigence minimale BCEAO : 5.0%<br>
+          Seuil avec Coussin de conservation : 7.5%
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Capital ordinaire & Primes d'émission<br>
+          - Réserves & Report à nouveau<br>
+          - Déductions CET1 (actifs incorporels)<br>
+          - Total RWA (Crédit + Marché + Opérationnel)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratio 2: Tier 1 -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">Ratio Tier 1 (Capital de Base)</span>
+      <span class="badge badge-success">Min : 6.0% | Coussin : 2.5%</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Évalue la solvabilité fondamentale de l'établissement en incluant le CET1 et les instruments de fonds propres additionnels de catégorie 1 (AT1) perpétuels sans incitation au remboursement.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Ratio Tier 1 = Tier 1 / RWA Total</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Tier 1 = CET1 + AT1<br>
+          Exigence minimale BCEAO : 6.0% (cible avec coussin : 8.5%)
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Fonds propres CET1<br>
+          - Instruments additionnels AT1 (actions de préférence...)<br>
+          - Déductions AT1<br>
+          - Total RWA de la banque
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratio 3: Solvabilité Globale -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">Ratio de Solvabilité Globale (CAR - Capital Adequacy Ratio)</span>
+      <span class="badge badge-success">Min : 9.0% | Coussin : 2.5%</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Indicateur central de régulation prudentielle. Il garantit que l'ensemble des fonds propres effectifs (T1 + T2) couvre au moins 9% des risques totaux étalonnés de l'établissement.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Ratio Solvabilité = FPE / RWA Total</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Exigence minimale BCEAO : 9.0%<br>
+          Seuil global avec coussin de conservation : 11.5%
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Fonds Propres Effectifs (FPE)<br>
+          - RWA Crédit (Bilan & Hors-bilan)<br>
+          - RWA Marché (Taux, Actions, Change)<br>
+          - RWA Opérationnel (BIC / CRR3)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratio 4: Levier -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">Ratio de Levier</span>
+      <span class="badge badge-primary">Norme Min : 3.0%</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Sert de filet de sécurité non fondé sur le risque pour limiter l'accumulation d'un levier excessif et prémunir contre les erreurs de modélisation des pondérations de risque.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Ratio Levier = Tier 1 / Expositions Totales</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Expositions Totales = Actifs bruts au bilan + Engagements hors-bilan non pondérés.<br>
+          Seuil réglementaire : Minimum 3.0%
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Capital Tier 1<br>
+          - Total actif comptable brut<br>
+          - Équivalents crédit hors-bilan (sans pondération de risque)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table Synthèse Solvabilité -->
+  <h4 style="color: var(--primary); margin: 25px 0 10px 0;">Synthèse des 4 Ratios Réglementaires & Exigences de Fonds Propres</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Ratio Réglementaire</th>
+        <th>Formule Prudentielle</th>
+        <th>Pilier 1 (Min Legal)</th>
+        <th>Coussin Conservation</th>
+        <th>Cible Globale</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ratio CET1</strong></td>
+        <td>Fonds Propres CET1 / RWA Total</td>
+        <td>5.0%</td>
+        <td>+2.5%</td>
+        <td><strong>7.5%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Ratio Tier 1</strong></td>
+        <td>Fonds Propres Tier 1 / RWA Total</td>
+        <td>6.0%</td>
+        <td>+2.5%</td>
+        <td><strong>8.5%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Ratio de Solvabilité Globale</strong></td>
+        <td>Fonds Propres Effectifs (FPE) / RWA Total</td>
+        <td>9.0%</td>
+        <td>+2.5%</td>
+        <td><strong>11.5%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Ratio de Levier</strong></td>
+        <td>Tier 1 / Total Expositions (Non pondérées)</td>
+        <td>3.0%</td>
+        <td>-</td>
+        <td><strong>3.0%</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+      <!-- SECTION 2 : RISQUE DE CRÉDIT -->
+  <div class="section-title">
+    2. Risque de Crédit & Actifs Pondérés (RWA)
+    <span class="section-subtitle">Approche Standard Bâle II / Dispositif Prudentiel BCEAO</span>
+  </div>
+
+  <!-- Note intro Section 2 -->
+  <div class="exec-note">
+    <h4>Indicateurs Effectifs du Risque de Crédit</h4>
+    <p>
+      Le risque de crédit est évalué selon l'<strong>Approche Standard BCEAO</strong>. L'application calcule à la ligne et au niveau du portefeuille l'exposition réelle, les pondérations prudentielles, les actifs pondérés (RWA) et l'atténuation par les garanties (CRM).
+    </p>
+  </div>
+
+  <!-- Card 2.1: Exposition Brute & EAD -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">2.1 Exposition au Défaut (EAD - Exposure at Default)</span>
+      <span class="badge badge-primary">Mesure de l'Exposition</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Mesure le montant total du crédit auquel la banque est réellement exposée au moment où l'emprunteur ferait défaut. Il intègre l'encours du bilan et les engagements futurs du hors-bilan.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">EAD Bilan = Encours Brut au Bilan</div>
+        <div class="formula-text" style="margin-top:4px;">EAD Hors-Bilan = Nominal x CCF</div>
+        <div class="formula-text" style="margin-top:4px;">EAD Total = EAD Bilan + EAD Hors-Bilan</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Encours comptable brut au bilan<br>
+          - Montant nominal des engagements hors-bilan<br>
+          - Facteur de conversion en équivalent crédit (CCF : 0%, 20%, 50%, 100%)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2.2: RWA Crédit -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">2.2 Actifs Pondérés par le Risque de Crédit (RWA Crédit)</span>
+      <span class="badge badge-primary">Base de Capital</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Convertit l'exposition nominale en une mesure ajustée du risque selon la solvabilité de l'emprunteur. C'est le dénominateur fondamental des ratios de solvabilité.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">RWA Crédit = EAD x Pondération (%)</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Pondération (RW) issue de la grille BCEAO (0% à 150%) selon la classe d'exposition et la notation.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Exposition au Défaut (EAD)<br>
+          - Catégorie prudentielle (Souverain, Banque, PME, Détail...)<br>
+          - Notation externe d'agence (AAA à < B-) ou statut non noté
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2.3: Capital Requis Crédit -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">2.3 Exigence de Fonds Propres Crédit (Capital Requis)</span>
+      <span class="badge badge-warning">Charge de Capital</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Représente le montant en valeur monétaire (XOF) de fonds propres qu'il faut obligatoirement réserver pour couvrir les risques de crédit.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Capital Requis = RWA Crédit x 9.0%</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Taux minimal légal BCEAO : 9.0% (11.5% avec coussin de conservation).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - RWA Crédit total du portefeuille<br>
+          - Ratio de capital minimal réglementaire (9.0%)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2.5: Atténuation du Risque (CRM) -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">2.4 Atténuation du Risque de Crédit (CRM) & Risque Résiduel</span>
+      <span class="badge badge-success">Garanties & Cautions</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Évalue la réduction du risque et du capital permise par les garanties éligibles (hypothèques, avals, cautions d'État).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Couverture CRM (%) = Couverture / Exposition Brute</div>
+        <div class="formula-text" style="margin-top:4px;">Risque Résiduel = max(0, Exposition Brute - CRM)</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Type de CRM (financée, non financée, aucune)<br>
+          - Valeur du collatéral<br>
+          - Décote réglementaire pour risque marché/change (Haircuts)<br>
+          - Rating du garant
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2.6: Taux de Défaut & NPL -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">2.5 Taux de Défaut & Créances Souffrance (NPL)</span>
+      <span class="badge badge-warning">Surveillance des Incidents</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Surveille la proportion des créances dépréciées ayant des impayés de plus de 90 jours.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Taux Défaut = Encours Défaut / Exposition Brute</div>
+        <div class="formula-text" style="margin-top:4px;">Taux Couverture NPL = Provisions / Encours NPL</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Statut prudentiel des lignes (impayés &ge; 90 jours)<br>
+          - Montant des encours en dépréciation<br>
+          - Provisions individuelles constituées
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grille de Pondération BCEAO Table -->
+    <h4 style="color: var(--primary); margin: 25px 0 10px 0;">Grille Prudentielle des Pondérations (11 Catégories Officielle BCEAO - Approche Standard)</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Classe d'Exposition (Toutes Catégories)</th>
+        <th>AAA à AA-</th>
+        <th>A+ à A-</th>
+        <th>BBB+ à BBB-</th>
+        <th>BB+ à B-</th>
+        <th>Inférieur à B-</th>
+        <th>Non Noté</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>États UMOA & BCEAO (FCFA)</strong></td>
+        <td>0.0%</td>
+        <td>0.0%</td>
+        <td>0.0%</td>
+        <td>0.0%</td>
+        <td>0.0%</td>
+        <td><strong>0.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Autres Souverains</strong></td>
+        <td>0.0%</td>
+        <td>20.0%</td>
+        <td>50.0%</td>
+        <td>100.0%</td>
+        <td>150.0%</td>
+        <td><strong>100.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Organismes publics (hors adm. centrale)</strong></td>
+        <td>20.0%</td>
+        <td>50.0%</td>
+        <td>100.0%</td>
+        <td>100.0%</td>
+        <td>150.0%</td>
+        <td><strong>100.0% (20% en FCFA UMOA)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Banques Multilatérales de Dév. (BMD)</strong></td>
+        <td>0.0%</td>
+        <td>20.0%</td>
+        <td>50.0%</td>
+        <td>50.0%</td>
+        <td>100.0%</td>
+        <td><strong>50.0% (0% éligibles)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Institutions Financières (Banques)</strong></td>
+        <td>20.0%</td>
+        <td>50.0%</td>
+        <td>100.0%</td>
+        <td>100.0%</td>
+        <td>150.0%</td>
+        <td><strong>100.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Entreprises (Corporates & PME)</strong></td>
+        <td>20.0%</td>
+        <td>50.0%</td>
+        <td>100.0%</td>
+        <td>100.0%</td>
+        <td>150.0%</td>
+        <td><strong>100.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Clientèle de Détail (Retail / Particuliers)</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>75.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Prêts garantis par l'Immobilier Résidentiel</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>100.0% (35% sous critères)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Prêts garantis par l'Immobilier Commercial</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>100.0% (50% sous critères)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Créances en Souffrance (&ge; 90 jours)</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>150.0% (100% si provisions &ge; 20%)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Créances à Risque Élevé (Participations spéculatives)</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>150.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Autres Actifs (Encaisse, immo. corporelles...)</strong></td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><strong>0% à 100.0%</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- CCF Table -->
+  <h4 style="color: var(--primary); margin: 25px 0 10px 0;">Facteurs de Conversion en Équivalent Crédit (CCF) - Hors-Bilan</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Nature de l'Engagement Hors-Bilan</th>
+        <th>CCF Applicable</th>
+        <th>Description & Exemples</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Garanties financières directes</strong></td>
+        <td>100.0%</td>
+        <td>Avals de traites, garanties de remboursement de prêts.</td>
+      </tr>
+      <tr>
+        <td><strong>Lettres de crédit stand-by</strong></td>
+        <td>100.0%</td>
+        <td>Stand-by LC agissant comme garantie financière.</td>
+      </tr>
+      <tr>
+        <td><strong>Engagements conditionnels (Cautions)</strong></td>
+        <td>50.0%</td>
+        <td>Cautions de soumission, garanties de bonne fin de travaux.</td>
+      </tr>
+      <tr>
+        <td><strong>Lignes de crédit irrévocables non tirées</strong></td>
+        <td>50.0%</td>
+        <td>Facilités de crédit confirmées utilisables par le client.</td>
+      </tr>
+      <tr>
+        <td><strong>Facilités révocables sans condition</strong></td>
+        <td>0.0%</td>
+        <td>Autorisations de découvert annulables à tout moment sans préavis.</td>
+      </tr>
+    </tbody>
+  </table>
+
+    <!-- SECTION 3 : RISQUE OPÉRATIONNEL -->
+  <div class="section-title">
+    3. Risque Opérationnel
+    <span class="section-subtitle">CRR3 Art. 315-321 / BCEAO Titre V Art. 301 & Cartographie</span>
+  </div>
+
+  <div class="exec-note">
+    <h4>Présentation du Risque Opérationnel</h4>
+    <p>
+      Le risque opérationnel est le risque de pertes résultant de pannes informatiques, de fraudes internes/externes, d'erreurs humaines, de litiges ou d'événements extérieurs. 
+      L'application calcule les fonds propres requis selon la nouvelle méthode <strong>BIC / CRR3</strong>, la méthode <strong>AIB (BCEAO)</strong> et la méthode <strong>Standardisée (AS)</strong>, tout en assurant le suivi des <strong>incidents, KRI et de la cartographie des risques</strong>.
+    </p>
+  </div>
+
+  <!-- Card 3.1: BIC / CRR3 -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.1 Business Indicator Component (BIC / CRR3 - Méthode Principale)</span>
+      <span class="badge badge-warning">Exigence Opérationnelle</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Nouvelle norme internationale (CRR3) évaluant le besoin de capital selon le volume d'activité de la banque structuré en 3 composantes financières (ILDC, SC, FC).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">BI = ILDC + SC + FC</div>
+        <div class="formula-text" style="margin-top:4px;">BIC = Taux marginaux (12%, 15%, 18%) sur BI</div>
+        <div class="formula-text" style="margin-top:4px;">RWA Opérationnel = BIC x 11.111</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - 12 postes du compte de résultat consolidés<br>
+          - ILDC : Marge d'intérêts, dividendes & leasing<br>
+          - SC : Commissions & frais de services<br>
+          - FC : Résultats des portefeuilles financiers (3 ans)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3.2: Méthode AIB -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.2 Approche Indicateur de Base (AIB - Repli Réglementaire BCEAO)</span>
+      <span class="badge badge-primary">Titre V - Art. 301</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Méthode forfaitaire historique retenue par la BCEAO pour les établissements appliquant le cadre standardisé basé sur le Produit Net Bancaire (PNB).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Capital AIB = 15% x Moyenne(PNB > 0 sur 3 ans)</div>
+        <div class="formula-text" style="margin-top:4px;">RWA AIB = Capital AIB x 11.111</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Produit Net Bancaire (PNB) des 3 derniers exercices<br>
+          - Exclusions des années où le PNB est négatif
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3.3: Méthode AS (Standardisée) -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.3 Approche Standardisée par Lignes de Métier (AS)</span>
+      <span class="badge badge-primary">Approche Métier</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Pondère le PNB selon le profil de risque propre à chaque ligne de métier (Banque d'investissement, Banque de détail, Paiements...).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Capital AS = Somme(PNB_i x Beta_i)</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Beta_i = Facteur réglementaire par métier (12%, 15%, 18%).
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Ventilation du PNB par ligne d'activité réglementaire<br>
+          - Facteurs Beta applicables à chaque métier
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3.4: Pertes & Incidents -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.4 Suivi des Pertes Opérationnelles & Recouvrements</span>
+      <span class="badge badge-warning">Base d'Incidents</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Comptabilise l'impact financier réel des événements d'incidents (fraudes, pannes, litiges) et mesure l'efficacité des mécanismes de couverture.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Perte Nette = Perte Brute - Recouvrements</div>
+        <div class="formula-text" style="margin-top:4px;">Taux Recouvrement = Recouvrement / Perte Brute</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Registre des événements d'incidents déclarés<br>
+          - Montant brut des pertes constatées<br>
+          - Indemnités d'assurance & montants récupérés
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3.5: Cartographie & Risque Résiduel -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.5 Cartographie des Risques & Scoring du Risque Résiduel</span>
+      <span class="badge badge-success">Contrôle Interne</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Évalue l'exposition nette de la banque après prise en compte de la qualité et de l'efficacité du dispositif de contrôle interne.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Risque Brut = Probabilité (1-5) x Impact (1-5)</div>
+        <div class="formula-text" style="margin-top:4px;">Risque Résiduel = Risque Brut / Efficacité Contrôle</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Évaluation de la fréquence & gravité (échelles 1 à 5)<br>
+          - Score d'efficacité des contrôles en place<br>
+          - Niveaux : Faible (&le;4), Moyen (5-9), Élevé (10-16), Critique (&gt;16)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3.6: KRI & Contrôles -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">3.6 Indicateurs Clés de Risque (KRI) & Taux de Conformité</span>
+      <span class="badge badge-success">Indicateurs de Pilotage</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Alerte de manière précoce sur la dérive des processus opérationnels et mesure le taux d'exécution des plans d'action correctifs.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">KRI Taux d'Erreur = Incidents Mois / Total</div>
+        <div class="formula-text" style="margin-top:4px;">Taux Conformité = Points Conformes / Total x 100</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Suivi mensuel des métriques KRI opérationnelles<br>
+          - Résultats des campagnes de contrôle permanent<br>
+          - Avancement des plans d'action
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- SECTION 4 : RISQUE DE MARCHÉ & VaR -->
+  <div class="section-title">
+    4. Risque de Marché
+    <span class="section-subtitle">Titre VI BCEAO (Art. 316-442)</span>
+  </div>
+
+  <div class="exec-note">
+    <h4>Périmètre du Risque de Marché</h4>
+    <p>
+      Le module Risque de Marché évalue les pertes potentielles liées aux variations des prix du marché sur 4 piliers : 
+      le <strong>risque de change (FX)</strong>, le <strong>risque de taux d'intérêt</strong>, le <strong>risque sur actions</strong> et les <strong>modèles de VaR/Expected Shortfall</strong>.
+    </p>
+  </div>
+
+  <!-- Card 4.1: Exigence Globale & RWA Marché -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">4.1 Exigence Globale de Fonds Propres & RWA Marché</span>
+      <span class="badge badge-primary">Synthèse Marché</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Agrège l'ensemble des charges de capital réglementaire requises au titre des risques de taux, d'actions, de change et de produits de base.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Exigence Marché = Exigence Taux + Actions + Change</div>
+        <div class="formula-text" style="margin-top:4px;">RWA Marché = Exigence Marché x 11.111</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Positions nettes de change par devise<br>
+          - Portefeuille titres de transaction (obligations, bons du Trésor)<br>
+          - Portefeuille d'actions et titres de propriété
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4.2: Risque de Change (FX) -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">4.2 Risque de Change (Position Nette Globale FX)</span>
+      <span class="badge badge-warning">Titre VI - Art. 406-417</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Couvre le risque de perte lié aux variations défavorables des cours des devises étrangères détenues au bilan et au hors-bilan.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Position Nette Globale = MAX(Longues, Courtes)</div>
+        <div class="formula-text" style="margin-top:4px;">Exigence Change = Position Globale x 8.0%</div>
+        <div class="formula-text" style="margin-top:4px;">RWA Change = Exigence Change x 11.111</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Actifs et passifs en devises (au comptant & à terme)<br>
+          - Cours de change du jour (USD, EUR, XOF...)<br>
+          - Positions d'engagements hors-bilan en devises
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4.3: Risque de Taux d'Intérêt -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">4.3 Risque de Taux d'Intérêt (Portefeuille de Négociation / Titres)</span>
+      <span class="badge badge-primary">Titre VI - Art. 349-394</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Protège contre le risque de dépréciation des obligations et bons du Trésor suite à une hausse des taux d'intérêt du marché.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Exigence Taux = Risque Spécifique + Risque Général</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Spécifique = Pondération émetteur (Tableau 16 BCEAO) | Général = Méthode par bandes d'échéances.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Caractéristiques des titres (nominal, coupon, maturité)<br>
+          - Courbe des taux de référence UMOA / BEAC<br>
+          - Duration modifiée & sensibilité aux taux
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4.4: Risque sur Actions -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">4.4 Risque sur Actions</span>
+      <span class="badge badge-primary">Titre VI - Art. 395-405</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Couvre le risque de baisse de la valeur marchande des actions et titres de propriété négociés sur les marchés financiers.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Risque Spécifique = 9% x Somme(|Pos. Net émetteur|)</div>
+        <div class="formula-text" style="margin-top:4px;">Risque Général = 9% x Somme(|Pos. Net marché|)</div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Positions acheteuses (longues) et vendeuses (courtes) par émetteur<br>
+          - Cours boursiers et marchés de cotation (BRVM, etc.)
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- SECTION 5 : CONCENTRATION, GRANDS RISQUES & DASHBOARD -->
+  <div class="section-title">
+    5. Concentration, Grands Risques & Dashboard de Pilotage
+    <span class="section-subtitle">Pilier 2 - Surveillance Prudentielle & Alertes Automatiques</span>
+  </div>
+
+  <div class="exec-note">
+    <h4>Rôle du Module de Pilotage & Surveillance (Pilier 2)</h4>
+    <p>
+      Cette section regroupe l'ensemble des indicateurs de surveillance continue du portefeuille. 
+      L'application calcule en temps réel la <strong>concentration des risques</strong>, le respect des <strong>plafonds de Grands Risques BCEAO</strong> et déclenche des <strong>alertes automatiques d'incidents critiques</strong> pour la gouvernance des risques.
+    </p>
+  </div>
+
+  <!-- Card 5.1: Grands Risques BCEAO -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">5.1 Grands Risques BCEAO (Plafond de 25% des Fonds Propres)</span>
+      <span class="badge badge-warning">Limite Réglementaire</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Evite qu'un défaut d'un seul client ou groupe lié ne compromette la survie de la banque. Limite l'exposition maximale sur une même contrepartie.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">Ratio Grand Risque = EAD Contrepartie / FPE</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Seuil déclaration : &ge; 10.0% des FPE<br>
+          Limite légale maximale : 25.0% des FPE (hors États UMOA)
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - EAD cumulée par groupe de contreparties liées<br>
+          - Montant des Fonds Propres Effectifs (FPE)<br>
+          - Identification des souverains UMOA (exclus)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5.2: Indice HHI -->
+  <div class="indicator-card">
+    <div class="card-header">
+      <span class="indicator-name">5.2 Indice de Concentration HHI (Herfindahl-Hirschman Index)</span>
+      <span class="badge badge-primary">Diversification Portefeuille</span>
+    </div>
+    <div class="grid-3">
+      <div class="grid-box">
+        <div class="grid-box-title">1. À quoi ça sert ?</div>
+        <div class="grid-box-content">
+          Mesure la qualité de la diversification du portefeuille. Détecte les risques de concentration sectorielle, géographique ou par emprunteur.
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">2. Comment c'est calculé ?</div>
+        <div class="formula-text">HHI = Somme(Part_i)²</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">
+          Part_i = Exposition_i / Exposition Totale<br>
+          &lt; 0.15 : Faible | 0.15 - 0.25 : Modérée | &gt; 0.25 : Élevée (Alerte)
+        </div>
+      </div>
+      <div class="grid-box">
+        <div class="grid-box-title">3. De quoi a-t-on besoin ?</div>
+        <div class="grid-box-content">
+          - Répartition des encours par secteur d'activité<br>
+          - Répartition par pays / zone géographique<br>
+          - Part relative de chaque contrepartie
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table 5.3: Tableau des Alertes Automatiques -->
+  <h4 style="color: var(--primary); margin: 25px 0 10px 0;">5.3 Système d'Alertes d'Incidents Critiques (Tableau de Bord)</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Indicateur d'Alerte</th>
+        <th>Condition de Déclenchement Automatique</th>
+        <th>Rôle & Impact Business</th>
+        <th>Action Corrective Recommandée</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Taux de Défaut Élevé</strong></td>
+        <td>Taux de défaut &ge; 5.0% de l'exposition brute</td>
+        <td>Surveille la détérioration de la qualité du crédit client.</td>
+        <td>Revue des comités de crédit & provisionnement renforcé.</td>
+      </tr>
+      <tr>
+        <td><strong>Concentration Contrepartie</strong></td>
+        <td>Part d'un groupe client &ge; 35.0% du RWA</td>
+        <td>Évite une dépendance excessive vis-à-vis d'un emprunteur.</td>
+        <td>Syndication de crédits & gel des extensions de lignes.</td>
+      </tr>
+      <tr>
+        <td><strong>Dépassement Grand Risque</strong></td>
+        <td>Encours groupe &ge; 25.0% des Fonds Propres (FPE)</td>
+        <td>Non-conformité réglementaire stricte vis-à-vis de la BCEAO.</td>
+        <td>Réduction immédiate des autorisations & cession d'encours.</td>
+      </tr>
+      <tr>
+        <td><strong>Concentration Sectorielle Élevée</strong></td>
+        <td>Indice HHI &gt; 0.25 (ou un secteur &ge; 50% du RWA)</td>
+        <td>Exposition vulnérable à un choc sectoriel spécifique.</td>
+        <td>Rééquilibrage de la politique d'octroi vers d'autres secteurs.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Documentation - Risk Management - Conforme au Dispositif Prudentiel BCEAO / UMOA.
+  </div>
+
+</div>
+
+</body>
+</html>
+

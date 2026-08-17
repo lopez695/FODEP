@@ -1,0 +1,33 @@
+# Proxy inverse pour un serveur accessible depuis Internet, avec un nom de
+# domaine public. Caddy obtient et renouvelle seul le certificat Let's Encrypt.
+#
+# Variables attendues (fichier .env a la racine) :
+#   RWA_DOMAINE = risk.mabanque.ci
+#   RWA_EMAIL   = adresse de contact pour l'autorite de certification
+
+{
+	email {$RWA_EMAIL}
+}
+
+{$RWA_DOMAINE} {
+	encode gzip
+
+	# HSTS : une fois le site visite en HTTPS, le navigateur refuse de revenir
+	# en clair, meme si un attaquant reecrit un lien http://.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# L'API sous /api : application et backend partagent le meme domaine, donc
+	# aucune requete d'origine croisee, et le cookie de session reste
+	# strictement de premiere partie.
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

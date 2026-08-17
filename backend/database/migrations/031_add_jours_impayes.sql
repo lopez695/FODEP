@@ -1,0 +1,1 @@
+ALTER TABLE expositions ADD COLUMN jours_impayes INTEGER NOT NULL DEFAULT 0;

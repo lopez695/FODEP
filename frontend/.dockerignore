@@ -1,0 +1,16 @@
+# Seul build/web est copie dans l'image : tout le reste est inutile et
+# alourdirait le contexte de construction.
+lib/
+test/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+assets/
+.dart_tool/
+build/windows/
+build/app/
+.env
+.env.*
