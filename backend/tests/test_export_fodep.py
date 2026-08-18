@@ -15,8 +15,9 @@ import json
 from unittest import mock
 
 import pytest
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.styles import Protection
 
 from app.participations.models import ParticipationView
 from app.rapports.fodep import construire_fodep, nom_fichier_fodep
@@ -25,6 +26,7 @@ from app.rapports.fodep.agregation import (
     repartir_sur_paliers,
 )
 from app.rapports.fodep.disposition import (
+    completer_etat_a_zero,
     indexer_codes_dispru,
     lire_disposition_categorie,
     lire_etats_requis,
@@ -480,6 +482,23 @@ def test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare(classeur):
         f"déclaré : {', '.join(vides[:20])}"
         + (f" (et {len(vides) - 20} autres)" if len(vides) > 20 else "")
     )
+
+
+def test_completer_etat_a_zero_ne_materialise_pas_la_grille_vide():
+    """Une borne de feuille gonflée ne doit pas créer ses cellules absentes."""
+
+    classeur = Workbook()
+    feuille = classeur.active
+    feuille["C9"].protection = Protection(locked=False)
+    # Simule l'artefact du modèle : une cellule vide très loin du tableau fixe
+    # max_column, sans que la grille intermédiaire n'existe dans le fichier.
+    feuille.cell(row=1, column=1025)
+    cellules_avant = len(feuille._cells)
+
+    completer_etat_a_zero(feuille)
+
+    assert feuille["C9"].value == 0
+    assert len(feuille._cells) == cellules_avant
 
 
 POSITIONS_MARCHE_D_ESSAI = {

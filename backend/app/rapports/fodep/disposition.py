@@ -280,7 +280,20 @@ def completer_etat_a_zero(feuille, *, premiere_colonne: int = 3) -> None:
     """
 
     styles_de_saisie = styles_ouverts(feuille.parent)
-    for ligne in feuille.iter_rows(min_row=PREMIERE_LIGNE_UTILE, min_col=premiere_colonne):
-        for cellule in ligne:
-            if _est_a_completer(cellule, styles_de_saisie):
-                cellule.value = 0
+
+    # Ne pas passer par ``iter_rows`` sans borne haute : le modèle BCEAO porte
+    # parfois une mise en forme résiduelle jusqu'à la colonne 1025. Openpyxl
+    # matérialiserait alors chaque coordonnée de ce rectangle, soit plusieurs
+    # millions de cellules vides pour l'ensemble du classeur. Une coordonnée
+    # absente de ``_cells`` ne peut pas être une case de saisie explicitement
+    # ouverte par le modèle ; seules les cellules déjà présentes sont utiles.
+    # La copie protège aussi l'itération si openpyxl ajuste son index pendant
+    # l'affectation des zéros.
+    cellules = tuple(feuille._cells.values())
+    for cellule in cellules:
+        if (
+            cellule.row >= PREMIERE_LIGNE_UTILE
+            and cellule.column >= premiere_colonne
+            and _est_a_completer(cellule, styles_de_saisie)
+        ):
+            cellule.value = 0
