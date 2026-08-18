@@ -96,9 +96,13 @@ def test_historique_repond_422_et_non_404_sans_donnees():
 def test_toutes_les_routes_var_declarees_sont_atteignables():
     """Aucune route VaR ne doit etre publiee sans etre joignable."""
 
+    # Meme raison qu'ailleurs : depuis FastAPI 0.14x, `app.routes` porte des
+    # enveloppes de routeur et non les routes elles-memes.
+    from tests.conftest import routes_effectives
+
     chemins_var = [
         route.path
-        for route in app.routes
+        for route in routes_effectives(app)
         if getattr(route, "path", "").startswith("/var/")
     ]
 

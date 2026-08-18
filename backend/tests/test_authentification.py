@@ -208,9 +208,14 @@ def test_aucune_route_metier_n_echappe_a_l_authentification():
     from app.auth.guard import CHEMINS_PUBLICS
     from app.main import app
 
+    # `routes_effectives` deplie les enveloppes de routeur : depuis FastAPI
+    # 0.14x, `app.routes` n'expose plus les routes a plat, et ce releve restait
+    # vide — le controle ne s'executait donc plus sur la version du venv.
+    from tests.conftest import routes_effectives
+
     mutantes = {
         (methode, route.path)
-        for route in app.routes
+        for route in routes_effectives(app)
         for methode in getattr(route, "methods", set()) or set()
         if methode in {"POST", "PUT", "DELETE", "PATCH"}
         and not route.path.startswith("/auth")

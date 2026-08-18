@@ -10,6 +10,11 @@ openpyxl==3.1.5
 # est relu puis reecrit pour etre rempli.
 pillow>=10.0.0
 python-multipart==0.0.27
+
+# Lecture des declarations FODEP deposees en PDF, pour confronter les onze
+# normes de l'EP01 a leurs seuils. Seul le texte est extrait : un PDF scanne n'en
+# a pas, et l'outil n'embarque pas de reconnaissance optique.
+pypdf>=5.0.0
 sqlalchemy==2.0.36
 numpy>=1.26
 scipy>=1.11.0

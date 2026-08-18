@@ -247,6 +247,219 @@ class ContenuFodep {
       );
 }
 
+/// Où en est une norme prudentielle d'une déclaration analysée.
+enum SituationNorme {
+  respectee('respectee', 'Respectée'),
+  depassee('depassee', 'Dépassée'),
+  nonMesuree('non_mesuree', 'Non mesurée');
+
+  const SituationNorme(this.wire, this.libelle);
+
+  final String wire;
+  final String libelle;
+
+  static SituationNorme fromWire(String? valeur) => SituationNorme.values
+      .firstWhere((s) => s.wire == valeur, orElse: () => SituationNorme.nonMesuree);
+}
+
+/// Une des onze normes de l'EP01, confrontée à son seuil.
+class NormeAnalysee {
+  const NormeAnalysee({
+    required this.code,
+    required this.libelle,
+    required this.situation,
+    this.reference = '',
+    this.seuil,
+    this.observe,
+    this.minimum,
+    this.ecart,
+  });
+
+  final String code;
+  final String libelle;
+
+  /// État du FODEP qui produit le niveau observé.
+  final String reference;
+
+  final double? seuil;
+  final double? observe;
+
+  /// `true` pour un plancher — ratios de fonds propres, levier —, `false` pour
+  /// un plafond. Nul quand le sens de la norme est inconnu de l'outil.
+  final bool? minimum;
+
+  final SituationNorme situation;
+
+  /// Marge restante, ou montant du dépassement, en points du ratio.
+  final double? ecart;
+
+  factory NormeAnalysee.fromJson(Map<String, dynamic> json) => NormeAnalysee(
+        code: json['code'] as String? ?? '',
+        libelle: json['libelle'] as String? ?? '',
+        reference: json['reference'] as String? ?? '',
+        seuil: (json['seuil'] as num?)?.toDouble(),
+        observe: (json['observe'] as num?)?.toDouble(),
+        minimum: json['minimum'] as bool?,
+        situation: SituationNorme.fromWire(json['situation'] as String?),
+        ecart: (json['ecart'] as num?)?.toDouble(),
+      );
+}
+
+/// Statut d'un contrôle de cohérence.
+enum StatutControle {
+  exact('exact', 'Exact'),
+  arrondi('arrondi', 'Arrondi'),
+  ecart('ecart', 'Écart');
+
+  const StatutControle(this.wire, this.libelle);
+
+  final String wire;
+  final String libelle;
+
+  static StatutControle fromWire(String? valeur) => StatutControle.values
+      .firstWhere((s) => s.wire == valeur, orElse: () => StatutControle.exact);
+}
+
+/// Un total du formulaire, confronté à la somme de ses lignes.
+///
+/// Les normes disent si la déclaration respecte le dispositif ; ces contrôles
+/// disent si elle se contredit. Un total qui ne suit pas ses lignes fait rejeter
+/// le dépôt sans qu'aucune norme ne soit en cause.
+class ControleCoherence {
+  const ControleCoherence({
+    required this.etat,
+    required this.libelle,
+    required this.colonne,
+    required this.attendu,
+    required this.constate,
+    required this.ecart,
+    required this.tolerance,
+    required this.statut,
+  });
+
+  final String etat;
+  final String libelle;
+
+  /// Colonne vérifiée, telle que le formulaire l'intitule.
+  final String colonne;
+
+  /// Somme des lignes de la section.
+  final double attendu;
+
+  /// Valeur portée par la ligne de total.
+  final double constate;
+
+  final double ecart;
+
+  /// Dérive maximale imputable aux arrondis : une demi-unité par ligne sommée.
+  final double tolerance;
+
+  final StatutControle statut;
+
+  factory ControleCoherence.fromJson(Map<String, dynamic> json) =>
+      ControleCoherence(
+        etat: json['etat'] as String? ?? '',
+        libelle: json['libelle'] as String? ?? '',
+        colonne: json['colonne'] as String? ?? '',
+        attendu: (json['attendu'] as num?)?.toDouble() ?? 0,
+        constate: (json['constate'] as num?)?.toDouble() ?? 0,
+        ecart: (json['ecart'] as num?)?.toDouble() ?? 0,
+        tolerance: (json['tolerance'] as num?)?.toDouble() ?? 0,
+        statut: StatutControle.fromWire(json['statut'] as String?),
+      );
+}
+
+/// Ce qu'un état porte : combien de lignes, et s'il est entièrement à zéro.
+class EtatRenseigne {
+  const EtatRenseigne({
+    required this.nom,
+    required this.lignes,
+    required this.toutAZero,
+  });
+
+  final String nom;
+  final int lignes;
+
+  /// Aucune valeur numérique non nulle. L'état est déclaré, mais ne dit rien.
+  final bool toutAZero;
+
+  factory EtatRenseigne.fromJson(Map<String, dynamic> json) => EtatRenseigne(
+        nom: json['nom'] as String? ?? '',
+        lignes: (json['lignes'] as num?)?.toInt() ?? 0,
+        toutAZero: json['tout_a_zero'] == true,
+      );
+}
+
+/// Verdict d'ensemble sur une déclaration déposée.
+class AnalyseDeclaration {
+  const AnalyseDeclaration({
+    required this.nomFichier,
+    required this.pages,
+    this.normes = const [],
+    this.controles = const [],
+    this.inventaire = const [],
+    this.classeur = false,
+    this.avertissements = const [],
+  });
+
+  final String nomFichier;
+  final int pages;
+  final List<NormeAnalysee> normes;
+
+  /// Contrôles de cohérence interne. Vides pour une impression : sommer des
+  /// nombres extraits d'un PDF ne prouverait rien.
+  final List<ControleCoherence> controles;
+
+  /// Les états du formulaire, et ce qu'ils portent.
+  final List<EtatRenseigne> inventaire;
+
+  /// `true` quand la lecture a porté sur le classeur, la pièce transmise.
+  final bool classeur;
+
+  /// Ce qui empêche de conclure : PDF scanné, normes absentes, niveaux nuls.
+  final List<String> avertissements;
+
+  List<ControleCoherence> get ecarts => controles
+      .where((controle) => controle.statut == StatutControle.ecart)
+      .toList();
+
+  List<EtatRenseigne> get etatsAZero =>
+      inventaire.where((etat) => etat.toutAZero).toList();
+
+  List<NormeAnalysee> get depassees => normes
+      .where((norme) => norme.situation == SituationNorme.depassee)
+      .toList();
+
+  List<NormeAnalysee> get nonMesurees => normes
+      .where((norme) => norme.situation == SituationNorme.nonMesuree)
+      .toList();
+
+  factory AnalyseDeclaration.fromJson(Map<String, dynamic> json) =>
+      AnalyseDeclaration(
+        nomFichier: json['nom_fichier'] as String? ?? '',
+        pages: (json['pages'] as num?)?.toInt() ?? 0,
+        classeur: json['classeur'] == true,
+        normes: [
+          for (final norme in (json['normes'] as List<dynamic>?) ?? const [])
+            NormeAnalysee.fromJson(norme as Map<String, dynamic>),
+        ],
+        controles: [
+          for (final controle
+              in (json['controles'] as List<dynamic>?) ?? const [])
+            ControleCoherence.fromJson(controle as Map<String, dynamic>),
+        ],
+        inventaire: [
+          for (final etat in (json['inventaire'] as List<dynamic>?) ?? const [])
+            EtatRenseigne.fromJson(etat as Map<String, dynamic>),
+        ],
+        avertissements: [
+          for (final message
+              in (json['avertissements'] as List<dynamic>?) ?? const [])
+            '$message',
+        ],
+      );
+}
+
 /// Une case du FODEP que le déclarant renseigne lui-même.
 ///
 /// L'adresse — l'état et la cellule — est la clé : elle ne bouge pas avec

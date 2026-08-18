@@ -678,6 +678,23 @@ class RwaApiService {
     return ContenuFodep.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Analyse une déclaration FODEP au regard du dispositif prudentiel UMOA.
+  ///
+  /// Le PDF n'a pas à venir de cet outil : une déclaration d'un exercice
+  /// précédent ou d'une autre entité s'analyse aussi bien. Seules les onze
+  /// normes de l'EP01 sont confrontées à leurs seuils.
+  Future<AnalyseDeclaration> analyserDeclarationFodep(
+    Uint8List pdf,
+    String nomFichier,
+  ) async {
+    final json = await _client.uploadBytes(
+      '/rapports/fodep/analyse',
+      pdf,
+      nomFichier,
+    );
+    return AnalyseDeclaration.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Cases du FODEP que l'application ne calcule pas, et valeurs déjà saisies.
   ///
   /// Le catalogue est lu dans le formulaire lui-même : ce sont les cases que

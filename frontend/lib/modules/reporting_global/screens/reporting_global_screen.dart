@@ -10,11 +10,8 @@ import 'package:lottie/lottie.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../../core/services/api_client.dart' show ApiException;
 import '../../../core/services/rwa_api_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../services/fodep_pdf.dart';
-import '../widgets/choix_format_fodep_dialog.dart';
 import '../../../core/state/portfolio_amount_unit_scope.dart';
 import '../../../core/state/portfolio_currency_scope.dart';
 import '../../../core/utils/currency_conversion.dart';
@@ -24,7 +21,7 @@ import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../dashboard/models/dashboard_models.dart';
 import '../../expositions/models/exposition_models.dart';
-import '../../rapports/screens/saisies_fodep_page.dart';
+import '../../rapports/screens/fodep_page.dart';
 import '../../risque_marche/repositories/foreign_exchange_repository.dart';
 import '../../risque_marche/services/market_data_import_store.dart';
 import '../../risque_marche/services/market_risk_aggregation_service.dart';
@@ -219,7 +216,6 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
   String _periode = 'Mensuel';
   String _destinataire = 'Organe exécutif';
   bool _generating = false;
-  bool _generatingFodep = false;
   String? _savedFileName;
   // Confirmation temporaire (grande, au centre) affichée juste après la
   // génération, puis qui disparaît toute seule - remplace le bandeau vert
@@ -431,101 +427,6 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
     }
   }
 
-  // ─── Export du FODEP (BCEAO) ────────────────────────────────────────────────
-
-  /// Télécharge le Formulaire de Déclaration Prudentielle rempli par le backend.
-  ///
-  /// Le FODEP est le classeur officiel de la BCEAO : il n'est pas reconstruit
-  /// ici, mais renseigné côté serveur à partir du formulaire d'origine. Le
-  /// rôle de cet écran se borne à choisir la date d'arrêté, à enregistrer le
-  /// fichier et à remonter les réserves de lecture qui l'accompagnent.
-  Future<void> _exportFodep() async {
-    // Le format se demande avant de produire quoi que ce soit : les deux
-    // sorties partent du même classeur, mais l'une est la pièce déclarative et
-    // l'autre sa lecture. Choisir après coup ferait ressortir le classeur.
-    final format = await ChoixFormatFodepDialog.demander(
-      context,
-      dateArrete: _dateFin == null ? null : _fmtDate(_dateFin!),
-    );
-    if (format == null || !mounted) return;
-
-    setState(() => _generatingFodep = true);
-    try {
-      final enPdf = format == FormatExportFodep.pdf;
-
-      // Un seul aller-retour dans les deux cas, et la même source : le PDF est
-      // rendu depuis le contenu que le backend extrait du classeur qu'il vient
-      // d'écrire, jamais d'un second calcul.
-      final Uint8List octets;
-      final String nomPropose;
-      final List<String> reserves;
-      if (enPdf) {
-        final contenu = await widget.api.fetchContenuFodep(dateArrete: _dateFin);
-        if (!mounted) return;
-        octets = await construireFodepPdf(contenu: contenu);
-        nomPropose = contenu.nomFichier.replaceFirst(RegExp(r'\.xlsx$'), '.pdf');
-        reserves = contenu.anomalies;
-      } else {
-        final export = await widget.api.downloadFodep(dateArrete: _dateFin);
-        if (!mounted) return;
-        octets = export.bytes;
-        nomPropose = export.fileName;
-        reserves = export.anomalies;
-      }
-      final extension = enPdf ? '.pdf' : '.xlsx';
-      if (!mounted) return;
-
-      final location = await getSaveLocation(
-        suggestedName: nomPropose,
-        acceptedTypeGroups: [
-          enPdf
-              ? const XTypeGroup(label: 'Document PDF', extensions: ['pdf'])
-              : const XTypeGroup(label: 'Classeur Excel', extensions: ['xlsx']),
-        ],
-      );
-      if (!mounted || location == null) return;
-
-      final saved = await saveBytesAtLocation(
-        location,
-        octets,
-        requiredExtension: extension,
-      );
-      if (!mounted) return;
-
-      setState(() {
-        _savedFileName = saved.path.split(RegExp(r'[\\/]')).last;
-        _showSuccessToast = true;
-      });
-      _successTimer?.cancel();
-      _successTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _showSuccessToast = false);
-      });
-
-      // Les réserves s'affichent quel que soit le format : le PDF les porte
-      // déjà en page de garde, mais personne ne relit une page de garde avant
-      // d'avoir enregistré le fichier.
-      if (reserves.isNotEmpty) {
-        await _afficherReservesFodep(reserves);
-      }
-    } on FichierVerrouilleException catch (e) {
-      _signalerErreur(e.message);
-    } on ApiException catch (e) {
-      // Le backend embarqué est démarré une fois pour toutes au lancement de
-      // l'application, sans rechargement automatique : tant qu'elle n'a pas
-      // été relancée, il sert le code d'avant la mise à jour et ignore la
-      // route du FODEP. Un « Not Found » brut laisserait chercher longtemps.
-      final message = e.statusCode == 404
-          ? 'Export FODEP indisponible sur le serveur en cours d\'exécution. '
-              'Fermez puis relancez l\'application pour redémarrer son backend.'
-          : 'Erreur : ${e.message}';
-      _signalerErreur(message);
-    } catch (e) {
-      _signalerErreur('Erreur : $e');
-    } finally {
-      if (mounted) setState(() => _generatingFodep = false);
-    }
-  }
-
   /// Affiche une erreur d'export, assez longtemps pour être lue et agie.
   void _signalerErreur(String message) {
     if (!mounted) return;
@@ -534,58 +435,6 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
       duration: const Duration(seconds: 8),
       content: Text(message),
     ));
-  }
-
-  Future<void> _afficherReservesFodep(List<String> anomalies) async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.info_outline_rounded, size: 20, color: _kBlue),
-          SizedBox(width: 8),
-          Expanded(child: Text('À vérifier avant transmission')),
-        ]),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Le FODEP a été enregistré. Les points suivants relèvent de '
-                  'postes que l\'application ne sait pas encore alimenter, ou '
-                  'de règles propres au formulaire : complétez-les à la main '
-                  'avant de déposer la déclaration.',
-                  style: TextStyle(fontSize: 13, height: 1.5),
-                ),
-                const SizedBox(height: 14),
-                for (final anomalie in anomalies)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('•  ', style: TextStyle(fontSize: 13)),
-                        Expanded(
-                          child: Text(anomalie,
-                              style: const TextStyle(fontSize: 12.5, height: 1.45)),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Compris'),
-          ),
-        ],
-      ),
-    );
   }
 
   // ─── Construction du document PDF ───────────────────────────────────────────
@@ -1041,14 +890,16 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
     );
   }
 
-  /// Ouvre la saisie des cases que l'application ne calcule pas.
+  /// Ouvre la page de la déclaration prudentielle : cases à renseigner et
+  /// export du formulaire.
   ///
-  /// Au retour, l'aperçu est rechargé : une case renseignée change ce que
-  /// l'export contiendra, et l'écran mentirait en montrant l'état d'avant.
-  Future<void> _ouvrirLesSaisies() async {
+  /// Au retour, l'aperçu est rechargé si des cases ont été renseignées : elles
+  /// changent ce que l'export contiendra, et l'écran mentirait en montrant
+  /// l'état d'avant.
+  Future<void> _ouvrirLeFodep() async {
     // La date de fin voyage avec : l'attestation la porte sans qu'on la
-    // saisisse, et l'écran de saisie doit montrer laquelle sera déclarée.
-    final modifie = await SaisiesFodepPage.ouvrir(
+    // saisisse, et la page doit montrer laquelle sera déclarée.
+    final modifie = await FodepPage.ouvrir(
       context,
       widget.api,
       dateArrete: _dateFin,
@@ -1062,29 +913,16 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHeader(
+          const PageHeader(
             title: 'Reporting global',
             subtitle:
                 'Génération du rapport consolidé : Dashboard, Crédit, Marché, Opérationnel',
             titleFontSize: 26,
             subtitleFontSize: 12.5,
-            // Les états que l'application ne calcule pas partent à zéro tant
-            // que personne ne les a renseignés : le passage se fait donc
-            // depuis l'écran d'où part l'export, pas ailleurs.
-            trailing: OutlinedButton.icon(
-              onPressed: _ouvrirLesSaisies,
-              icon: const Icon(Icons.edit_note_rounded, size: 18),
-              label: const Text('Cases à renseigner'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kBlue,
-                side: BorderSide(color: _kBlue.withValues(alpha: 0.45)),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radius),
-                ),
-              ),
-            ),
+            // Les cases à renseigner ont rejoint la page de la déclaration, à
+            // côté de l'export qu'elles alimentent : les deux se font l'une
+            // après l'autre, et les séparer aux deux coins de cet écran laissait
+            // exporter sans avoir rien renseigné.
           ),
           const SizedBox(height: 14),
           Expanded(
@@ -1170,8 +1008,13 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
                                 ],
                               ),
                       ),
+                      // Un accès, pas une action : renseigner les cases et
+                      // exporter le formulaire sont deux moments de la même
+                      // tâche, et ils vivent désormais sur la page qui leur est
+                      // consacrée. Cet écran a pour sujet le rapport
+                      // consolidé.
                       OutlinedButton.icon(
-                        onPressed: _generatingFodep ? null : _exportFodep,
+                        onPressed: _ouvrirLeFodep,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _kBlue,
                           side: const BorderSide(color: _kBlue),
@@ -1182,29 +1025,20 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
                               borderRadius:
                                   BorderRadius.circular(AppTheme.radius)),
                         ),
-                        icon: _generatingFodep
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: _kBlue))
-                            : const Icon(Icons.table_view_rounded,
-                                size: 18, color: _kBlue),
+                        icon: const Icon(Icons.table_view_rounded,
+                            size: 18, color: _kBlue),
                         label: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                                _generatingFodep
-                                    ? 'Préparation du FODEP…'
-                                    : 'Exporter le FODEP',
-                                style: const TextStyle(
+                            const Text('Déclaration FODEP',
+                                style: TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
                                     height: 1.2)),
                             Text(
                                 _dateFin == null
-                                    ? 'Formulaire BCEAO'
+                                    ? 'Cases à renseigner et export'
                                     : 'Arrêté au ${_fmtDate(_dateFin!)}',
                                 style: TextStyle(
                                     fontSize: 11,

@@ -4,10 +4,11 @@ from datetime import date
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.rapports.fodep import construire_fodep, nom_fichier_fodep
+from app.rapports.fodep.analyse import AnalyseDeclaration, analyser_declaration
 from app.rapports.fodep.contenu import ContenuFodep, contenu_fodep
 from app.rapports.models import (
     ReportRequest,
@@ -62,6 +63,36 @@ def put_saisies_fodep(payload: SaisiesFodepEnregistrees) -> SaisiesFodepEnregist
 
     enregistrees = enregistrer_saisies_fodep(payload.saisies)
     return SaisiesFodepEnregistrees(saisies=payload.saisies, enregistrees=enregistrees)
+
+
+@router.post("/fodep/analyse", response_model=AnalyseDeclaration)
+async def post_analyse_fodep(
+    file: UploadFile = File(...),
+) -> AnalyseDeclaration:
+    """Analyse une déclaration FODEP au regard du dispositif prudentiel UMOA.
+
+    Le PDF déposé n'a pas à venir de cet outil : une déclaration d'un exercice
+    précédent ou d'une autre entité s'analyse aussi bien. Seules les onze normes
+    de l'EP01 sont confrontées à leurs seuils — c'est l'état de conformité du
+    formulaire.
+    """
+
+    octets = await file.read()
+    if not octets:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "FODEP_ANALYSE_FICHIER_VIDE",
+                "message": "Le fichier déposé est vide.",
+            },
+        )
+    try:
+        return analyser_declaration(octets, file.filename or "declaration.pdf")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "FODEP_ANALYSE_PDF_ILLISIBLE", "message": str(exc)},
+        ) from exc
 
 
 @router.get("/fodep/contenu", response_model=ContenuFodep)
