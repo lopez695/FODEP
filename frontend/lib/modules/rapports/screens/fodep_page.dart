@@ -50,6 +50,12 @@ class FodepPage extends StatefulWidget {
 
 class _FodepPageState extends State<FodepPage> {
   late Future<SaisiesFodep> _saisies;
+
+  /// Date d'arrêté retenue pour la déclaration.
+  ///
+  /// Initialisée avec la date de fin du reporting, elle se choisit sur
+  /// l'écran des cases à renseigner : c'est l'attestation qui la porte.
+  DateTime? _dateArrete;
   bool _exportEnCours = false;
   bool _analyseEnCours = false;
   bool _saisiesModifiees = false;
@@ -58,25 +64,32 @@ class _FodepPageState extends State<FodepPage> {
   void initState() {
     super.initState();
     _saisies = widget.api.fetchSaisiesFodep();
+    _dateArrete = widget.dateArrete;
   }
 
   String? get _dateArreteLisible {
-    final date = widget.dateArrete;
+    final date = _dateArrete;
     if (date == null) return null;
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
   Future<void> _ouvrirLesSaisies() async {
-    final modifie = await SaisiesFodepPage.ouvrir(
+    final retour = await SaisiesFodepPage.ouvrir(
       context,
       widget.api,
-      dateArrete: widget.dateArrete,
+      dateArrete: _dateArrete,
     );
-    if (!mounted || !modifie) return;
+    if (!mounted) return;
     setState(() {
-      _saisiesModifiees = true;
-      _saisies = widget.api.fetchSaisiesFodep();
+      // La date d'arrêté se choisit sur l'écran de saisie, parce que c'est
+      // l'attestation qui la porte. L'export doit repartir de celle-là, sans
+      // quoi la déclaration contredirait l'attestation qu'on vient de régler.
+      _dateArrete = retour.dateArrete;
+      if (retour.modifie) {
+        _saisiesModifiees = true;
+        _saisies = widget.api.fetchSaisiesFodep();
+      }
     });
   }
 
@@ -102,14 +115,14 @@ class _FodepPageState extends State<FodepPage> {
       final List<String> reserves;
       if (enPdf) {
         final contenu =
-            await widget.api.fetchContenuFodep(dateArrete: widget.dateArrete);
+            await widget.api.fetchContenuFodep(dateArrete: _dateArrete);
         if (!mounted) return;
         octets = await construireFodepPdf(contenu: contenu);
         nomPropose = contenu.nomFichier.replaceFirst(RegExp(r'\.xlsx$'), '.pdf');
         reserves = contenu.anomalies;
       } else {
         final export =
-            await widget.api.downloadFodep(dateArrete: widget.dateArrete);
+            await widget.api.downloadFodep(dateArrete: _dateArrete);
         if (!mounted) return;
         octets = export.bytes;
         nomPropose = export.fileName;

@@ -1,0 +1,49 @@
+# Ce que le dépôt n'a pas à porter.
+#
+# Le dépôt n'avait aucun fichier d'exclusion : la sortie de compilation, les
+# caches et les journaux y étaient versionnés au même titre que le code. Deux
+# fichiers `app.dill` de 75 Mo y figuraient, ce qui explique un historique de
+# 150 Mo pour 64 objets. Tout ce qui suit se régénère ; rien n'en est perdu.
+
+# ─── Flutter et Dart ────────────────────────────────────────────────────────
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+**/generated_plugin_registrant.dart
+
+# Symboles de débogage et binaires déposés par le SDK dans le projet Windows.
+# `frontend/windows/.gitignore` couvre déjà `flutter/ephemeral`, où vit le
+# fichier le plus lourd de l'installation (264 Mo).
+*.pdb
+*.ilk
+
+# ─── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/.venv/
+.venv/
+venv/
+
+# ─── Données d'exécution ────────────────────────────────────────────────────
+#
+# La base `rwa_data.db` reste suivie : c'est un choix, pas un oubli. Ses deux
+# fichiers compagnons, eux, n'ont aucun sens hors du moment où SQLite les
+# écrit — les versionner ne conserve rien et crée une modification à chaque
+# ouverture de l'application.
+*.db-wal
+*.db-shm
+backend/data/logs/
+backend/data/backups/
+*.log
+
+# ─── Système ────────────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store

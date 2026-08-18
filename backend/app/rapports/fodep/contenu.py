@@ -15,13 +15,14 @@ Le classeur reste la seule source : le PDF n'est jamais un second calcul.
 from __future__ import annotations
 
 from datetime import date
-from io import BytesIO
 
-from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel, Field
 
-from app.rapports.fodep.service import construire_fodep, nom_fichier_fodep
+from app.rapports.fodep.service import (
+    nom_fichier_fodep,
+    renseigner_classeur_fodep,
+)
 
 # Largeur retenue par etat. Les etats du FODEP n'en portent pas davantage, et
 # au-dela les colonnes deviennent illisibles sur une page A4 paysage.
@@ -193,30 +194,38 @@ def _largeurs(feuille, derniere: int) -> list[float]:
 
 
 def contenu_fodep(date_arrete: date | None = None) -> ContenuFodep:
-    """Construit le FODEP puis en extrait le contenu, etat par etat."""
+    """Renseigne le FODEP puis en extrait le contenu, etat par etat.
 
-    resultat = construire_fodep(date_arrete)
-    classeur = load_workbook(BytesIO(resultat.contenu), data_only=False)
+    Le classeur est lu la ou il est produit, en memoire. L'ecrire dans un
+    tampon pour le relire aussitot coutait huit secondes par apercu et ne
+    rendait rien de plus : le classeur enregistre est le meme que celui qu'on
+    tenait deja.
+    """
 
-    etats: list[EtatFodep] = []
-    for nom in classeur.sheetnames:
-        feuille = classeur[nom]
-        derniere = _derniere_colonne(feuille)
-        if derniere == 0:
-            continue
-        lignes = _lignes_du_formulaire(feuille, derniere)
-        if lignes:
-            etats.append(
-                EtatFodep(
-                    nom=nom,
-                    largeurs=_largeurs(feuille, derniere),
-                    lignes=lignes,
+    produit = renseigner_classeur_fodep(date_arrete)
+    try:
+        classeur = produit.classeur
+        etats: list[EtatFodep] = []
+        for nom in classeur.sheetnames:
+            feuille = classeur[nom]
+            derniere = _derniere_colonne(feuille)
+            if derniere == 0:
+                continue
+            lignes = _lignes_du_formulaire(feuille, derniere)
+            if lignes:
+                etats.append(
+                    EtatFodep(
+                        nom=nom,
+                        largeurs=_largeurs(feuille, derniere),
+                        lignes=lignes,
+                    )
                 )
-            )
 
-    return ContenuFodep(
-        nom_fichier=nom_fichier_fodep(resultat.date_arrete),
-        date_arrete=resultat.date_arrete,
-        anomalies=list(resultat.anomalies),
-        etats=etats,
-    )
+        return ContenuFodep(
+            nom_fichier=nom_fichier_fodep(produit.date_arrete),
+            date_arrete=produit.date_arrete,
+            anomalies=list(produit.anomalies),
+            etats=etats,
+        )
+    finally:
+        produit.classeur.close()
