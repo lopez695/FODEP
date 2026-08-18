@@ -209,7 +209,33 @@ def indexer_codes_dispru(feuille, *, colonne: int = 1) -> dict[str, int]:
     return index
 
 
-def _est_a_completer(cellule) -> bool:
+def styles_ouverts(classeur) -> frozenset[int] | None:
+    """Index des styles que la BCEAO a laissés ouverts à la saisie.
+
+    Un classeur ne porte qu'une poignée de styles de protection — quatre pour
+    le FODEP — et chaque cellule s'y réfère par un numéro. Les relever une
+    fois permet ensuite de reconnaître une case ouverte sur ce seul numéro.
+
+    L'intérêt n'est pas cosmétique. Lire `cellule.protection` construit deux
+    objets par cellule, et le balayage en visite deux millions et demi : c'est
+    la moitié du temps de production du formulaire. Comparer un entier ne coûte
+    rien.
+
+    Retourne `None` si openpyxl ne présente pas cette table — la lecture
+    repasse alors par le chemin ordinaire, plus lent mais toujours juste.
+    """
+
+    try:
+        return frozenset(
+            index
+            for index, protection in enumerate(classeur._protections)
+            if not protection.locked
+        )
+    except AttributeError:
+        return None
+
+
+def _est_a_completer(cellule, styles_de_saisie: frozenset[int] | None = None) -> bool:
     """Indique si une cellule est une case de saisie encore vide.
 
     Le verrouillage posé par la BCEAO sert de garde-fou : seules les cellules
@@ -220,7 +246,12 @@ def _est_a_completer(cellule) -> bool:
 
     if isinstance(cellule, MergedCell) or cellule.value is not None:
         return False
-    return cellule.protection is not None and not cellule.protection.locked
+    if styles_de_saisie is None:
+        return cellule.protection is not None and not cellule.protection.locked
+    # Une cellule que le fichier ne style pas explicitement porte le style par
+    # defaut, qui est verrouille : elle n'est pas une case a renseigner.
+    style = cellule._style
+    return style is not None and style.protectionId in styles_de_saisie
 
 
 def completer_a_zero(feuille, lignes: dict[str, int], colonnes: range) -> None:
@@ -230,10 +261,11 @@ def completer_a_zero(feuille, lignes: dict[str, int], colonnes: range) -> None:
     cellules non verrouillées doivent être renseignées » (notice, § 3.3).
     """
 
+    styles_de_saisie = styles_ouverts(feuille.parent)
     for ligne in lignes.values():
         for colonne in colonnes:
             cellule = feuille.cell(row=ligne, column=colonne)
-            if _est_a_completer(cellule):
+            if _est_a_completer(cellule, styles_de_saisie):
                 cellule.value = 0
 
 
@@ -247,7 +279,8 @@ def completer_etat_a_zero(feuille, *, premiere_colonne: int = 3) -> None:
     intitulés, ne sont jamais touchées.
     """
 
+    styles_de_saisie = styles_ouverts(feuille.parent)
     for ligne in feuille.iter_rows(min_row=PREMIERE_LIGNE_UTILE, min_col=premiere_colonne):
         for cellule in ligne:
-            if _est_a_completer(cellule):
+            if _est_a_completer(cellule, styles_de_saisie):
                 cellule.value = 0

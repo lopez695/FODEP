@@ -132,6 +132,23 @@ class ResultatFodep:
     anomalies: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ClasseurFodep:
+    """Le classeur renseigné, encore ouvert, avec ce qui l'accompagne.
+
+    L'aperçu n'a que faire d'un fichier : il relit ce que l'application vient
+    d'écrire. Lui rendre le classeur en mémoire lui épargne une sauvegarde et
+    un rechargement — huit secondes sur une déclaration, pour retrouver
+    exactement l'état qu'on tenait déjà.
+
+    Celui qui reçoit ce classeur en devient responsable et doit le refermer.
+    """
+
+    classeur: object
+    date_arrete: date
+    anomalies: list[str] = field(default_factory=list)
+
+
 def nom_fichier_fodep(date_arrete: date) -> str:
     """Nom de fichier attendu pour une déclaration à une date d'arrêté."""
 
@@ -2207,7 +2224,32 @@ def _remplir_attestation(classeur, date_arrete: date) -> None:
 
 
 def construire_fodep(date_arrete: date | None = None) -> ResultatFodep:
-    """Produit le classeur FODEP renseigné à partir des données du portefeuille."""
+    """Produit le classeur FODEP renseigné, prêt à être transmis.
+
+    C'est la forme déclarative : un fichier. L'aperçu, lui, passe par
+    `renseigner_classeur_fodep` et lit le classeur sans l'écrire.
+    """
+
+    produit = renseigner_classeur_fodep(date_arrete)
+    try:
+        tampon = BytesIO()
+        produit.classeur.save(tampon)
+        return ResultatFodep(
+            contenu=tampon.getvalue(),
+            date_arrete=produit.date_arrete,
+            anomalies=produit.anomalies,
+        )
+    finally:
+        produit.classeur.close()
+
+
+def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
+    """Renseigne le classeur FODEP à partir des données du portefeuille.
+
+    Le classeur est rendu ouvert : c'est à l'appelant de le refermer. Deux
+    lectures en ont besoin — l'export, qui l'enregistre, et l'aperçu, qui le
+    parcourt — et rien ne justifie de l'écrire sur disque pour le relire aussitôt.
+    """
 
     if not CHEMIN_MODELE.exists():
         raise FileNotFoundError(
@@ -2361,17 +2403,18 @@ def construire_fodep(date_arrete: date | None = None) -> ResultatFodep:
 
         _verifier_coherence_fonds_propres(fonds_propres, fonds_propres_saisis, anomalies)
 
-        tampon = BytesIO()
-        classeur.save(tampon)
-        return ResultatFodep(
-            contenu=tampon.getvalue(),
+        return ClasseurFodep(
+            classeur=classeur,
             date_arrete=date_effective,
             # Une même réserve peut être soulevée par plusieurs expositions :
             # la répéter n'apprendrait rien de plus au lecteur.
             anomalies=list(dict.fromkeys(anomalies)),
         )
-    finally:
+    except BaseException:
+        # Le classeur n'est referme ici que si la production echoue : rendu a
+        # l'appelant, il lui appartient, et le fermer serait le lui retirer.
         classeur.close()
+        raise
 
 
 def _completer_les_etats_alimentes(classeur) -> None:

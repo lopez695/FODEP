@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/services/rwa_api_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/report_models.dart';
 
 /// Saisie de ce que l'application ne produira jamais.
@@ -30,17 +31,25 @@ class SaisiesFodepPage extends StatefulWidget {
   /// qui sera déclarée. Nulle si l'export doit la déduire du portefeuille.
   final DateTime? dateArrete;
 
-  static Future<bool> ouvrir(
+  /// Ce que la saisie rend : si des cases ont changé, et la date d'arrêté
+  /// retenue.
+  ///
+  /// La date fait partie du retour parce qu'elle se choisit ici : c'est
+  /// l'attestation qui la porte, et c'est sur cet écran qu'on la voit. Sans
+  /// cela, l'export repartirait de la date du reporting et contredirait
+  /// l'attestation que le déclarant vient de régler.
+  static Future<({bool modifie, DateTime? dateArrete})> ouvrir(
     BuildContext context,
     RwaApiService api, {
     DateTime? dateArrete,
   }) async {
-    final modifie = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final retour =
+        await Navigator.of(context).push<({bool modifie, DateTime? dateArrete})>(
+      MaterialPageRoute<({bool modifie, DateTime? dateArrete})>(
         builder: (_) => SaisiesFodepPage(api: api, dateArrete: dateArrete),
       ),
     );
-    return modifie ?? false;
+    return retour ?? (modifie: false, dateArrete: dateArrete);
   }
 
   @override
@@ -56,10 +65,37 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
   bool _enregistrement = false;
   bool _modifieDepuisOuverture = false;
 
+  /// Date d'arrêté que portera l'attestation.
+  ///
+  /// Elle arrive de la date de fin du reporting, qui est un défaut raisonnable,
+  /// mais c'est le déclarant qui l'arrête : une déclaration peut porter sur une
+  /// fin de trimestre sans que le reporting consulté s'y arrête.
+  DateTime? _dateArrete;
+
   @override
   void initState() {
     super.initState();
     _future = widget.api.fetchSaisiesFodep();
+    _dateArrete = widget.dateArrete;
+  }
+
+  Future<void> _choisirLaDate() async {
+    final maintenant = DateTime.now();
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: _dateArrete ?? maintenant,
+      // Une déclaration porte sur une période close, mais les jeux de données
+      // peuvent être postérieurs à aujourd'hui : la borne haute laisse deux
+      // exercices d'avance plutôt que d'interdire une date déjà saisie.
+      firstDate: DateTime(2010),
+      lastDate: DateTime(maintenant.year + 2, 12, 31),
+      helpText: 'Date d\'arrêté de la déclaration',
+      cancelText: 'Annuler',
+      confirmText: 'Retenir',
+      fieldLabelText: 'Date d\'arrêté',
+    );
+    if (choisie == null || !mounted) return;
+    setState(() => _dateArrete = choisie);
   }
 
   String _cle(CaseFodep case_) => '${case_.etat}!${case_.cellule}';
@@ -115,8 +151,6 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return PopScope(
       canPop: _enAttente.isEmpty,
       onPopInvokedWithResult: (didPop, _) {
@@ -124,87 +158,66 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
         _confirmerAbandon();
       },
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Retour',
-            onPressed: () => _quitter(),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Cases à renseigner du FODEP'),
-              Text(
-                'Ce que l\'application ne produira jamais : l\'identité de '
-                'l\'établissement et les signataires de l\'attestation.',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            if (_enAttente.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                child: FilledButton.icon(
-                  onPressed: _enregistrement ? null : _enregistrer,
-                  icon: _enregistrement
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.save_outlined, size: 18),
-                  label: Text('Enregistrer (${_enAttente.length})'),
-                ),
-              ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: FutureBuilder<SaisiesFodep>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              );
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Chargement impossible : ${snapshot.error}'),
-              );
-            }
-            final saisies = snapshot.data!;
-            if (saisies.etats.isEmpty) {
-              return const Center(
-                child: Text(
-                  'Rien à saisir : tout ce que le formulaire exige vient de '
-                  'l\'application.',
-                ),
-              );
-            }
-            return Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
-                  children: [
-                    _Avancement(saisies: saisies, enAttente: _enAttente.length),
-                    const SizedBox(height: 20),
-                    for (final etat in saisies.etats)
-                      _BlocEtat(
-                        etat: etat,
-                        enAttente: _enAttente,
-                        onModifier: _modifier,
-                        dateArrete: widget.dateArrete,
+        backgroundColor: _Charte.fond(context),
+        body: Column(
+          children: [
+            _EnteteSaisies(
+              enAttente: _enAttente.length,
+              enregistrement: _enregistrement,
+              onRetour: _quitter,
+              onEnregistrer: _enregistrer,
+            ),
+            Expanded(
+              child: FutureBuilder<SaisiesFodep>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Chargement impossible : ${snapshot.error}'),
+                    );
+                  }
+                  final saisies = snapshot.data!;
+                  if (saisies.etats.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Rien à saisir : tout ce que le formulaire exige '
+                        'vient de l\'application.',
                       ),
-                  ],
-                ),
+                    );
+                  }
+                  return Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1180),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+                        children: [
+                          _Avancement(
+                            saisies: saisies,
+                            enAttente: _enAttente.length,
+                          ),
+                          const SizedBox(height: 20),
+                          for (final etat in saisies.etats)
+                            _BlocEtat(
+                              etat: etat,
+                              enAttente: _enAttente,
+                              onModifier: _modifier,
+                              dateArrete: _dateArrete,
+                              onChoisirLaDate: _choisirLaDate,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
@@ -212,7 +225,8 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
 
   Future<void> _quitter() async {
     if (_enAttente.isEmpty) {
-      Navigator.of(context).pop(_modifieDepuisOuverture);
+      Navigator.of(context)
+          .pop((modifie: _modifieDepuisOuverture, dateArrete: _dateArrete));
       return;
     }
     await _confirmerAbandon();
@@ -241,12 +255,204 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
       ),
     );
     if (abandonner == true && mounted) {
-      Navigator.of(context).pop(_modifieDepuisOuverture);
+      Navigator.of(context)
+          .pop((modifie: _modifieDepuisOuverture, dateArrete: _dateArrete));
     }
   }
 }
 
+/// Les couleurs de l'écran, prises à la charte de l'application.
+///
+/// La page vivait jusqu'ici sur les couleurs par défaut de Material, quand
+/// tous les autres écrans suivent `AppTheme`. Elle en paraissait empruntée à
+/// une autre application. Ces quelques accès lui rendent la même palette, en
+/// clair comme en sombre.
+abstract final class _Charte {
+  static bool _sombre(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color fond(BuildContext context) =>
+      _sombre(context) ? AppTheme.darkBackground : AppTheme.background;
+
+  static Color carte(BuildContext context) =>
+      _sombre(context) ? AppTheme.darkCard : AppTheme.card;
+
+  static Color bordure(BuildContext context) =>
+      _sombre(context) ? AppTheme.darkBorder : AppTheme.border;
+
+  static Color texte(BuildContext context) =>
+      _sombre(context) ? AppTheme.darkText : AppTheme.text;
+
+  static Color discret(BuildContext context) =>
+      _sombre(context) ? AppTheme.darkMuted : AppTheme.muted;
+}
+
+/// L'en-tête de la page : d'où l'on vient, ce qu'on fait, et où en sont les
+/// modifications non enregistrées.
+///
+/// Le bouton d'enregistrement ne disparaît plus quand il n'y a rien à
+/// enregistrer : à sa place s'affiche l'état « à jour ». Une barre dont les
+/// commandes vont et viennent se relit à chaque fois, et l'absence de bouton
+/// ne dit pas d'elle-même que tout est sauvegardé.
+class _EnteteSaisies extends StatelessWidget {
+  const _EnteteSaisies({
+    required this.enAttente,
+    required this.enregistrement,
+    required this.onRetour,
+    required this.onEnregistrer,
+  });
+
+  final int enAttente;
+  final bool enregistrement;
+  final VoidCallback onRetour;
+  final VoidCallback onEnregistrer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final aEnregistrer = enAttente > 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _Charte.carte(context),
+        border: Border(bottom: BorderSide(color: _Charte.bordure(context))),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      child: Row(
+        children: [
+          Tooltip(
+            message: 'Retour au reporting',
+            child: InkWell(
+              onTap: onRetour,
+              borderRadius: BorderRadius.circular(AppTheme.radius),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  border: Border.all(color: _Charte.bordure(context)),
+                  borderRadius: BorderRadius.circular(AppTheme.radius),
+                ),
+                child: Icon(
+                  Icons.arrow_back_rounded,
+                  size: 19,
+                  color: _Charte.texte(context),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Cases à renseigner du FODEP',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: _Charte.texte(context),
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Ce que l\'application ne produira jamais : l\'identité de '
+                  'l\'établissement et les signataires de l\'attestation.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    color: _Charte.discret(context),
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          if (aEnregistrer)
+            FilledButton.icon(
+              onPressed: enregistrement ? null : onEnregistrer,
+              icon: enregistrement
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined, size: 18),
+              label: Text('Enregistrer ($enAttente)'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.accent,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                textStyle: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radius),
+                ),
+              ),
+            )
+          else
+            const _Pastille(
+              teinte: AppTheme.success,
+              icone: Icons.check_circle_outline_rounded,
+              texte: 'Saisies à jour',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Une étiquette d'état : une pastille de couleur et deux mots.
+class _Pastille extends StatelessWidget {
+  const _Pastille({
+    required this.teinte,
+    required this.icone,
+    required this.texte,
+  });
+
+  final Color teinte;
+  final IconData icone;
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: teinte.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icone, size: 15, color: teinte),
+          const SizedBox(width: 6),
+          Text(
+            texte,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: teinte,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Où en est la saisie, tous états confondus.
+///
+/// Le compte se lit d'abord comme un chiffre, pas comme une phrase : c'est la
+/// seule information que le déclarant vient chercher en haut de page. La
+/// barre et la note qui l'entourent ne font que la préciser.
 class _Avancement extends StatelessWidget {
   const _Avancement({required this.saisies, required this.enAttente});
 
@@ -256,53 +462,94 @@ class _Avancement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final part = saisies.totalCases > 0
-        ? saisies.totalRenseignees / saisies.totalCases
-        : 0.0;
+    final total = saisies.totalCases;
+    final faits = saisies.totalRenseignees;
+    final part = total > 0 ? faits / total : 0.0;
+    final complet = total > 0 && faits == total;
+    // Le vert est réservé à l'attestation entièrement renseignée : il dit
+    // « rien ne manque », et le dire trop tôt serait un mensonge.
+    final teinte = complet ? AppTheme.success : AppTheme.accent;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor),
-        borderRadius: BorderRadius.circular(10),
+        color: _Charte.carte(context),
+        border: Border.all(color: _Charte.bordure(context)),
+        borderRadius: BorderRadius.circular(AppTheme.radius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '${saisies.totalRenseignees} champ(s) renseigné(s) sur '
-                  '${saisies.totalCases}.',
-                  style: theme.textTheme.bodyMedium,
+              Text(
+                '$faits',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: faits == 0 ? _Charte.discret(context) : teinte,
+                  height: 1,
                 ),
               ),
-              if (enAttente > 0)
-                Text(
-                  '$enAttente en attente d\'enregistrement',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.tertiary,
+              Padding(
+                padding: const EdgeInsets.only(left: 3, top: 6),
+                child: Text(
+                  '/ $total',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
+                    color: _Charte.discret(context),
                   ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: Text(
+                  'champ(s) renseigné(s)',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _Charte.texte(context),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (enAttente > 0)
+                _Pastille(
+                  teinte: AppTheme.warning,
+                  icone: Icons.pending_outlined,
+                  texte: '$enAttente en attente d\'enregistrement',
+                )
+              else if (complet)
+                const _Pastille(
+                  teinte: AppTheme.success,
+                  icone: Icons.task_alt_rounded,
+                  texte: 'Attestation complète',
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           ClipRRect(
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: part,
-              minHeight: 6,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              minHeight: 8,
+              backgroundColor: _Charte.bordure(context),
+              valueColor: AlwaysStoppedAnimation<Color>(teinte),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Text(
             'Tout le reste du formulaire est produit par l\'application. Les '
             'états qu\'elle n\'alimente pas encore sont déclarés à zéro, ce que '
             'la notice admet d\'une activité inexistante.',
-            style: theme.textTheme.bodySmall,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 12,
+              color: _Charte.discret(context),
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -320,12 +567,16 @@ class _BlocEtat extends StatelessWidget {
     required this.enAttente,
     required this.onModifier,
     this.dateArrete,
+    this.onChoisirLaDate,
   });
 
   final EtatASaisir etat;
   final Map<String, CaseFodep> enAttente;
   final void Function(CaseFodep, String) onModifier;
   final DateTime? dateArrete;
+
+  /// Ouvre le calendrier : la date d'arrêté se choisit, elle ne se subit pas.
+  final VoidCallback? onChoisirLaDate;
 
   @override
   Widget build(BuildContext context) {
@@ -382,6 +633,7 @@ class _BlocEtat extends StatelessWidget {
             enAttente: enAttente,
             onModifier: onModifier,
             dateArrete: dateArrete,
+            onChoisirLaDate: onChoisirLaDate,
           ),
         ],
       ),
@@ -675,12 +927,16 @@ class _Attestation extends StatelessWidget {
     required this.enAttente,
     required this.onModifier,
     this.dateArrete,
+    this.onChoisirLaDate,
   });
 
   final EtatASaisir etat;
   final Map<String, CaseFodep> enAttente;
   final void Function(CaseFodep, String) onModifier;
   final DateTime? dateArrete;
+
+  /// Ouvre le calendrier : la date d'arrêté se choisit, elle ne se subit pas.
+  final VoidCallback? onChoisirLaDate;
 
   static const String _certification =
       'certifions que le présent formulaire a été rempli conformément aux '
@@ -756,6 +1012,7 @@ class _Attestation extends StatelessWidget {
             cleModifiee: _modifiee('T7'),
             onModifier: onModifier,
             dateArrete: dateArrete,
+            onChoisirLaDate: onChoisirLaDate,
           ),
           const SizedBox(height: 22),
           _BlocResponsable(
@@ -867,6 +1124,7 @@ class _EnteteCodes extends StatelessWidget {
     required this.cleModifiee,
     required this.onModifier,
     this.dateArrete,
+    this.onChoisirLaDate,
   });
 
   final CaseFodep? cib;
@@ -875,6 +1133,9 @@ class _EnteteCodes extends StatelessWidget {
   final bool cleModifiee;
   final void Function(CaseFodep, String) onModifier;
   final DateTime? dateArrete;
+
+  /// Ouvre le calendrier : la date d'arrêté se choisit, elle ne se subit pas.
+  final VoidCallback? onChoisirLaDate;
 
   /// Les huit caractères du gabarit : les chiffres de la date si elle est
   /// connue, les lettres du modèle sinon.
@@ -896,20 +1157,48 @@ class _EnteteCodes extends StatelessWidget {
       spacing: 30,
       runSpacing: 14,
       children: [
+        // La date d'arrêté se choisit : c'est le déclarant qui arrête sa
+        // déclaration, pas la période de reporting qu'il consultait. Elle
+        // arrive pré-remplie de cette période, ce qui est un défaut commode,
+        // mais les huit cases restaient figées et laissaient croire qu'on ne
+        // pouvait pas la corriger.
         _GroupeDeCases(
           legende: 'Date d\'arrêté',
           precision: connue
-              ? 'portée par l\'application · se change avec la date de fin du '
-                  'reporting'
-              : 'portée par l\'application, d\'après la date de fin du '
-                  'reporting',
+              ? 'choisissez la date que portera l\'attestation'
+              : 'aucune date retenue : choisissez celle de l\'arrêté',
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (var index = 0; index < caracteres.length; index++) ...[
-                if (index == 4 || index == 6) const SizedBox(width: 6),
-                _CaseFigee(lettre: caracteres[index], renseignee: connue),
-              ],
+              InkWell(
+                onTap: onChoisirLaDate,
+                borderRadius: BorderRadius.circular(AppTheme.radius),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var index = 0; index < caracteres.length; index++) ...[
+                        if (index == 4 || index == 6) const SizedBox(width: 6),
+                        _CaseFigee(
+                          lettre: caracteres[index],
+                          renseignee: connue,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: onChoisirLaDate,
+                icon: const Icon(Icons.calendar_month_outlined, size: 19),
+                tooltip: 'Choisir la date d\'arrêté',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
+              ),
             ],
           ),
         ),
