@@ -123,6 +123,62 @@ class ReportDraft {
 
 /// Classeur FODEP renvoyé par le backend, avec ses réserves de lecture.
 ///
+/// Ce qu'une réserve de lecture attend du déclarant.
+///
+/// Toutes n'appellent pas le même geste. L'écran les présentait d'affilée sous
+/// une même consigne — « complétez-les à la main » — alors qu'on ne complète
+/// ni une convention de report, ni un poste que l'établissement ne détient
+/// pas. Les remarques qui demandaient vraiment une action se lisaient comme
+/// les autres, c'est-à-dire pas du tout.
+enum NatureReserve {
+  /// Un geste avant de transmettre : compléter une saisie, reprendre un
+  /// import, vérifier une valeur.
+  aVerifier('a_verifier'),
+
+  /// Un choix de l'application pour loger ses données dans le formulaire, là
+  /// où celui-ci n'offre pas la ligne attendue. Celui qui signe l'endosse.
+  convention('convention'),
+
+  /// Un constat sur la déclaration produite : un poste à zéro faute d'objet,
+  /// un décompte. Se lit, ne se corrige pas.
+  information('information');
+
+  const NatureReserve(this.code);
+
+  final String code;
+
+  /// Une nature inconnue est traitée comme une vérification : mieux vaut
+  /// montrer une remarque de trop en tête de liste que la reléguer.
+  static NatureReserve depuis(String? code) => values.firstWhere(
+        (nature) => nature.code == code,
+        orElse: () => NatureReserve.aVerifier,
+      );
+}
+
+/// Une remarque de lecture accompagnant la déclaration.
+class ReserveFodep {
+  const ReserveFodep({required this.nature, required this.message});
+
+  final NatureReserve nature;
+  final String message;
+
+  /// Accepte aussi une réserve transmise en texte brut, comme le faisaient les
+  /// versions antérieures : un poste de travail dont le backend n'a pas encore
+  /// été relancé ne doit pas perdre ses réserves.
+  factory ReserveFodep.depuisJson(Object? brut) {
+    if (brut is Map) {
+      return ReserveFodep(
+        nature: NatureReserve.depuis(brut['nature'] as String?),
+        message: brut['message'] as String? ?? '',
+      );
+    }
+    return ReserveFodep(
+      nature: NatureReserve.aVerifier,
+      message: brut?.toString() ?? '',
+    );
+  }
+}
+
 /// [anomalies] liste les postes que l'application ne sait pas encore
 /// alimenter, ou dont la règle du formulaire s'écarte de celle retenue
 /// ailleurs dans l'outil. Elles doivent être lues avant de transmettre la
@@ -136,7 +192,7 @@ class FodepExport {
 
   final Uint8List bytes;
   final String fileName;
-  final List<String> anomalies;
+  final List<ReserveFodep> anomalies;
 }
 
 /// Une cellule du formulaire, avec ce qu'il faut pour la redessiner.
@@ -282,9 +338,9 @@ class ContenuFodep {
   final String nomFichier;
   final DateTime? dateArrete;
 
-  /// Mêmes réserves que celles de [FodepExport] : elles doivent être lues avant
-  /// de transmettre, et figurent donc aussi sur le PDF.
-  final List<String> anomalies;
+  /// Mêmes réserves que celles de [FodepExport] : elles doivent être lues
+  /// avant de transmettre.
+  final List<ReserveFodep> anomalies;
 
   final List<EtatFodep> etats;
 
@@ -293,7 +349,7 @@ class ContenuFodep {
         dateArrete: DateTime.tryParse('${json['date_arrete']}'),
         anomalies: [
           for (final anomalie in (json['anomalies'] as List<dynamic>?) ?? const [])
-            '$anomalie',
+            ReserveFodep.depuisJson(anomalie),
         ],
         etats: [
           for (final etat in (json['etats'] as List<dynamic>?) ?? const [])

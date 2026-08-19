@@ -157,7 +157,9 @@ def telecharger_fodep(
         ) from exc
 
     for anomalie in resultat.anomalies:
-        logger.warning("Export FODEP : %s", anomalie)
+        logger.warning(
+            "Export FODEP [%s] : %s", anomalie.nature.value, anomalie.message
+        )
 
     entetes = {
         "Content-Disposition": (
@@ -168,7 +170,9 @@ def telecharger_fodep(
         # les postes que l'application ne sait pas encore alimenter. Les
         # accents sont échappés en \\uXXXX : un en-tête HTTP ne transporte que
         # de l'ASCII, et un « é » brut y suffirait à faire échouer l'envoi.
-        "X-Fodep-Anomalies": json.dumps(resultat.anomalies),
+        "X-Fodep-Anomalies": json.dumps(
+            [reserve.model_dump(mode="json") for reserve in resultat.anomalies]
+        ),
     }
     return StreamingResponse(
         iter([resultat.contenu]),

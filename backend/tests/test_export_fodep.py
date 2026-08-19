@@ -315,7 +315,9 @@ def test_l_ep22_signale_les_classifications_deduites(ep22):
     """La convention de classement doit rester visible avant transmission."""
 
     _, anomalies = ep22
-    assert any("Exécution des opérations" in anomalie for anomalie in anomalies), (
+    assert any(
+        "Exécution des opérations" in anomalie.message for anomalie in anomalies
+    ), (
         "Une perte rangée par convention plutôt que par déclaration doit être "
         "signalée : sinon la classification passe pour une donnée déclarée."
     )
@@ -1114,7 +1116,7 @@ def test_les_etats_requis_sont_declares_ou_signales(classeur):
 
     resultat = construire_fodep()
     requis = lire_etats_requis(classeur, base=BASE_DE_DECLARATION)
-    reserves = " ".join(resultat.anomalies)
+    reserves = " ".join(reserve.message for reserve in resultat.anomalies)
 
     for etat in sorted(requis):
         if etat in ETATS_ALIMENTES or etat in ETATS_DECLARES_A_ZERO:
@@ -1147,7 +1149,7 @@ def test_les_normes_non_mesurees_de_l_ep01_sont_signalees():
         "app.rapports.fodep.service._lire_parties_liees", return_value=[]
     ):
         resultat = construire_fodep()
-    reserves = " ".join(resultat.anomalies)
+    reserves = " ".join(reserve.message for reserve in resultat.anomalies)
     assert "EP01" in reserves
     assert "CONFORME" in reserves
     assert "prêts aux actionnaires" in reserves.lower() or "actionnaires" in reserves
@@ -1224,7 +1226,16 @@ def test_la_route_sert_le_classeur_et_ses_reserves():
 
     entete = reponse.headers["x-fodep-anomalies"]
     entete.encode("ascii")
-    assert isinstance(json.loads(entete), list)
+    reserves = json.loads(entete)
+    assert isinstance(reserves, list)
+    # Chaque reserve voyage avec sa nature : c'est elle qui decide si
+    # l'ecran la presente comme un geste a faire ou comme un constat.
+    assert all(set(reserve) == {"nature", "message"} for reserve in reserves)
+    assert {reserve["nature"] for reserve in reserves} <= {
+        "a_verifier",
+        "convention",
+        "information",
+    }
 
     # Le corps doit être un classeur exploitable, pas un flux tronqué.
     assert len(load_workbook(BytesIO(reponse.content)).sheetnames) == 44

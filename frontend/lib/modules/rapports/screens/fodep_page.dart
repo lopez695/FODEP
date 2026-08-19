@@ -112,7 +112,7 @@ class _FodepPageState extends State<FodepPage> {
       // d'écrire, jamais d'un second calcul.
       final Uint8List octets;
       final String nomPropose;
-      final List<String> reserves;
+      final List<ReserveFodep> reserves;
       if (enPdf) {
         final contenu =
             await widget.api.fetchContenuFodep(dateArrete: _dateArrete);
@@ -149,13 +149,26 @@ class _FodepPageState extends State<FodepPage> {
       );
       if (!mounted) return;
 
+      // La boîte n'interrompt que s'il reste un geste à faire. Sinon les
+      // remarques restent consultables d'un clic : ce sont des constats et des
+      // conventions de report, qui doivent pouvoir être lus — celui qui signe
+      // les endosse — sans arrêter quelqu'un qui n'a rien à corriger.
+      final aFaire =
+          reserves.any((reserve) => reserve.nature == NatureReserve.aVerifier);
+
       _annoncer(
         'Enregistré : ${enregistre.path.split(RegExp(r'[\\/]')).last}',
+        action: reserves.isEmpty || aFaire
+            ? null
+            : (
+                libelle: 'Voir les remarques',
+                surAppui: () => _afficherLesReserves(reserves),
+              ),
       );
 
-      // Les réserves s'affichent quel que soit le format : personne ne relit
-      // une page de garde avant d'avoir enregistré le fichier.
-      if (reserves.isNotEmpty) await _afficherLesReserves(reserves);
+      // Personne ne relit une page de garde avant d'avoir enregistré le
+      // fichier : la boîte vient après, et seulement si elle a de quoi.
+      if (aFaire) await _afficherLesReserves(reserves);
     } on FichierVerrouilleException catch (erreur) {
       _signaler(erreur.message);
     } on ApiException catch (erreur) {
@@ -221,10 +234,24 @@ class _FodepPageState extends State<FodepPage> {
     }
   }
 
-  void _annoncer(String message) {
+  void _annoncer(
+    String message, {
+    ({String libelle, VoidCallback surAppui})? action,
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        // Une remarque à lire demande plus de quatre secondes pour être vue.
+        duration: Duration(seconds: action == null ? 4 : 10),
+        action: action == null
+            ? null
+            : SnackBarAction(
+                label: action.libelle,
+                onPressed: action.surAppui,
+              ),
+      ),
+    );
   }
 
   /// Affiche une erreur assez longtemps pour être lue et agie.
@@ -237,43 +264,65 @@ class _FodepPageState extends State<FodepPage> {
     ));
   }
 
-  Future<void> _afficherLesReserves(List<String> reserves) async {
+  /// Ce qu'il reste à faire, puis ce qu'il faut savoir.
+  ///
+  /// La boîte affichait ses remarques d'affilée sous une seule consigne —
+  /// « complétez-les à la main avant de déposer la déclaration ». Or on ne
+  /// complète pas à la main une convention de report, ni un poste que
+  /// l'établissement ne détient pas : la consigne était fausse pour la plupart
+  /// des lignes, et les deux ou trois qui appelaient vraiment un geste s'y
+  /// noyaient. Chaque réserve porte donc sa nature, et l'écran la range.
+  Future<void> _afficherLesReserves(List<ReserveFodep> reserves) async {
     final theme = Theme.of(context);
+    List<ReserveFodep> deNature(NatureReserve nature) =>
+        [for (final reserve in reserves) if (reserve.nature == nature) reserve];
+
+    final aVerifier = deNature(NatureReserve.aVerifier);
+    final conventions = deNature(NatureReserve.convention);
+    final informations = deNature(NatureReserve.information);
+
     await showDialog<void>(
       context: context,
       builder: (contexte) => AlertDialog(
-        title: const Text('À vérifier avant transmission'),
+        title: Text(
+          aVerifier.isEmpty
+              ? 'Déclaration enregistrée'
+              : 'À faire avant de transmettre',
+        ),
         content: SizedBox(
-          width: 520,
+          width: 560,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Le FODEP a été enregistré. Les points suivants relèvent de '
-                  'postes que l\'application ne sait pas encore alimenter, ou '
-                  'de règles propres au formulaire : complétez-les à la main '
-                  'avant de déposer la déclaration.',
+                  aVerifier.isEmpty
+                      ? "Le FODEP est enregistré et rien n'appelle de correction. Les "
+                          "remarques ci-dessous disent comment l'application a rempli le "
+                          'formulaire : celui qui signe les endosse.'
+                      : 'Le FODEP est enregistré. Ce qui suit demande un geste avant de '
+                          "le déposer ; le reste dit comment l'application a rempli le "
+                          'formulaire.',
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                 ),
-                const SizedBox(height: 14),
-                for (final reserve in reserves)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('•  '),
-                        Expanded(
-                          child: Text(
-                            reserve,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(height: 1.45),
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 16),
+                if (aVerifier.isNotEmpty)
+                  _SectionReserves(
+                    titre: 'À compléter ou à vérifier',
+                    reserves: aVerifier,
+                    ouverte: true,
+                    couleur: AppTheme.danger,
+                  ),
+                if (conventions.isNotEmpty)
+                  _SectionReserves(
+                    titre: "Conventions retenues par l'application",
+                    reserves: conventions,
+                  ),
+                if (informations.isNotEmpty)
+                  _SectionReserves(
+                    titre: 'Pour information',
+                    reserves: informations,
                   ),
               ],
             ),
@@ -282,7 +331,7 @@ class _FodepPageState extends State<FodepPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(contexte).pop(),
-            child: const Text('J\'ai lu'),
+            child: const Text("J'ai lu"),
           ),
         ],
       ),
@@ -512,6 +561,91 @@ class _Etape extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           action,
+        ],
+      ),
+    );
+  }
+}
+
+/// Un groupe de réserves, sous son intitulé.
+///
+/// Ce qui appelle un geste s'ouvre ; les conventions et les constats se
+/// replient. Ils doivent rester consultables — celui qui signe les endosse —
+/// sans encombrer la seule chose à faire avant de déposer la déclaration.
+class _SectionReserves extends StatefulWidget {
+  const _SectionReserves({
+    required this.titre,
+    required this.reserves,
+    this.ouverte = false,
+    this.couleur,
+  });
+
+  final String titre;
+  final List<ReserveFodep> reserves;
+  final bool ouverte;
+  final Color? couleur;
+
+  @override
+  State<_SectionReserves> createState() => _SectionReservesState();
+}
+
+class _SectionReservesState extends State<_SectionReserves> {
+  late bool _ouverte = widget.ouverte;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final couleur = widget.couleur ?? theme.colorScheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _ouverte = !_ouverte),
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    _ouverte ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: couleur,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${widget.titre} (${widget.reserves.length})',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: couleur,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_ouverte)
+            for (final reserve in widget.reserves)
+              Padding(
+                padding: const EdgeInsets.only(left: 24, bottom: 9),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('•  '),
+                    Expanded(
+                      child: Text(
+                        reserve.message,
+                        style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         ],
       ),
     );

@@ -732,13 +732,13 @@ class RwaApiService {
     return correspondance?.group(1)?.trim();
   }
 
-  List<String> _anomaliesFodep(Map<String, String> headers) {
+  List<ReserveFodep> _anomaliesFodep(Map<String, String> headers) {
     final brut = headers['x-fodep-anomalies'];
     if (brut == null || brut.isEmpty) return const [];
     try {
       final decode = jsonDecode(brut);
       if (decode is List) {
-        return decode.map((item) => item.toString()).toList();
+        return decode.map(ReserveFodep.depuisJson).toList();
       }
     } on FormatException {
       // Un en-tête illisible ne doit pas empêcher de récupérer le fichier :

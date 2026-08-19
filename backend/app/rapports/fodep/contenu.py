@@ -19,6 +19,7 @@ from datetime import date
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel, Field
 
+from app.rapports.fodep.reserves import Reserve
 from app.rapports.fodep.service import (
     nom_fichier_fodep,
     renseigner_classeur_fodep,
@@ -120,9 +121,10 @@ class ContenuFodep(BaseModel):
     nom_fichier: str
     date_arrete: date
 
-    #: Reserves de lecture de l'export. Elles ne figurent pas dans le classeur :
-    #: l'interface les affiche, le PDF n'a pas a les inventer.
-    anomalies: list[str]
+    #: Reserves de lecture de l'export, chacune avec sa nature. Elles ne
+    #: figurent pas dans le classeur : l'interface les affiche, le PDF n'a pas
+    #: a les inventer.
+    anomalies: list[Reserve]
 
     etats: list[EtatFodep]
 

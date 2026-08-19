@@ -23,7 +23,12 @@ const _titreInterminable =
 ContenuFodep _contenu(List<EtatFodep> etats) => ContenuFodep(
       nomFichier: 'FODEP_30062026.xlsx',
       dateArrete: DateTime(2026, 6, 30),
-      anomalies: const ['EP01 : normes déclarées à 0 %, donc « CONFORME ».'],
+      anomalies: const [
+        ReserveFodep(
+          nature: NatureReserve.aVerifier,
+          message: 'EP01 : normes déclarées à 0 %, donc « CONFORME ».',
+        ),
+      ],
       etats: etats,
     );
 

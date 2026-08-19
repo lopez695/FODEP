@@ -59,6 +59,12 @@ from app.rapports.fodep.agregation import (
     categorie_fodep,
     flottant,
 )
+from app.rapports.fodep.reserves import (
+    Reserve,
+    a_verifier,
+    convention,
+    information,
+)
 from app.rapports.fodep.disposition import (
     BLOC_AUTRES_HORS_BILAN,
     BLOC_BILAN,
@@ -129,7 +135,7 @@ class ResultatFodep:
 
     contenu: bytes
     date_arrete: date
-    anomalies: list[str] = field(default_factory=list)
+    anomalies: list[Reserve] = field(default_factory=list)
 
 
 @dataclass
@@ -146,7 +152,7 @@ class ClasseurFodep:
 
     classeur: object
     date_arrete: date
-    anomalies: list[str] = field(default_factory=list)
+    anomalies: list[Reserve] = field(default_factory=list)
 
 
 def nom_fichier_fodep(date_arrete: date) -> str:
@@ -216,12 +222,12 @@ def _lire_risque_marche() -> dict[str, float]:
 # ─── EP03 : fonds propres sur base individuelle ───────────────────────────
 
 
-def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, float], list[str]]:
+def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, float], list[Reserve]]:
     """Reporte les fonds propres réglementaires, et retourne leurs agrégats."""
 
     feuille = classeur["EP03"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     capital = flottant(donnees_fp.get("capital_ordinaire"))
     reserves = flottant(donnees_fp.get("reserves"))
@@ -280,17 +286,17 @@ def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, flo
     montants["FPI41"] = cet1 + at1 + t2
 
     if deductions_at1:
-        anomalies.append(
+        anomalies.append(convention(
             "Les déductions prudentielles AT1 sont déclarées sur la ligne FPI27 "
             "(ajustements réglementaires) : le formulaire n'offre pas de ligne "
             "générique pour cette catégorie."
-        )
+        ))
     if deductions_t2:
-        anomalies.append(
+        anomalies.append(convention(
             "Le formulaire n'offre aucune ligne de déduction générique en Tier 2 : "
             "les déductions T2 sont retranchées du total FPI40 sans apparaître "
             "sur une ligne détaillée."
-        )
+        ))
 
     for code, montant in montants.items():
         _ecrire_montant(feuille, lignes.get(code, 0), COLONNE_C, montant)
@@ -520,12 +526,12 @@ def _remplir_ep20(classeur, synthese: SyntheseCredit) -> float:
 # ─── EP21 : risque opérationnel, approche indicateur de base ──────────────
 
 
-def _remplir_ep21(classeur) -> tuple[float, list[str]]:
+def _remplir_ep21(classeur) -> tuple[float, list[Reserve]]:
     """Renseigne l'approche indicateur de base et retourne l'APR opérationnel."""
 
     feuille = classeur["EP21"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     calcul = calcul_aib()
     parametres = get_aib_parametres()
@@ -556,19 +562,19 @@ def _remplir_ep21(classeur) -> tuple[float, list[str]]:
     _ecrire_montant(feuille, ligne_apr, COLONNE_I, apr)
 
     if abs(calcul.apr_aib - apr) > 1.0:
-        anomalies.append(
+        anomalies.append(convention(
             f"APR opérationnel : l'EP21 impose le multiplicateur "
             f"{MULTIPLICATEUR_APR_FODEP:.1f}, là où le module Risque "
             f"Opérationnel applique 1 / "
             f"{parametres.ratio_solvabilite_min:.0%}. L'APR déclaré "
             f"({apr:,.0f} FCFA) diffère donc de celui du tableau de bord "
             f"({calcul.apr_aib:,.0f} FCFA)."
-        )
+        ))
     if calcul.donnees_insuffisantes:
-        anomalies.append(
+        anomalies.append(a_verifier(
             "Aucun exercice de produit brut positif n'est enregistré : "
             "l'EP21 est déclaré à zéro."
-        )
+        ))
     completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_I + 1))
     return apr, anomalies
 
@@ -646,12 +652,12 @@ def _date_de_comptabilisation(perte: dict[str, Any]) -> date | None:
     return None
 
 
-def _remplir_ep22(classeur, date_arrete: date) -> list[str]:
+def _remplir_ep22(classeur, date_arrete: date) -> list[Reserve]:
     """Renseigne la collecte des pertes opérationnelles du dernier exercice."""
 
     feuille = classeur["EP22"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     debut, fin = _exercice_declare(date_arrete)
     seuil = get_pertes_seuils().seuil_reporting_interne
@@ -705,33 +711,33 @@ def _remplir_ep22(classeur, date_arrete: date) -> list[str]:
 
     periode = f"du {debut:%d/%m/%Y} au {fin:%d/%m/%Y}"
     if toutes:
-        anomalies.append(
+        anomalies.append(information(
             f"EP22 : {len(toutes)} perte(s) brute(s) déclarée(s) pour l'exercice "
             f"{periode}, seuil de collecte {seuil:,.0f} FCFA."
-        )
+        ))
     else:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP22 : aucune perte comptabilisée sur l'exercice {periode}. "
             "L'état est déclaré à zéro — vérifiez que c'est bien le dernier "
             "exercice attendu par le formulaire."
-        )
+        ))
     if deduites:
-        anomalies.append(
+        anomalies.append(convention(
             f"EP22 : {deduites} perte(s) n'ont pas de cause racine se rattachant "
             "sans ambiguïté à une catégorie d'événement de Bâle et ont été "
             "versées à « Exécution des opérations ». Cette classification est "
             "une convention de l'application, pas une donnée déclarée : "
             "vérifiez-la avant transmission."
-        )
+        ))
     if sans_date:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP22 : {sans_date} perte(s) sans date exploitable ont été écartées."
-        )
+        ))
     if seuil and en_millions(seuil) == 0:
-        anomalies.append(
+        anomalies.append(information(
             f"EP22 : le seuil de collecte ({seuil:,.0f} FCFA) est inférieur au "
             "demi-million et s'arrondit donc à 0 dans l'unité du formulaire."
-        )
+        ))
 
     completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_H + 1))
     return anomalies
@@ -1250,7 +1256,7 @@ LIGNES_EP25_COMPENSATION: tuple[tuple[str, str], ...] = (
 )
 
 
-def _remplir_ep25(classeur, positions: dict[str, Any] | None) -> list[str]:
+def _remplir_ep25(classeur, positions: dict[str, Any] | None) -> list[Reserve]:
     """Déclare l'échelle de maturité du risque de taux.
 
     Le formulaire reprend l'approche standard dans son entier : le risque
@@ -1265,7 +1271,7 @@ def _remplir_ep25(classeur, positions: dict[str, Any] | None) -> list[str]:
     if not isinstance(taux, dict):
         return []
 
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     # ── Section A : risque spécifique ──────────────────────────────────────
     cumuls: dict[str, dict[str, float]] = {}
@@ -1304,11 +1310,11 @@ def _remplir_ep25(classeur, positions: dict[str, Any] | None) -> list[str]:
     _ecrire_montant(feuille, lignes.get("RM015", 0), COLONNE_I, exigence_specifique)
 
     if non_classees:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP25 : {non_classees} agrégat(s) de titres n'ont pas trouvé de "
             "ligne dans le formulaire et n'ont pas été déclarés au risque "
             "spécifique."
-        )
+        ))
 
     # ── Section B : échelle de maturité ────────────────────────────────────
     general = taux.get("general")
@@ -1348,12 +1354,12 @@ def _remplir_ep25(classeur, positions: dict[str, Any] | None) -> list[str]:
         exigence_generale += exigence
     _ecrire_montant(feuille, lignes.get("RM039", 0), COLONNE_I, exigence_generale)
 
-    anomalies.append(
+    anomalies.append(convention(
         "EP25 : le module tient une échelle de maturité par devise, là où le "
         "formulaire n'en présente qu'une. Les tranches déclarées sont donc la "
         "somme des échelles, tandis que l'exigence reste calculée devise par "
         "devise — c'est elle qui fait foi."
-    )
+    ))
     return anomalies
 
 
@@ -1375,7 +1381,7 @@ def _ponderation(feuille, ligne: int, colonne: int) -> float:
     return flottant(feuille.cell(row=ligne, column=colonne).value)
 
 
-def _remplir_ep26(classeur, positions: dict[str, Any] | None) -> list[str]:
+def _remplir_ep26(classeur, positions: dict[str, Any] | None) -> list[Reserve]:
     """Détaille le risque de position sur titres de propriété.
 
     Le formulaire distingue trois assiettes par ligne : toutes les positions,
@@ -1430,7 +1436,7 @@ def _remplir_ep26(classeur, positions: dict[str, Any] | None) -> list[str]:
     return []
 
 
-def _remplir_ep27(classeur, positions: dict[str, Any] | None) -> list[str]:
+def _remplir_ep27(classeur, positions: dict[str, Any] | None) -> list[Reserve]:
     """Détaille le risque de change.
 
     L'exigence porte sur la position nette globale, c'est-à-dire le plus élevé
@@ -1473,8 +1479,11 @@ def _remplir_ep27(classeur, positions: dict[str, Any] | None) -> list[str]:
     # ni position sur or ni option de change.
     completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_EXIGENCE_EP27 + 1))
     return [
-        "EP27 : les positions sur or (RM061) et les exigences sur options "
-        "(RM063 à RM065) sont déclarées à zéro, l'application ne les suivant pas."
+        information(
+            "EP27 : les positions sur or (RM061) et les exigences sur options "
+            "(RM063 à RM065) sont déclarées à zéro, l'application ne les "
+            "suivant pas."
+        )
     ]
 
 
@@ -1506,7 +1515,7 @@ def _lire_membres_de_groupes() -> list[dict[str, Any]]:
     return [dict(ligne) for ligne in lignes]
 
 
-def _remplir_ep30(classeur, groupes: dict[str, dict[str, Any]]) -> list[str]:
+def _remplir_ep30(classeur, groupes: dict[str, dict[str, Any]]) -> list[Reserve]:
     """Détaille chaque client des groupes de clients liés.
 
     Les montants proviennent de l'agrégation déjà servie aux états EP29, EP31
@@ -1520,18 +1529,20 @@ def _remplir_ep30(classeur, groupes: dict[str, dict[str, Any]]) -> list[str]:
 
     if not membres:
         return [
-            "EP30 : aucune contrepartie n'est rattachée à un groupe de clients "
-            "liés. L'état reste vide, et la division des risques (EP29, EP31, "
-            "EP32) traite chaque contrepartie comme un groupe à elle seule — "
-            "ce qui sous-estime les concentrations."
+            a_verifier(
+                "EP30 : aucune contrepartie n'est rattachée à un groupe de "
+                "clients liés. L'état reste vide, et la division des risques "
+                "(EP29, EP31, EP32) traite chaque contrepartie comme un groupe "
+                "à elle seule — ce qui sous-estime les concentrations."
+            )
         ]
 
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
     if len(membres) > len(codes):
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP30 : {len(membres)} clients de groupes pour {len(codes)} lignes "
             "disponibles. Les derniers ont été écartés."
-        )
+        ))
         membres = membres[: len(codes)]
 
     incomplets = 0
@@ -1571,15 +1582,15 @@ def _remplir_ep30(classeur, groupes: dict[str, dict[str, Any]]) -> list[str]:
             incomplets += 1
 
     if incomplets:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP30 : {incomplets} client(s) sans numéro Centrale des risques. "
             "Ces colonnes d'identification sont exigées par le formulaire."
-        )
-    anomalies.append(
+        ))
+    anomalies.append(convention(
         "EP30 : l'exposition de bilan est portée en totalité sur « Prêts, "
         "avances et crédits-bails ». L'application ne distingue pas les titres "
         "de créances des participations au sein d'une exposition."
-    )
+    ))
     completer_a_zero(feuille, lignes, range(COLONNE_H, COLONNE_M + 3))
     return anomalies
 
@@ -1606,23 +1617,23 @@ def _codes_participations(premier: int, dernier: int) -> tuple[str, ...]:
     return tuple(f"PA{numero:03d}" for numero in range(premier, dernier + 1))
 
 
-def _remplir_ep34(classeur, participations: list[Any]) -> list[str]:
+def _remplir_ep34(classeur, participations: list[Any]) -> list[Reserve]:
     """Liste les participations par section, avec le total de chacune."""
 
     feuille = classeur["EP34"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
     total_general = 0.0
 
     for categorie, premier, dernier, code_total in SECTIONS_EP34:
         retenues = [p for p in participations if p.categorie == categorie]
         codes = _codes_participations(premier, dernier)
         if len(retenues) > len(codes):
-            anomalies.append(
+            anomalies.append(a_verifier(
                 f"EP34 : {len(retenues)} participations relèvent de la section "
                 f"« {categorie} » alors que le formulaire n'offre que "
                 f"{len(codes)} lignes. Les plus faibles ont été écartées."
-            )
+            ))
             retenues = sorted(retenues, key=lambda p: p.montant_net, reverse=True)
             retenues = retenues[: len(codes)]
 
@@ -1654,12 +1665,12 @@ def _remplir_ep35(
     participations: list[Any],
     fonds_propres_t1: float,
     fonds_propres_effectifs: float,
-) -> list[str]:
+) -> list[Reserve]:
     """Détaille les participations dans les entités commerciales et leurs ratios."""
 
     feuille = classeur["EP35"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     commerciales = sorted(
         (p for p in participations if p.categorie == "entite_commerciale"),
@@ -1668,11 +1679,11 @@ def _remplir_ep35(
     )
     codes = _codes_participations(PREMIER_CODE_EP35, DERNIER_CODE_EP35)
     if len(commerciales) > len(codes):
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP35 : {len(commerciales)} participations dans des entités "
             f"commerciales pour {len(codes)} lignes disponibles. Les plus "
             "faibles ont été écartées."
-        )
+        ))
         commerciales = commerciales[: len(codes)]
 
     total_net = sum(p.montant_net for p in commerciales)
@@ -1711,11 +1722,11 @@ def _remplir_ep35(
         )
 
     if sans_capital:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP35 : {sans_capital} participation(s) sans capital d'émetteur "
             "renseigné. Le pourcentage du capital détenu, plafonné à 25 %, "
             "reste vide pour ces lignes."
-        )
+        ))
     completer_a_zero(feuille, lignes, range(COLONNE_D, COLONNE_I + 1))
     return anomalies
 
@@ -1831,7 +1842,7 @@ def _remplir_ep36(
     immobilisations: SyntheseImmobilisations,
     participations_immobilieres: float,
     fonds_propres_t1: float,
-) -> tuple[float, list[str]]:
+) -> tuple[float, list[Reserve]]:
     """Immobilisations hors exploitation, plafonnées à 15 % des fonds propres."""
 
     feuille = classeur["EP36"]
@@ -1862,13 +1873,13 @@ def _remplir_ep36(
     _ecrire_montant(feuille, lignes.get("IM005", 0), COLONNE_F, excedent)
     _ecrire_montant(feuille, lignes.get("FPI29 / FPC29", 0), COLONNE_C, fonds_propres_t1)
 
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
     if not immobilisations.hors_exploitation_net:
-        anomalies.append(
+        anomalies.append(a_verifier(
             "EP36 : aucune immobilisation n'est déclarée « hors exploitation ». "
             "Si l'établissement en détient, classez-la sous cette nature à "
             "l'import — sa limite prudentielle reste sinon non mesurée."
-        )
+        ))
     completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_F + 1))
     return ratio, anomalies
 
@@ -1922,7 +1933,7 @@ def _remplir_ep38(
     groupes: dict[str, dict[str, Any]],
     parties_liees: list[dict[str, Any]],
     fonds_propres_effectifs: float,
-) -> tuple[float, list[str]]:
+) -> tuple[float, list[Reserve]]:
     """Concours aux actionnaires, dirigeants et personnel, par catégorie."""
 
     feuille = classeur["EP38"]
@@ -1971,18 +1982,18 @@ def _remplir_ep38(
         feuille, lignes.get("FPI41 / FPC41", 0), COLONNE_C, fonds_propres_effectifs
     )
 
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
     if not parties_liees:
-        anomalies.append(
+        anomalies.append(a_verifier(
             "EP38 : aucune contrepartie n'est signalée comme actionnaire, "
             "dirigeant ou membre du personnel. La limite correspondante de "
             "l'EP01 reste donc non mesurée."
-        )
+        ))
     completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_H + 1))
     return ratio, anomalies
 
 
-def _remplir_ep39(classeur, parties_liees: list[dict[str, Any]]) -> list[str]:
+def _remplir_ep39(classeur, parties_liees: list[dict[str, Any]]) -> list[Reserve]:
     """Liste nominative des actionnaires, dirigeants et membres du personnel."""
 
     feuille = classeur["EP39"]
@@ -1990,12 +2001,12 @@ def _remplir_ep39(classeur, parties_liees: list[dict[str, Any]]) -> list[str]:
     codes = sorted(code for code in lignes if code.startswith("PR"))
     colonnes = dict(COLONNES_PARTIES_LIEES)
 
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
     if len(parties_liees) > len(codes):
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP39 : {len(parties_liees)} parties liées pour {len(codes)} lignes "
             "disponibles. Les dernières ont été écartées."
-        )
+        ))
         parties_liees = parties_liees[: len(codes)]
 
     for code, partie in zip(codes, parties_liees):
@@ -2020,7 +2031,7 @@ def _remplir_ep01(
     ratio_levier: float,
     synthese_participations: Any = None,
     ratios_encours: dict[str, float] | None = None,
-) -> list[str]:
+) -> list[Reserve]:
     feuille = classeur["EP01"]
     lignes = indexer_codes_dispru(feuille)
     colonne = COLONNE_G
@@ -2093,11 +2104,13 @@ def _remplir_ep01(
     if not non_mesurees:
         return []
     return [
-        "EP01 : les normes suivantes sont déclarées à 0 %, donc « CONFORME », "
-        "alors que l'application ne suit pas les encours correspondants "
-        "(états EP34 à EP38) — "
-        + " ; ".join(non_mesurees)
-        + ". Vérifiez-les avant transmission."
+        a_verifier(
+            "EP01 : les normes suivantes sont déclarées à 0 %, donc "
+            "« CONFORME », alors que l'application ne suit pas les encours "
+            "correspondants (états EP34 à EP38) — "
+            + " ; ".join(non_mesurees)
+            + ". Vérifiez-les avant transmission."
+        )
     ]
 
 
@@ -2121,7 +2134,7 @@ def _remplir_ep3m(
     classeur,
     participations: list[Any],
     immobilisations_incorporelles: float,
-) -> list[str]:
+) -> list[Reserve]:
     """Poste pour mémoire des déductions applicables aux fonds propres.
 
     Deux sections sont alimentées. La section A porte les immobilisations
@@ -2136,7 +2149,7 @@ def _remplir_ep3m(
 
     feuille = classeur["EP3M"]
     lignes = indexer_codes_dispru(feuille)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     _ecrire_montant(
         feuille, lignes.get("IM011", 0), COLONNE_C, immobilisations_incorporelles
@@ -2189,18 +2202,18 @@ def _remplir_ep3m(
     _ecrire_montant(feuille, lignes.get("PA155", 0), COLONNE_C, significatives)
 
     if sans_capital:
-        anomalies.append(
+        anomalies.append(a_verifier(
             f"EP3M : {sans_capital} participation(s) financière(s) sans capital "
             "de l'émetteur. Leur part de détention étant inconnue, elles sont "
             "rangées parmi les participations non significatives. Renseignez "
             "le capital pour que le seuil de 10 % les classe réellement."
-        )
+        ))
     if financieres and not immobilisations_incorporelles:
-        anomalies.append(
+        anomalies.append(a_verifier(
             "EP3M : aucune immobilisation incorporelle n'est déclarée. Si "
             "l'établissement en détient, classez-la sous cette nature à "
             "l'import — elle se déduit des fonds propres de base."
-        )
+        ))
     return anomalies
 
 
@@ -2308,31 +2321,31 @@ def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
         apr_marche = flottant(risque_marche.get("rwa_marche"))
         ventilation_marche = risque_marche.get("ventilation") or None
         if apr_marche and not ventilation_marche:
-            anomalies.append(
+            anomalies.append(a_verifier(
                 "Risque de marché : aucun détail par nature n'a été transmis "
                 "par le module. Les lignes de détail de l'EP08 (taux, titres "
                 "de propriété, change, produits de base) restent à zéro, seul "
                 "leur total est déclaré. Rouvrez l'écran Risque de Marché pour "
                 "que le détail soit enregistré."
-            )
+            ))
         elif apr_marche:
             positions_marche = risque_marche.get("positions")
             if positions_marche:
                 anomalies.extend(_remplir_ep25(classeur, positions_marche))
                 anomalies.extend(_remplir_ep26(classeur, positions_marche))
                 anomalies.extend(_remplir_ep27(classeur, positions_marche))
-                anomalies.append(
+                anomalies.append(information(
                     "Risque de marché : l'EP28 (produits de base), les "
                     "positions sur or et les exigences sur options sont "
                     "déclarées à zéro. L'établissement n'en détient aucune."
-                )
+                ))
             else:
-                anomalies.append(
+                anomalies.append(a_verifier(
                     "Risque de marché : les lignes de détail de l'EP08 sont "
                     "renseignées, mais les positions longues et courtes n'ont "
                     "pas été transmises : les états EP25 à EP28 restent à zéro. "
                     "Rouvrez l'écran Risque de Marché pour les enregistrer."
-                )
+                ))
 
         apr_total = _remplir_ep08(
             classeur,
@@ -2395,11 +2408,11 @@ def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
         anomalies.extend(_declarer_etats_non_alimentes(classeur))
         _completer_les_etats_alimentes(classeur)
         if saisies_ecrites:
-            anomalies.append(
+            anomalies.append(information(
                 f"{saisies_ecrites} cellule(s) proviennent de la saisie "
                 "manuelle des états non alimentés, et non d'un calcul de "
                 "l'application. Elles engagent celui qui les a portées."
-            )
+            ))
 
         _verifier_coherence_fonds_propres(fonds_propres, fonds_propres_saisis, anomalies)
 
@@ -2437,7 +2450,7 @@ def _completer_les_etats_alimentes(classeur) -> None:
             )
 
 
-def _declarer_etats_non_alimentes(classeur) -> list[str]:
+def _declarer_etats_non_alimentes(classeur) -> list[Reserve]:
     """Traite les états requis que les données de l'application ne couvrent pas.
 
     Le périmètre vient du formulaire : la feuille « Liste des états prudentiels
@@ -2449,19 +2462,19 @@ def _declarer_etats_non_alimentes(classeur) -> list[str]:
     """
 
     requis = lire_etats_requis(classeur, base=BASE_DE_DECLARATION)
-    anomalies: list[str] = []
+    anomalies: list[Reserve] = []
 
     for etat in sorted(requis & ETATS_DECLARES_A_ZERO):
         completer_etat_a_zero(classeur[etat])
 
     a_completer = sorted(requis - ETATS_ALIMENTES - ETATS_DECLARES_A_ZERO)
     if a_completer:
-        anomalies.append(
+        anomalies.append(a_verifier(
             "États exigés sur base "
             f"{BASE_DE_DECLARATION} mais laissés vides, faute de source dans "
             f"l'application : {', '.join(a_completer)}. Ils portent des "
             "colonnes d'identification à saisir à la main."
-        )
+        ))
     return anomalies
 
 
@@ -2484,15 +2497,15 @@ def _date_arrete_par_defaut(expositions: list[dict[str, Any]]) -> date:
 def _verifier_coherence_fonds_propres(
     fonds_propres: dict[str, float],
     donnees_saisies: dict[str, float],
-    anomalies: list[str],
+    anomalies: list[Reserve],
 ) -> None:
     """Signale tout écart entre l'EP03 et le calcul du tableau de bord."""
 
     reference = calculate_fonds_propres(donnees_saisies)
     for cle in ("cet1", "t1", "total_capital"):
         if abs(fonds_propres[cle] - reference[cle]) > 1.0:
-            anomalies.append(
+            anomalies.append(a_verifier(
                 f"Fonds propres « {cle} » : l'EP03 déclare "
                 f"{fonds_propres[cle] / 1e6:,.0f} M FCFA, le tableau de bord "
                 f"{reference[cle] / 1e6:,.0f} M FCFA."
-            )
+            ))
