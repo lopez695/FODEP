@@ -145,6 +145,7 @@ class _FodepPageState extends State<FodepPage> {
         emplacement,
         octets,
         requiredExtension: extension,
+        suggestedName: nomPropose,
       );
       if (!mounted) return;
 

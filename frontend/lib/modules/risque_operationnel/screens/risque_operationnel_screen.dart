@@ -5309,12 +5309,14 @@ class _HistoriqueViewState extends State<_HistoriqueView> {
 
     final rawBytes = workbook.save();
     if (rawBytes == null) return;
+    final nomPropose = 'historique_ro_$ts.xlsx';
     final location = await getSaveLocation(
-      suggestedName: 'historique_ro_$ts.xlsx',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [XTypeGroup(label: 'Excel', extensions: ['xlsx'])],
     );
     if (!mounted || location == null) return;
-    await saveBytesAtLocation(location, Uint8List.fromList(rawBytes), requiredExtension: '.xlsx');
+    await saveBytesAtLocation(location, Uint8List.fromList(rawBytes),
+        requiredExtension: '.xlsx', suggestedName: nomPropose);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Export Excel réussi'), backgroundColor: _kSuccess),
@@ -5402,12 +5404,14 @@ class _HistoriqueViewState extends State<_HistoriqueView> {
     ));
 
     final pdfBytes = await doc.save();
+    final nomPropose = 'historique_ro_$ts.pdf';
     final location = await getSaveLocation(
-      suggestedName: 'historique_ro_$ts.pdf',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [XTypeGroup(label: 'PDF', extensions: ['pdf'])],
     );
     if (!mounted || location == null) return;
-    await saveBytesAtLocation(location, pdfBytes, requiredExtension: '.pdf');
+    await saveBytesAtLocation(location, pdfBytes,
+        requiredExtension: '.pdf', suggestedName: nomPropose);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Export PDF réussi'), backgroundColor: _kSuccess),
@@ -6231,13 +6235,15 @@ class _RegistreViewState extends State<_RegistreView> {
     final rawBytes = workbook.save();
     if (rawBytes == null) return;
 
+    final nomPropose = 'registre_ro_$ts.xlsx';
     final location = await getSaveLocation(
-      suggestedName: 'registre_ro_$ts.xlsx',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [XTypeGroup(label: 'Excel', extensions: ['xlsx'])],
     );
     if (!mounted || location == null) return;
 
-    await saveBytesAtLocation(location, Uint8List.fromList(rawBytes), requiredExtension: '.xlsx');
+    await saveBytesAtLocation(location, Uint8List.fromList(rawBytes),
+        requiredExtension: '.xlsx', suggestedName: nomPropose);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Export Excel réussi'),
@@ -6503,13 +6509,15 @@ class _RegistreViewState extends State<_RegistreView> {
     ));
 
     final pdfBytes = await doc.save();
+    final nomPropose = 'registre_ro_$ts.pdf';
     final location = await getSaveLocation(
-      suggestedName: 'registre_ro_$ts.pdf',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [XTypeGroup(label: 'PDF', extensions: ['pdf'])],
     );
     if (!mounted || location == null) return;
 
-    await saveBytesAtLocation(location, pdfBytes, requiredExtension: '.pdf');
+    await saveBytesAtLocation(location, pdfBytes,
+        requiredExtension: '.pdf', suggestedName: nomPropose);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Export PDF réussi'),

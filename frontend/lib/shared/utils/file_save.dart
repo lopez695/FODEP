@@ -1,7 +1,18 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+
+import 'file_save_types.dart';
+
+// L'écriture d'un fichier n'existe que sur poste de travail : sur le web, le
+// navigateur seul décide où atterrit un téléchargement. Le test porte sur
+// « dart.library.io » plutôt que sur « dart.library.html » car ce dernier est
+// faux pour une compilation WebAssembly, qui repartirait alors sur « dart:io »
+// et échouerait à l'exécution (« Unsupported operation: _Namespace »).
+import 'file_save_web.dart'
+    if (dart.library.io) 'file_save_io.dart' as platform;
+
+export 'file_save_types.dart';
 
 String ensureRequiredFileExtension(String path, String requiredExtension) {
   final trimmedExtension = requiredExtension.trim();
@@ -22,49 +33,24 @@ String ensureRequiredFileExtension(String path, String requiredExtension) {
   return '$path$normalizedExtension';
 }
 
-/// Codes d'erreur Windows signalant un fichier tenu ouvert ailleurs.
-const int _partageRefuseWindows = 32; // ERROR_SHARING_VIOLATION
-const int _verrouRefuseWindows = 33; // ERROR_LOCK_VIOLATION
-
-/// Le fichier de destination est ouvert dans une autre application.
+/// Enregistre [bytes] à l'emplacement choisi par l'utilisateur.
 ///
-/// Le cas est courant et sans gravité : on réexporte vers un fichier resté
-/// ouvert dans Excel depuis l'export précédent. Le message système
-/// (« PathAccessException... errno = 32 ») ne dit pas quoi faire ; cette
-/// exception le remplace par la seule information utile.
-class FichierVerrouilleException implements Exception {
-  const FichierVerrouilleException(this.path);
-
-  final String path;
-
-  String get nomFichier => path.split(RegExp(r'[\\/]')).last;
-
-  String get message =>
-      '« $nomFichier » est ouvert dans une autre application. '
-      'Fermez-le, puis relancez l\'export.';
-
-  @override
-  String toString() => message;
-}
-
-Future<File> saveBytesAtLocation(
+/// [suggestedName] est obligatoire parce qu'il est la seule identité du
+/// fichier sur le web : le sélecteur y renvoie un emplacement vide, le
+/// navigateur nommant lui-même le téléchargement. Sans lui, l'utilisateur
+/// recevrait un fichier appelé « .xlsx ». Sur poste de travail, c'est le
+/// chemin retourné par [FileSaveLocation] qui fait foi.
+Future<FichierEnregistre> saveBytesAtLocation(
   FileSaveLocation location,
   Uint8List bytes, {
   required String requiredExtension,
-}) async {
-  final targetPath = ensureRequiredFileExtension(
-    location.path,
-    requiredExtension,
+  required String suggestedName,
+}) {
+  return platform.saveBytesAtLocationImpl(
+    location,
+    bytes,
+    requiredExtension: requiredExtension,
+    ensureExtension: ensureRequiredFileExtension,
+    suggestedName: suggestedName,
   );
-  final file = File(targetPath);
-  try {
-    await file.writeAsBytes(bytes, flush: true);
-  } on FileSystemException catch (erreur) {
-    final code = erreur.osError?.errorCode;
-    if (code == _partageRefuseWindows || code == _verrouRefuseWindows) {
-      throw FichierVerrouilleException(targetPath);
-    }
-    rethrow;
-  }
-  return file;
 }

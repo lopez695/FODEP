@@ -158,6 +158,7 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
         location,
         bytes,
         requiredExtension: '.xlsx',
+        suggestedName: 'modele_import_rwa.xlsx',
       );
       if (mounted) {
         _showMessage('Modèle Excel enregistré.');

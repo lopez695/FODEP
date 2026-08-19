@@ -394,8 +394,9 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
       final ts =
           '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
           '_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final nomPropose = 'rapport_global_${_periode.toLowerCase()}_$ts.pdf';
       final location = await getSaveLocation(
-        suggestedName: 'rapport_global_${_periode.toLowerCase()}_$ts.pdf',
+        suggestedName: nomPropose,
         acceptedTypeGroups: const [
           XTypeGroup(label: 'PDF', extensions: ['pdf'])
         ],
@@ -403,8 +404,12 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
       if (!mounted || location == null) return;
 
       // 4. Enregistrer
-      final saved =
-          await saveBytesAtLocation(location, bytes, requiredExtension: '.pdf');
+      final saved = await saveBytesAtLocation(
+        location,
+        bytes,
+        requiredExtension: '.pdf',
+        suggestedName: nomPropose,
+      );
       if (!mounted) return;
 
       final fileName = saved.path.split(RegExp(r'[\\/]')).last;

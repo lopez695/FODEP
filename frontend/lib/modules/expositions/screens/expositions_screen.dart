@@ -3946,8 +3946,9 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
 
   Future<void> _exportExcelWorkbook() async {
     final bytes = await widget.api.downloadExposureExcelExport();
+    final nomPropose = 'export_expositions_rwa_${_exportTimestamp()}.xlsx';
     final location = await getSaveLocation(
-      suggestedName: 'export_expositions_rwa_${_exportTimestamp()}.xlsx',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [
         XTypeGroup(label: 'Excel', extensions: ['xlsx']),
       ],
@@ -3960,6 +3961,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
       location,
       bytes,
       requiredExtension: '.xlsx',
+      suggestedName: nomPropose,
     );
     if (!mounted) {
       return;
@@ -3974,8 +3976,9 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
 
   Future<void> _exportVisibleTablePdf(List<ExposureRecord> rows) async {
     final pdfBytes = await _buildVisibleTablePdf(rows);
+    final nomPropose = 'export_expositions_rwa_${_exportTimestamp()}.pdf';
     final location = await getSaveLocation(
-      suggestedName: 'export_expositions_rwa_${_exportTimestamp()}.pdf',
+      suggestedName: nomPropose,
       acceptedTypeGroups: const [
         XTypeGroup(label: 'PDF', extensions: ['pdf']),
       ],
@@ -3988,6 +3991,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
       location,
       pdfBytes,
       requiredExtension: '.pdf',
+      suggestedName: nomPropose,
     );
     if (!mounted) {
       return;

@@ -4647,8 +4647,9 @@ class _EquityIndicatorContentBoardState
     final now = DateTime.now();
     final ts =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    final nomPropose = 'tableau_bord_actions_$ts.xlsx';
     final location = await getSaveLocation(
-      suggestedName: 'tableau_bord_actions_$ts.xlsx',
+      suggestedName: nomPropose,
       acceptedTypeGroups: [
         const XTypeGroup(label: 'Excel', extensions: ['xlsx']),
       ],
@@ -4658,6 +4659,7 @@ class _EquityIndicatorContentBoardState
       location,
       Uint8List.fromList(bytes),
       requiredExtension: '.xlsx',
+      suggestedName: nomPropose,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -9579,8 +9581,9 @@ class _BondIndicatorContentBoardState
     final now = DateTime.now();
     final ts =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    final nomPropose = 'tableau_bord_obligations_$ts.xlsx';
     final location = await getSaveLocation(
-      suggestedName: 'tableau_bord_obligations_$ts.xlsx',
+      suggestedName: nomPropose,
       acceptedTypeGroups: [
         const XTypeGroup(label: 'Excel', extensions: ['xlsx']),
       ],
@@ -9590,6 +9593,7 @@ class _BondIndicatorContentBoardState
       location,
       Uint8List.fromList(bytes),
       requiredExtension: '.xlsx',
+      suggestedName: nomPropose,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

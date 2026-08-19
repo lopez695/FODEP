@@ -377,6 +377,7 @@ class _ReportingCreditScreenState extends State<ReportingCreditScreen> {
         location,
         bytes,
         requiredExtension: format.fileExtension,
+        suggestedName: suggestedName,
       );
       await _service.registerExport(
         family: _selectedFamily,
