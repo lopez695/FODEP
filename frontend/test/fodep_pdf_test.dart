@@ -6,6 +6,9 @@
 // précédentes : un titre fusionné de cent trente caractères, un état à quatorze
 // colonnes, une quarantaine d'états. Le générateur paginait alors sans fin, ou
 // forçait une hauteur infinie.
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rwa_calculator/modules/rapports/models/report_models.dart';
@@ -38,6 +41,22 @@ CelluleFodep _c(
       droite: droite,
       colonnes: colonnes,
     );
+
+/// Formats des pages produites, lus dans le document.
+///
+/// Le generateur ecrit un « MediaBox » par page, en clair : c'est le seul
+/// moyen de verifier qu'un etat en portrait s'imprime bien en portrait sans
+/// embarquer un lecteur de PDF dans la suite.
+List<({double largeur, double hauteur})> _formats(Uint8List pdf) {
+  final motif = RegExp(r'/MediaBox\s*\[\s*0\s+0\s+([0-9.]+)\s+([0-9.]+)');
+  return [
+    for (final trouve in motif.allMatches(latin1.decode(pdf, allowInvalid: true)))
+      (
+        largeur: double.parse(trouve.group(1)!),
+        hauteur: double.parse(trouve.group(2)!),
+      ),
+  ];
+}
 
 Future<void> _rend(ContenuFodep contenu) async {
   final pdf = await construireFodepPdf(contenu: contenu);
@@ -180,5 +199,85 @@ void main() {
         ],
       ),
     ]));
+  });
+
+  test("l'orientation reglee dans le classeur est celle de la page", () async {
+    // Dix-neuf etats du FODEP sont en portrait. Les imprimer tous en paysage
+    // etirait leurs colonnes sur une page trois fois trop large pour elles.
+    final pdf = await construireFodepPdf(
+      contenu: _contenu([
+        EtatFodep(
+          nom: 'EP02',
+          largeurs: const [14.0, 40.0, 12.0, 14.0],
+          paysage: false,
+          lignes: [
+            _ligne([_c('CALCUL DES RATIOS DE SOLVABILITE', gras: true, colonnes: 3), _c('EP02')]),
+            _ligne([_c('RA001'), _c('Ratio CET 1'), _c('a x 100 / d'), _c('0,1231', droite: true)]),
+          ],
+        ),
+      ]),
+    );
+
+    final formats = _formats(pdf);
+    expect(formats, isNotEmpty);
+    for (final format in formats) {
+      expect(format.hauteur, greaterThan(format.largeur),
+          reason: 'Un etat en portrait doit sortir sur une page en portrait.');
+    }
+  });
+
+  test('un etat trop large pour une A4 passe sur une feuille plus grande',
+      () async {
+    // L'EP07 porte cinquante-quatre colonnes. Le forcer sur une A4 donnait un
+    // corps de deux points et demi, illisible ; le tronquer lui faisait perdre
+    // des colonnes entieres de la declaration.
+    final pdf = await construireFodepPdf(
+      contenu: _contenu([
+        EtatFodep(
+          nom: 'EP07',
+          largeurs: List<double>.filled(54, 12.0),
+          lignes: [
+            _ligne([
+              for (var colonne = 0; colonne < 54; colonne++)
+                _c('Colonne $colonne'),
+            ]),
+          ],
+        ),
+      ]),
+    );
+
+    final formats = _formats(pdf);
+    expect(formats, isNotEmpty);
+    for (final format in formats) {
+      expect(format.largeur, greaterThan(842),
+          reason: 'Une A4 paysage ne suffit pas a cinquante-quatre colonnes.');
+    }
+  });
+
+  test('un titre plus large que sa colonne ne fait pas paginer sans fin',
+      () async {
+    // La page de garde loge un titre de vingt-deux points dans une colonne
+    // large de deux caracteres : Excel le laisse deborder a droite, le
+    // generateur essayait de l'y faire tenir et produisait des pages jusqu'a
+    // lever « TooManyPagesException ».
+    final pdf = await construireFodepPdf(
+      contenu: _contenu([
+        EtatFodep(
+          nom: 'Page_de_garde',
+          largeurs: const [9.7, 52.7, 2.0],
+          paysage: false,
+          lignes: [
+            _ligne([
+              _c(''),
+              _c(''),
+              _c('FORMULAIRE DE DECLARATION PRUDENTIELLE DES ETABLISSEMENTS '
+                  'DE CREDIT ET DES COMPAGNIES FINANCIERES'),
+            ]),
+          ],
+        ),
+      ]),
+    );
+
+    expect(_formats(pdf), hasLength(1));
   });
 }

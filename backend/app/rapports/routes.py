@@ -99,7 +99,15 @@ async def post_analyse_fodep(
         ) from exc
 
 
-@router.get("/fodep/contenu", response_model=ContenuFodep)
+# « exclude_defaults » : chaque cellule porte desormais sa forme — fond,
+# bordures, taille, alignement. Transmettre les valeurs par defaut de
+# dizaines de milliers de cellules doublait le poids de l'apercu sans rien
+# apprendre au client, qui applique les memes defauts a la lecture.
+@router.get(
+    "/fodep/contenu",
+    response_model=ContenuFodep,
+    response_model_exclude_defaults=True,
+)
 def get_contenu_fodep(
     date_arrete: date | None = Query(
         default=None,

@@ -96,22 +96,40 @@ def test_les_normes_de_l_ep01_portent_leur_niveau_observe(contenu):
     assert ra001 is not None
     textes = _textes(ra001)
     # Reference, niveau a respecter, niveau observe : le ratio CET1 se relit
-    # entierement. La colonne « situation » reste vide, c'est une formule.
+    # entierement. La colonne « situation » reste vide, c'est une formule --
+    # et depuis que les cases vides mais bordees sont conservees, elle figure
+    # bien dans la ligne. Le niveau observe se cherche donc parmi les valeurs,
+    # non a la derniere colonne.
     assert len(textes) >= 5
-    assert textes[-1], "Le niveau observe de RA001 doit etre renseigne."
+    valeurs = [texte for texte in textes if texte]
+    assert valeurs[-1], "Le niveau observe de RA001 doit etre renseigne."
 
 
-def test_aucune_ligne_vide_ni_colonne_de_queue(contenu):
+def _porte_quelque_chose(cellule) -> bool:
+    return bool(cellule.texte or cellule.bordures or cellule.fond)
+
+
+def test_aucune_ligne_ni_colonne_de_queue_sans_objet(contenu):
     """Le formulaire compte beaucoup de lignes de mise en page : les reporter
-    donnerait un PDF de blancs, et des tableaux plus larges que la page."""
+    donnerait un PDF de blancs.
+
+    « Sans objet » ne veut pas dire « sans texte ». Une ligne bordee et
+    vide est une case a renseigner restee vide : la retirer ferait perdre au
+    tableau sa forme, et au lecteur l'endroit ou la valeur aurait du etre.
+    Seules les lignes qui ne portent ni texte, ni trait, ni couleur sont
+    ecartees.
+    """
 
     for etat in contenu.etats:
         assert etat.largeurs, f"{etat.nom} : aucune largeur de colonne."
         assert len(etat.largeurs) <= COLONNES_MAX
         for ligne in etat.lignes:
-            textes = _textes(ligne)
-            assert any(textes), f"{etat.nom} : ligne vide reportee."
-            assert textes[-1] != "", f"{etat.nom} : colonne de queue vide."
+            assert any(
+                _porte_quelque_chose(cellule) for cellule in ligne.cellules
+            ), f"{etat.nom} : ligne sans objet reportee."
+            assert _porte_quelque_chose(
+                ligne.cellules[-1]
+            ), f"{etat.nom} : colonne de queue sans objet."
             couvertes = sum(
                 max(cellule.colonnes, 1) for cellule in ligne.cellules
             )
@@ -143,3 +161,80 @@ def test_les_nombres_se_rendent_a_la_francaise():
     assert _texte(0) == "0"
     assert _texte(True) == "OUI"
     assert _texte(None) == ""
+
+
+def test_les_etats_larges_ne_sont_plus_tronques(contenu):
+    """Cinq etats portent du texte au-dela de la quatorzieme colonne.
+
+    Le plafond valait 14 : l'attestation y perdait son champ
+    « Etablissement », en colonne 20 du classeur, et l'EP07 la moitie de ses
+    cinquante-quatre colonnes. Le PDF choisit desormais son format et sa
+    reduction ; c'est a lui de faire tenir un etat large, pas a l'extraction de
+    le couper.
+    """
+
+    par_nom = {etat.nom: etat for etat in contenu.etats}
+    for nom in ("ADPE", "EP07", "EP29", "EP30", "EP31"):
+        assert len(par_nom[nom].largeurs) > 14, nom
+
+    adpe = par_nom["ADPE"]
+    intitules = {
+        cellule.texte.replace("\u00a0", " ").strip()
+        for ligne in adpe.lignes
+        for cellule in ligne.cellules
+    }
+    assert any(texte.startswith("ETABLISSEMENT") for texte in intitules)
+
+
+def test_la_forme_du_formulaire_accompagne_ses_valeurs(contenu):
+    """Fond, filets, alignement, taille et hauteur voyagent avec le texte.
+
+    Sans eux, le PDF redessinait une grille grise uniforme en corps unique :
+    la declaration s'y lisait, mais on n'y reconnaissait aucune page du
+    formulaire, et rien ne distinguait une case a renseigner d'un intitule.
+    """
+
+    ep02 = next(etat for etat in contenu.etats if etat.nom == "EP02")
+    cellules = [cellule for ligne in ep02.lignes for cellule in ligne.cellules]
+
+    # Les cases a renseigner du formulaire sont teintees.
+    assert any(cellule.fond == "FFF2CC" for cellule in cellules)
+    # Son tableau est borde, ses titres ne le sont pas.
+    assert any(cellule.bordures == "lrtb" for cellule in cellules)
+    assert any(not cellule.bordures for cellule in cellules)
+    # Ses en-tetes de colonne sont centres.
+    assert any(cellule.centre for cellule in cellules)
+    # La taille du classeur est conservee. L'EP02 est ecrit d'un bout a
+    # l'autre en 12 ; c'est a l'echelle du formulaire entier que la hierarchie
+    # se voit, du corps en 10 aux titres jusqu'a 22.
+    assert all(cellule.taille for cellule in cellules)
+    toutes = {
+        cellule.taille
+        for etat in contenu.etats
+        for ligne in etat.lignes
+        for cellule in ligne.cellules
+        if cellule.taille
+    }
+    assert max(toutes) >= 2 * min(toutes)
+    # Ses lignes portent la hauteur reglee dans le classeur.
+    assert any(ligne.hauteur for ligne in ep02.lignes)
+
+
+def test_l_orientation_et_les_en_tetes_viennent_du_classeur(contenu):
+    """Le classeur regle lui-meme comment il s'imprime.
+
+    Dix-neuf de ses etats sont en portrait ; les imprimer tous en paysage
+    etirait leurs colonnes sur une page trois fois trop large. Et treize
+    designent des lignes a repeter en haut de chaque page : une deuxieme page
+    d'EP30 qui ne rappelle ni l'etat ni ses colonnes ne se lit pas.
+    """
+
+    portraits = [etat.nom for etat in contenu.etats if not etat.paysage]
+    assert "EP02" in portraits
+    assert 5 <= len(portraits) < len(contenu.etats)
+
+    ep30 = next(etat for etat in contenu.etats if etat.nom == "EP30")
+    entetes = [ligne for ligne in ep30.lignes if ligne.entete]
+    assert entetes, "L'EP30 doit rappeler son en-tete a chaque page."
+    # Elles sont en tete, et d'un seul tenant.
+    assert all(ligne.entete for ligne in ep30.lignes[: len(entetes)])

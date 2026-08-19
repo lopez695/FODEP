@@ -145,7 +145,11 @@ class CelluleFodep {
     this.texte = '',
     this.gras = false,
     this.droite = false,
+    this.centre = false,
     this.colonnes = 1,
+    this.fond,
+    this.bordures = '',
+    this.taille,
   });
 
   final String texte;
@@ -156,24 +160,60 @@ class CelluleFodep {
   /// Les montants et les ratios y sont cadrés à droite.
   final bool droite;
 
+  /// Les en-têtes de colonne y sont centrés.
+  final bool centre;
+
   /// Colonnes couvertes, reprises des fusions du formulaire.
   final int colonnes;
+
+  /// Couleur de fond en RVB (« FFF2CC »), telle que le classeur la porte. Le
+  /// formulaire teinte les cases à renseigner : sans elles, on ne distingue
+  /// plus ce que l'établissement déclare de ce qu'on lui demande.
+  final String? fond;
+
+  /// Côtés bordés, parmi « l », « r », « t » et « b ». Le formulaire n'encadre
+  /// que ses tableaux ; c'est aussi ce qui rend continues ses fusions
+  /// verticales.
+  final String bordures;
+
+  /// Taille de police du classeur : 10 pour le corps, jusqu'à 20 pour les
+  /// titres.
+  final double? taille;
 
   factory CelluleFodep.fromJson(Map<String, dynamic> json) => CelluleFodep(
         texte: json['texte'] as String? ?? '',
         gras: json['gras'] == true,
         droite: json['droite'] == true,
+        centre: json['centre'] == true,
         colonnes: (json['colonnes'] as num?)?.toInt() ?? 1,
+        fond: json['fond'] as String?,
+        bordures: json['bordures'] as String? ?? '',
+        taille: (json['taille'] as num?)?.toDouble(),
       );
 }
 
 /// Une ligne du formulaire.
 class LigneFodep {
-  const LigneFodep({this.cellules = const []});
+  const LigneFodep({
+    this.cellules = const [],
+    this.hauteur,
+    this.entete = false,
+  });
 
   final List<CelluleFodep> cellules;
 
+  /// Hauteur réglée dans le classeur, en points. Le formulaire aère ses lignes
+  /// et donne à ses en-têtes deux ou trois fois la hauteur d'une ligne de
+  /// données.
+  final double? hauteur;
+
+  /// Ligne d'en-tête, réimprimée en haut de chaque page. Le classeur les
+  /// désigne lui-même, par son réglage « lignes à répéter en haut ».
+  final bool entete;
+
   factory LigneFodep.fromJson(Map<String, dynamic> json) => LigneFodep(
+        hauteur: (json['hauteur'] as num?)?.toDouble(),
+        entete: json['entete'] == true,
         cellules: [
           for (final cellule in (json['cellules'] as List<dynamic>?) ?? const [])
             CelluleFodep.fromJson(cellule as Map<String, dynamic>),
@@ -186,6 +226,7 @@ class EtatFodep {
   const EtatFodep({
     required this.nom,
     this.largeurs = const [],
+    this.paysage = true,
     this.lignes = const [],
   });
 
@@ -196,10 +237,24 @@ class EtatFodep {
   /// colonne d'un code DISPRU.
   final List<double> largeurs;
 
+  /// Orientation réglée dans le classeur. Dix-neuf états du FODEP sont en
+  /// portrait : les imprimer tous en paysage étirait leurs colonnes sur une
+  /// page trois fois trop large pour elles.
+  final bool paysage;
+
   final List<LigneFodep> lignes;
+
+  /// Lignes d'en-tête, à réimprimer en haut de chaque page.
+  List<LigneFodep> get entetes =>
+      [for (final ligne in lignes) if (ligne.entete) ligne];
+
+  /// Lignes du corps, celles que la pagination fait défiler.
+  List<LigneFodep> get corps =>
+      [for (final ligne in lignes) if (!ligne.entete) ligne];
 
   factory EtatFodep.fromJson(Map<String, dynamic> json) => EtatFodep(
         nom: json['nom'] as String? ?? '',
+        paysage: json['paysage'] as bool? ?? true,
         largeurs: [
           for (final largeur in (json['largeurs'] as List<dynamic>?) ?? const [])
             (largeur as num).toDouble(),
