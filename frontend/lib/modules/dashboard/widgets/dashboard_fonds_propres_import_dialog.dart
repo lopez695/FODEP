@@ -114,7 +114,12 @@ class _FondsPropresImportDialogState extends State<_FondsPropresImportDialog> {
         ],
       );
       if (location == null) return;
-      await saveBytesAtLocation(location, bytes, requiredExtension: '.xlsx');
+      await saveBytesAtLocation(
+        location,
+        bytes,
+        requiredExtension: '.xlsx',
+        suggestedName: 'modele_import_fonds_propres.xlsx',
+      );
       if (mounted) _showMsg('Modèle enregistré.');
     } on PathAccessException {
       if (mounted) {

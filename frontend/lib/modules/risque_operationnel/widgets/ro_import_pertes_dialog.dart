@@ -215,7 +215,12 @@ class _RoImportPertesDialogState extends State<_RoImportPertesDialog> {
         ],
       );
       if (location == null) return;
-      await saveBytesAtLocation(location, bytes, requiredExtension: '.xlsx');
+      await saveBytesAtLocation(
+        location,
+        bytes,
+        requiredExtension: '.xlsx',
+        suggestedName: 'modele_import_pertes_op.xlsx',
+      );
       if (mounted) _showMsg('Modèle enregistré.');
     } on PathAccessException {
       if (mounted) {

@@ -369,7 +369,12 @@ class _ValueAtRiskScreenState extends State<ValueAtRiskScreen> {
         ],
       );
       if (!mounted || location == null) return;
-      await saveBytesAtLocation(location, bytes, requiredExtension: '.xlsx');
+      await saveBytesAtLocation(
+        location,
+        bytes,
+        requiredExtension: '.xlsx',
+        suggestedName: 'modele_import_var.xlsx',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

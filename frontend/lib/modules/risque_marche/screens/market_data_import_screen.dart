@@ -324,6 +324,7 @@ class _MarketDataImportDialogState extends State<_MarketDataImportDialog> {
         location,
         bytes,
         requiredExtension: '.xlsx',
+        suggestedName: _scope.templateFileName,
       );
       if (!mounted) return;
       _showMessage('Modèle RiskManagement portefeuille enregistré.');
