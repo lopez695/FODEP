@@ -475,6 +475,7 @@ class CaseFodep {
     required this.libelle,
     required this.colonne,
     this.typeSaisie = 'nombre',
+    this.choix = const <String>[],
     this.valeur,
     this.texte,
     this.commentaire,
@@ -495,6 +496,14 @@ class CaseFodep {
   /// pour l'attestation. L'écran en tire le clavier, les caractères qu'il
   /// laisse passer et le contrôle qu'il applique.
   final String typeSaisie;
+
+  /// Valeurs proposées quand la case se choisit au lieu de se taper. Vide, la
+  /// case reste une ligne de saisie libre. La liste vient du catalogue servi
+  /// par le backend, jamais de l'écran : c'est le formulaire qui dit ce qu'une
+  /// case accepte.
+  final List<String> choix;
+
+  bool get estUneListe => choix.isNotEmpty;
 
   /// Seul un montant est conservé en valeur numérique. Tout le reste est du
   /// texte, y compris ce qui n'est fait que de chiffres : un numéro de
@@ -528,6 +537,7 @@ class CaseFodep {
       libelle: libelle,
       colonne: colonne,
       typeSaisie: typeSaisie,
+      choix: choix,
       valeur: effacer ? null : (valeur ?? this.valeur),
       texte: effacer ? null : (texte ?? this.texte),
       commentaire: commentaire ?? this.commentaire,
@@ -542,6 +552,10 @@ class CaseFodep {
         libelle: json['libelle'] as String? ?? '',
         colonne: json['colonne'] as String? ?? '',
         typeSaisie: json['type_saisie'] as String? ?? 'nombre',
+        choix: <String>[
+          for (final valeur in (json['choix'] as List<dynamic>? ?? const []))
+            if (valeur is String) valeur,
+        ],
         valeur: (json['valeur'] as num?)?.toDouble(),
         texte: json['texte'] as String?,
         commentaire: json['commentaire'] as String?,
@@ -618,11 +632,16 @@ class SaisiesFodep {
     required this.etats,
     required this.totalCases,
     required this.totalRenseignees,
+    this.dateArrete,
   });
 
   final List<EtatASaisir> etats;
   final int totalCases;
   final int totalRenseignees;
+
+  /// Date d'arrêté retenue par le déclarant lors d'une saisie précédente.
+  /// Nulle, l'écran repart de la date de fin du reporting.
+  final DateTime? dateArrete;
 
   factory SaisiesFodep.fromJson(Map<String, dynamic> json) => SaisiesFodep(
         etats: ((json['etats'] as List<dynamic>?) ?? const [])
@@ -630,5 +649,6 @@ class SaisiesFodep {
             .toList(),
         totalCases: (json['total_cases'] as num?)?.toInt() ?? 0,
         totalRenseignees: (json['total_renseignees'] as num?)?.toInt() ?? 0,
+        dateArrete: DateTime.tryParse(json['date_arrete'] as String? ?? ''),
       );
 }

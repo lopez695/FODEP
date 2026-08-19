@@ -707,9 +707,19 @@ class RwaApiService {
 
   /// Enregistre des saisies. Une valeur nulle efface la case, qui retombe
   /// alors au zéro automatique de l'export.
-  Future<int> enregistrerSaisiesFodep(List<CaseFodep> saisies) async {
+  ///
+  /// La date d'arrêté part du même écran et du même bouton : la transmettre
+  /// ici évite qu'une partie de la saisie soit retenue et l'autre non.
+  Future<int> enregistrerSaisiesFodep(
+    List<CaseFodep> saisies, {
+    DateTime? dateArrete,
+  }) async {
     final reponse = await _client.put('/rapports/fodep/saisies', {
       'saisies': [for (final saisie in saisies) saisie.toPayload()],
+      if (dateArrete != null)
+        'date_arrete': '${dateArrete.year.toString().padLeft(4, '0')}-'
+            '${dateArrete.month.toString().padLeft(2, '0')}-'
+            '${dateArrete.day.toString().padLeft(2, '0')}',
     });
     return ((reponse as Map)['enregistrees'] as num?)?.toInt() ?? 0;
   }

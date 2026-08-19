@@ -61,8 +61,12 @@ def get_saisies_fodep() -> SaisiesFodep:
 def put_saisies_fodep(payload: SaisiesFodepEnregistrees) -> SaisiesFodepEnregistrees:
     """Enregistre des saisies. Une valeur nulle efface la case."""
 
-    enregistrees = enregistrer_saisies_fodep(payload.saisies)
-    return SaisiesFodepEnregistrees(saisies=payload.saisies, enregistrees=enregistrees)
+    enregistrees = enregistrer_saisies_fodep(payload.saisies, payload.date_arrete)
+    return SaisiesFodepEnregistrees(
+        saisies=payload.saisies,
+        enregistrees=enregistrees,
+        date_arrete=payload.date_arrete,
+    )
 
 
 @router.post("/fodep/analyse", response_model=AnalyseDeclaration)

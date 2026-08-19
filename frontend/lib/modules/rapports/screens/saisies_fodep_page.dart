@@ -75,8 +75,17 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
   @override
   void initState() {
     super.initState();
-    _future = widget.api.fetchSaisiesFodep();
     _dateArrete = widget.dateArrete;
+    _future = widget.api.fetchSaisiesFodep();
+    // La date déjà arrêtée par le déclarant l'emporte sur celle du reporting :
+    // c'est un choix qu'il a posé, pas un défaut.
+    _future.then((saisies) {
+      final retenue = saisies.dateArrete;
+      if (!mounted || retenue == null) return;
+      setState(() => _dateArrete = retenue);
+    }).catchError((_) {
+      // L'erreur de chargement est déjà rendue par le FutureBuilder.
+    });
   }
 
   Future<void> _choisirLaDate() async {
@@ -96,6 +105,25 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
     );
     if (choisie == null || !mounted) return;
     setState(() => _dateArrete = choisie);
+
+    // Enregistrée aussitôt, et non mise en attente comme les cases : une date
+    // ne se tape pas, elle se choisit d'un clic dans un calendrier — il n'y a
+    // pas de saisie en cours à laisser mûrir. Elle échappe ainsi à tout ce qui
+    // peut faire perdre une modification en attente, y compris un onglet de
+    // navigateur fermé, contre quoi l'écran ne peut rien.
+    try {
+      await widget.api.enregistrerSaisiesFodep(const [], dateArrete: choisie);
+    } catch (erreur) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "La date d'arrêté n'a pas pu être enregistrée : $erreur. "
+            'Elle vaudra pour cet export, mais sera oubliée ensuite.',
+          ),
+        ),
+      );
+    }
   }
 
   String _cle(CaseFodep case_) => '${case_.etat}!${case_.cellule}';
@@ -840,6 +868,88 @@ class _ChampCaseState extends State<_ChampCase> {
     );
   }
 
+  /// Les valeurs proposees, la saisie deja portee comprise.
+  ///
+  /// Une valeur enregistree avant que la case ne devienne une liste — ou par
+  /// une version anterieure du catalogue — figure en tete plutot que d'etre
+  /// perdue : l'ecran ne doit jamais effacer en silence ce que le declarant a
+  /// ecrit. C'est a lui de la remplacer s'il le souhaite.
+  List<String> get _valeursProposees {
+    final portee = _controleur.text.trim();
+    final proposees = widget.case_.choix;
+    if (portee.isEmpty || proposees.contains(portee)) return proposees;
+    return <String>[portee, ...proposees];
+  }
+
+  /// Une case qui se choisit dans une liste.
+  ///
+  /// L'État de l'attestation est l'un des huit membres de l'Union : le taper
+  /// n'apporte rien et expose à la faute de frappe sur une case qui identifie
+  /// la déclaration.
+  Widget _listeDeroulante(ThemeData theme, String etiquette) {
+    final portee = _controleur.text.trim();
+
+    return SizedBox(
+      width: widget.largeur,
+      child: Tooltip(
+        message: '${widget.case_.libelle}\n'
+            '${widget.case_.etat} · cellule ${widget.case_.cellule}',
+        child: DropdownButtonFormField<String>(
+          initialValue: portee.isEmpty ? null : portee,
+          isExpanded: true,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+          hint: Text(
+            'Choisir',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          items: [
+            // De quoi revenir en arriere : sans cette entree, une case
+            // choisie par erreur ne pourrait plus etre videe.
+            DropdownMenuItem<String>(
+              value: null,
+              child: Text(
+                'Non renseigné',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
+            for (final valeur in _valeursProposees)
+              DropdownMenuItem<String>(
+                value: valeur,
+                child: Text(valeur, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (choisie) {
+            _controleur.text = choisie ?? '';
+            widget.onModifier(choisie ?? '');
+            setState(() {});
+          },
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: widget.etiquetteVisible ? etiquette : null,
+            labelStyle: theme.textTheme.labelSmall,
+            helperText: widget.etiquetteVisible ? widget.case_.cellule : null,
+            helperStyle: theme.textTheme.labelSmall,
+            border: const OutlineInputBorder(),
+            enabledBorder: widget.modifiee
+                ? OutlineInputBorder(
+                    borderSide:
+                        BorderSide(color: theme.colorScheme.tertiary, width: 2),
+                  )
+                : null,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -850,6 +960,11 @@ class _ChampCaseState extends State<_ChampCase> {
         : (widget.case_.libelle.isNotEmpty
             ? widget.case_.libelle
             : widget.case_.cellule);
+
+    if (widget.case_.estUneListe) {
+      return _listeDeroulante(theme, etiquette);
+    }
+
     final erreur = _erreur;
 
     return SizedBox(

@@ -20,7 +20,7 @@ saisis. Un ecran de saisie n'a pas a redemander ce que la base contient deja.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from database.connection import database_manager
 
@@ -36,6 +36,8 @@ class CaseASaisir:
     libelle: str
     colonne: str
     type_saisie: str = "nombre"
+    # Valeurs proposees quand la case se choisit au lieu de se taper.
+    choix: tuple[str, ...] = ()
     valeur: float | None = None
     texte: str | None = None
     commentaire: str | None = None
@@ -58,10 +60,37 @@ class CaseASaisir:
 # « Téléphone » n'accepte pas les memes caracteres qu'une adresse
 # electronique. Aucun de ces types n'est un nombre : tous sont conserves en
 # texte, un CIB commencant par un zero le perdrait autrement.
-TYPES_ADPE: tuple[str, ...] = ("texte", "code", "telephone", "email", "date")
+TYPES_ADPE: tuple[str, ...] = (
+    "texte",
+    "code",
+    "telephone",
+    "email",
+    "date",
+    "pays",
+)
+
+# L'État de la case C5 n'est pas un nom à taper : le FODEP est la déclaration
+# prudentielle de l'UMOA, et un établissement qui la remplit relève de l'un
+# des huit États membres. Les proposer evite la faute de frappe et
+# l'orthographe approximative sur une case qui identifie la déclaration.
+#
+# L'ordre est celui de l'alphabet, comme la BCEAO les enumere.
+PAYS_UEMOA: tuple[str, ...] = (
+    "Bénin",
+    "Burkina Faso",
+    "Côte d'Ivoire",
+    "Guinée-Bissau",
+    "Mali",
+    "Niger",
+    "Sénégal",
+    "Togo",
+)
+
+# Valeurs proposees par les cases dont le contenu se choisit dans une liste.
+CHOIX_PAR_TYPE: dict[str, tuple[str, ...]] = {"pays": PAYS_UEMOA}
 
 CHAMPS_ADPE: tuple[tuple[str, str, str, str], ...] = (
-    ("C5", "État", "Identification", "texte"),
+    ("C5", "État", "Identification", "pays"),
     ("T5", "Établissement", "Identification", "texte"),
     ("N7", "CIB — code identifiant bancaire (5 caractères)", "Identification", "code"),
     ("T7", "Lettre clé (1 caractère)", "Identification", "code"),
@@ -127,6 +156,7 @@ def catalogue_adpe() -> list[CaseASaisir]:
             libelle=libelle,
             colonne="",
             type_saisie=type_champ,
+            choix=CHOIX_PAR_TYPE.get(type_champ, ()),
         )
         for index, (cellule, libelle, groupe, type_champ) in enumerate(
             CHAMPS_ADPE
@@ -158,6 +188,57 @@ class SaisieEnregistree:
         """Ce qui sera ecrit dans la cellule, texte prioritaire."""
 
         return self.texte if self.texte else self.valeur
+
+
+# ─── Date d'arrete ───────────────────────────────────────────────────────────
+
+# La date d'arrete est saisie sur le meme ecran que le reste de l'attestation,
+# et elle n'etait retenue que le temps de la session : choisie puis la page
+# rechargee, elle repartait de la date de fin du reporting. C'est une donnee du
+# declarant comme les autres — elle se conserve.
+#
+# Elle ne vit pas dans « saisies_fodep » : cette table est indexee par une
+# cellule du classeur, or la date n'occupe pas une cellule mais une grille de
+# huit cases que l'export remplit lui-meme.
+CLE_DATE_ARRETE = "fodep_date_arrete"
+
+
+def lire_date_arrete() -> date | None:
+    """Date d'arrete retenue par le declarant, si elle a ete choisie."""
+
+    with database_manager.read_connection() as connexion:
+        ligne = connexion.execute(
+            "SELECT valeur FROM metadonnees_app WHERE cle = ?",
+            (CLE_DATE_ARRETE,),
+        ).fetchone()
+    if ligne is None:
+        return None
+    try:
+        return date.fromisoformat(str(ligne["valeur"]))
+    except ValueError:
+        # Une valeur illisible vaut absence : l'export retombe sur la date
+        # deduite du portefeuille plutot que d'echouer.
+        return None
+
+
+def enregistrer_date_arrete(valeur: date | None) -> None:
+    """Retient la date d'arrete. Une valeur absente ne l'efface pas.
+
+    Rien dans l'ecran ne retire une date deja choisie : on la remplace. Traiter
+    l'absence comme un effacement ferait donc perdre la date au premier
+    enregistrement d'une autre case.
+    """
+
+    if valeur is None:
+        return
+    with database_manager.transaction() as connexion:
+        connexion.execute(
+            """
+            INSERT INTO metadonnees_app(cle, valeur) VALUES(?, ?)
+            ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur
+            """,
+            (CLE_DATE_ARRETE, valeur.isoformat()),
+        )
 
 
 def lire_saisies() -> dict[tuple[str, str], SaisieEnregistree]:

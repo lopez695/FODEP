@@ -8,7 +8,9 @@ from app.expositions.services import list_expositions
 from app.hors_bilan.services import list_commitments
 from app.rapports.fodep.saisies import (
     catalogue_adpe,
+    enregistrer_date_arrete,
     enregistrer_saisies,
+    lire_date_arrete,
     lire_saisies,
 )
 from app.rapports.models import (
@@ -138,6 +140,7 @@ def lire_cases_a_saisir() -> SaisiesFodep:
                 libelle=case.libelle,
                 colonne=case.colonne,
                 type_saisie=case.type_saisie,
+                choix=list(case.choix),
                 valeur=saisie.valeur if saisie else None,
                 texte=saisie.texte if saisie else None,
                 commentaire=saisie.commentaire if saisie else None,
@@ -159,10 +162,20 @@ def lire_cases_a_saisir() -> SaisiesFodep:
         etats=[attestation],
         total_cases=len(cases),
         total_renseignees=renseignees,
+        date_arrete=lire_date_arrete(),
     )
 
 
-def enregistrer_saisies_fodep(saisies: list[CaseFodep]) -> int:
-    """Enregistre les saisies transmises par l'ecran."""
+def enregistrer_saisies_fodep(
+    saisies: list[CaseFodep],
+    date_arrete: date | None = None,
+) -> int:
+    """Enregistre les saisies transmises par l'ecran, et la date d'arrete.
 
+    La date part du meme ecran et du meme bouton que les cases : la
+    conserver ailleurs ferait un enregistrement partiel, ou le declarant
+    croirait avoir tout retenu.
+    """
+
+    enregistrer_date_arrete(date_arrete)
     return enregistrer_saisies([saisie.model_dump() for saisie in saisies])

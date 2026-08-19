@@ -63,6 +63,11 @@ class CaseFodep(BaseModel):
     # le reste est du texte, et l'ecran en tire le clavier et les caracteres
     # qu'il laisse passer.
     type_saisie: str = "nombre"
+    # Valeurs proposees quand la case se choisit au lieu de se taper. Vide, la
+    # case reste une ligne de saisie libre. Les huit États de l'UMOA sont le
+    # seul cas aujourd'hui : les servir depuis le catalogue plutôt que de les
+    # ecrire dans l'ecran garde une seule source à la liste.
+    choix: list[str] = []
     valeur: float | None = None
     texte: str | None = None
     commentaire: str | None = None
@@ -89,6 +94,9 @@ class SaisiesFodep(BaseModel):
     etats: list[EtatASaisir]
     total_cases: int
     total_renseignees: int
+    # Date que portera l'attestation, telle que le declarant l'a arretee.
+    # Absente, l'export la deduit du portefeuille.
+    date_arrete: date | None = None
 
 
 class SaisiesFodepEnregistrees(BaseModel):
@@ -96,4 +104,7 @@ class SaisiesFodepEnregistrees(BaseModel):
 
     saisies: list[CaseFodep]
     enregistrees: int = 0
+    # Transmise avec les cases : elle se choisit sur le meme ecran, elle
+    # s'enregistre au meme moment.
+    date_arrete: date | None = None
 
