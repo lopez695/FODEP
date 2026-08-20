@@ -259,6 +259,81 @@ def test_les_largeurs_valent_pour_toute_la_plage_de_colonnes(contenu):
     assert liste.largeurs[1] > individuelle
 
 
+def test_l_ep01_conclut_chaque_norme_et_le_dit_en_couleur(contenu):
+    """La colonne « Situation de l'etablissement » porte la conclusion.
+
+    Elle n'est pas une donnee du classeur mais une formule -- la comparaison
+    du niveau observe au niveau a respecter -- et le classeur est ecrit sans
+    etre evalue. Le PDF laissait donc vide la colonne qui porte le verdict de
+    l'etat, alors que c'est la premiere chose qu'on y lit.
+
+    La couleur ne vient pas davantage de la police : le classeur ne colore
+    aucune cellule. Elle vient d'une regle conditionnelle, verte pour CONFORME
+    et rouge pour INFRACTION. Sans elle, une infraction se lisait du meme noir
+    qu'une conformite -- ce que la colonne sert precisement a distinguer.
+    """
+
+    ep01 = next(etat for etat in contenu.etats if etat.nom == "EP01")
+    ra001 = _ligne_du_code(ep01, "RA001")
+    assert ra001 is not None
+
+    # Code, intitule, reference, niveau a respecter, niveau observe, situation.
+    situation = ra001.cellules[5]
+    assert situation.texte in {"CONFORME", "INFRACTION"}
+    assert situation.couleur == ("00B050" if situation.texte == "CONFORME" else "FF0000")
+
+    # Les onze normes concluent : aucune ne reste sans verdict.
+    verdicts = [
+        ligne.cellules[5].texte
+        for code in (f"RA{numero:03d}" for numero in range(1, 12))
+        for ligne in [_ligne_du_code(ep01, code)]
+        if ligne is not None
+    ]
+    assert len(verdicts) == 11
+    assert all(verdict in {"CONFORME", "INFRACTION"} for verdict in verdicts)
+
+
+def test_les_pourcentages_se_lisent_comme_dans_le_classeur(contenu):
+    """Le classeur ecrit 0,075 et demande « 0.00 % » : il affiche 7,50 %.
+
+    Sans lire le format, le PDF alignait des « 0,0750 » la ou le declarant lit
+    des pourcentages. Deux cent quarante-quatre cellules du formulaire sont
+    dans ce cas, dont toute la colonne des niveaux a respecter de l'EP01.
+    """
+
+    from app.rapports.fodep.contenu import ESPACE_FINE
+
+    ep01 = next(etat for etat in contenu.etats if etat.nom == "EP01")
+
+    # Deux decimales pour les ratios de solvabilite, aucune pour les limites.
+    ra001 = _ligne_du_code(ep01, "RA001")
+    ra004 = _ligne_du_code(ep01, "RA004")
+    assert ra001 is not None and ra004 is not None
+    assert ra001.cellules[3].texte == f"7,50{ESPACE_FINE}%"
+    assert ra004.cellules[3].texte == f"25{ESPACE_FINE}%"
+
+    # RA010 vaut 1 : c'est 100 %, et non « 1 ».
+    ra010 = _ligne_du_code(ep01, "RA010")
+    assert ra010 is not None
+    assert ra010.cellules[3].texte == f"100{ESPACE_FINE}%"
+
+
+def test_les_pourcentages_s_arrondissent_comme_excel():
+    """Python arrondit au pair, Excel s'eloigne de zero.
+
+    La norme RA006 est observee a 0,225 et s'affiche sans decimale : 22 % pour
+    Python, 23 % pour le classeur. Un ecart d'un point sur une limite
+    prudentielle, la ou les deux documents doivent dire la meme chose.
+    """
+
+    from app.rapports.fodep.contenu import ESPACE_FINE, _texte
+
+    assert _texte(0.225, "0\\ %") == f"23{ESPACE_FINE}%"
+    assert _texte(0.075, "0.00\\ %") == f"7,50{ESPACE_FINE}%"
+    # Hors pourcentage, rien ne change.
+    assert _texte(1234567, "General") == f"1{ESPACE_FINE}234{ESPACE_FINE}567"
+
+
 def test_les_reserves_de_lecture_accompagnent_le_contenu(contenu):
     """Elles doivent figurer sur le PDF : une declaration relue sans ses
     reserves se signe sans les connaitre."""

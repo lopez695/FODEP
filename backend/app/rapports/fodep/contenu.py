@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from base64 import b64encode
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+import re
 
 from pydantic import BaseModel, Field
 
@@ -186,7 +188,54 @@ class ContenuFodep(BaseModel):
     etats: list[EtatFodep]
 
 
-def _texte(valeur) -> str:
+def _decimales_du_pourcentage(format_nombre: str | None) -> int | None:
+    """Nombre de decimales si la cellule s'affiche en pourcentage, sinon None.
+
+    Le classeur ecrit 0,075 et demande « 0.00\\ % » : Excel montre « 7,50 % ».
+    Sans lire le format, le PDF alignait des « 0,0750 » la ou le declarant lit
+    des pourcentages -- deux cent quarante-quatre cellules du formulaire, dont
+    toute la colonne des niveaux a respecter de l'EP01 et les ponderations des
+    etats de risque de credit.
+
+    Seule la premiere section du format compte : « #,##0%\\ ;\\(#,##0%\\) »
+    reserve la seconde aux nombres negatifs, que le formulaire ne porte pas.
+    """
+
+    if not format_nombre:
+        return None
+    section = format_nombre.split(";")[0]
+    # Les caracteres echappes (« \\ % ») et les litteraux entre guillemets ne
+    # sont pas des marques de format : un « % » ecrit en toutes lettres ne
+    # transformerait pas le nombre.
+    section = re.sub(r'"[^"]*"', "", section).replace("\\", "")
+    if "%" not in section:
+        return None
+    decimales = re.search(r"\.(0+)", section)
+    return len(decimales.group(1)) if decimales else 0
+
+
+def _nombre_francais(valeur: float, decimales: int) -> str:
+    """Nombre arrondi comme Excel l'arrondit, puis ecrit a la francaise.
+
+    Python arrondit au pair le plus proche : 22,5 devient 22. Excel s'eloigne
+    de zero : 22,5 devient 23. La norme RA006, observee a 0,225 et affichee
+    sans decimale, se lisait donc « 22 % » sur le PDF et « 23 % » dans le
+    classeur -- un ecart d'un point sur une limite prudentielle, la ou les deux
+    documents doivent dire la meme chose.
+    """
+
+    arrondi = Decimal(str(valeur)).quantize(
+        Decimal(1).scaleb(-decimales), rounding=ROUND_HALF_UP
+    )
+    return (
+        f"{arrondi:,.{decimales}f}"
+        .replace(",", "\x00")
+        .replace(".", ",")
+        .replace("\x00", ESPACE_FINE)
+    )
+
+
+def _texte(valeur, format_nombre: str | None = None) -> str:
     """Cellule rendue lisible, ou vide quand elle n'a rien a dire."""
 
     if valeur is None:
@@ -196,12 +245,18 @@ def _texte(valeur) -> str:
     if isinstance(valeur, str):
         texte = valeur.strip()
         # Une formule n'a pas de valeur hors d'Excel : le classeur est ecrit
-        # sans etre evalue. Afficher « =SI(...) » ferait passer une mecanique
-        # pour un resultat ; la case reste vide, comme dans le classeur non
-        # encore ouvert.
+        # sans etre evalue. Celles que ce module sait calculer sont posees
+        # avant d'arriver ici ; pour les autres, afficher « =SI(...) » ferait
+        # passer une mecanique pour un resultat, et la case reste vide.
         return "" if texte.startswith("=") else texte
     if isinstance(valeur, date):
         return valeur.strftime("%d/%m/%Y")
+    if isinstance(valeur, (int, float)):
+        decimales = _decimales_du_pourcentage(format_nombre)
+        if decimales is not None:
+            # L'espace avant le signe est insecable : « 7,50 % » ne se coupe
+            # pas en fin de ligne.
+            return _nombre_francais(valeur * 100, decimales) + ESPACE_FINE + "%"
     if isinstance(valeur, float):
         if valeur == int(valeur):
             return f"{int(valeur):,}".replace(",", ESPACE_FINE)
@@ -209,6 +264,114 @@ def _texte(valeur) -> str:
     if isinstance(valeur, int):
         return f"{valeur:,}".replace(",", ESPACE_FINE)
     return str(valeur).strip()
+
+
+# La seule formule du formulaire : la conformite d'une norme de l'EP01.
+#
+# « =IF($G10>($F10),"CONFORME","INFRACTION") » -- le niveau observe compare au
+# niveau a respecter. Le classeur en compte onze, toutes de cette forme, et pas
+# une autre formule ailleurs.
+_COMPARAISON = re.compile(
+    r'^=IF\(\s*\$?([A-Z]{1,3})\$?(\d+)\s*(>=|<=|<>|>|<|=)\s*'
+    r'\(?\s*\$?([A-Z]{1,3})\$?(\d+)\s*\)?\s*,\s*'
+    r'"([^"]*)"\s*,\s*"([^"]*)"\s*\)$',
+    re.IGNORECASE,
+)
+
+
+def _formules(feuille) -> dict[tuple[int, int], str]:
+    """Resultat des formules que ce module sait calculer.
+
+    Le classeur est ecrit sans etre evalue : ses formules n'ont pas de valeur
+    tant qu'Excel ne l'a pas ouvert. La colonne « Situation de l'etablissement »
+    de l'EP01 restait donc vide sur le PDF -- alors qu'elle porte la conclusion
+    de l'etat, CONFORME ou INFRACTION, et que c'est la premiere chose qu'on y
+    lit.
+
+    Seule la comparaison de deux cellules est calculee. Une formule d'une autre
+    forme laisse la case vide, comme avant : mieux vaut une case vide qu'un
+    resultat invente.
+    """
+
+    resultats: dict[tuple[int, int], str] = {}
+    for ligne in feuille.iter_rows():
+        for cellule in ligne:
+            if not isinstance(cellule.value, str):
+                continue
+            comparaison = _COMPARAISON.match(cellule.value.strip())
+            if comparaison is None:
+                continue
+            colonne_a, rang_a, operateur, colonne_b, rang_b, oui, non = (
+                comparaison.groups()
+            )
+            gauche = feuille[f"{colonne_a}{rang_a}"].value
+            droite = feuille[f"{colonne_b}{rang_b}"].value
+            if not isinstance(gauche, (int, float)) or not isinstance(
+                droite, (int, float)
+            ):
+                continue
+            if isinstance(gauche, bool) or isinstance(droite, bool):
+                continue
+            verifie = {
+                ">": gauche > droite,
+                "<": gauche < droite,
+                ">=": gauche >= droite,
+                "<=": gauche <= droite,
+                "=": gauche == droite,
+                "<>": gauche != droite,
+            }[operateur]
+            resultats[(cellule.row, cellule.column)] = oui if verifie else non
+    return resultats
+
+
+def _couleurs_conditionnelles(feuille) -> dict[tuple[int, int], list[tuple[str, str]]]:
+    """Couleurs que le classeur donne a un texte selon ce qu'il vaut.
+
+    L'EP01 ecrit CONFORME en vert et INFRACTION en rouge. La couleur n'est pas
+    dans la police de la cellule -- le classeur n'en colore aucune -- mais dans
+    une regle conditionnelle, que le PDF ignorait. Un etat en infraction s'y
+    lisait donc du meme noir qu'un etat conforme, ce qui est exactement ce que
+    la colonne sert a distinguer.
+    """
+
+    regles: dict[tuple[int, int], list[tuple[str, str]]] = {}
+    for mise_en_forme in feuille.conditional_formatting:
+        for regle in mise_en_forme.rules:
+            if regle.type != "cellIs" or regle.operator != "equal":
+                continue
+            differentiel = regle.dxf
+            police = differentiel.font if differentiel is not None else None
+            couleur = police.color.rgb if police is not None and police.color else None
+            if not isinstance(couleur, str) or not regle.formula:
+                continue
+            attendu = str(regle.formula[0]).strip().strip('"')
+            for plage in mise_en_forme.sqref.ranges:
+                for rang in range(plage.min_row, plage.max_row + 1):
+                    for colonne in range(plage.min_col, plage.max_col + 1):
+                        regles.setdefault((rang, colonne), []).append(
+                            (attendu, _rvb(couleur))
+                        )
+    return regles
+
+
+def _rvb(couleur: str) -> str:
+    """Couleur ARVB d'Excel ramenee aux six chiffres du RVB."""
+
+    return couleur[-6:].upper()
+
+
+def _couleur_du_texte(
+    regles: list[tuple[str, str]] | None,
+    texte: str,
+) -> str | None:
+    """Couleur de la premiere regle conditionnelle que le texte verifie."""
+
+    if not regles or not texte:
+        return None
+    for attendu, couleur in regles:
+        if texte.strip().casefold() == attendu.casefold():
+            return couleur
+    return None
 
 
 def _derniere_colonne(feuille) -> int:
@@ -486,6 +649,8 @@ def _lignes_du_formulaire(feuille, derniere: int) -> list[LigneFodep]:
     titres = _lignes_de_titre(feuille)
     images = _images_ancrees(feuille, derniere)
     icones = _icones(feuille)
+    formules = _formules(feuille)
+    couleurs = _couleurs_conditionnelles(feuille)
     lignes: list[LigneFodep] = []
 
     for ligne in feuille.iter_rows(max_col=derniere):
@@ -507,10 +672,20 @@ def _lignes_du_formulaire(feuille, derniere: int) -> list[LigneFodep]:
             )
             icone = icones.get(position)
             symbole = icone[0] if icone else None
+            if symbole is not None:
+                texte = symbole
+            else:
+                # Une formule calculee l'emporte sur son ecriture : c'est son
+                # resultat que le classeur affiche.
+                texte = formules.get(position) or _texte(
+                    cellule.value, cellule.number_format
+                )
             cellules.append(
                 CelluleFodep(
-                    texte=symbole if symbole is not None else _texte(cellule.value),
-                    couleur=icone[1] if icone else None,
+                    texte=texte,
+                    couleur=icone[1]
+                    if icone
+                    else _couleur_du_texte(couleurs.get(position), texte),
                     icone=icone[2] if icone else None,
                     gras=bool(cellule.font and cellule.font.bold),
                     droite=_est_a_droite(cellule, symbole),
