@@ -581,24 +581,31 @@ class _ChoixMethodeOperationnelleState
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _OptionMethode(
-                  titre: 'Indicateur de base',
-                  etats: 'EP21 · EP22',
-                  choisie: _standard == false,
-                  onChoisir: () => _choisir(false),
-                ),
-                _OptionMethode(
-                  titre: 'Standard',
-                  etats: 'EP23 · EP24',
-                  precision: 'sur accord de la Commission bancaire',
-                  choisie: _standard == true,
-                  onChoisir: () => _choisir(true),
-                ),
-              ],
+            // Les deux méthodes se valent : elles doivent se présenter à la
+            // même taille. Sans cela, la mention de l'accord allonge la carte
+            // de l'approche standard, et le déséquilibre se lit comme une
+            // préférence de l'application.
+            IntrinsicHeight(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _OptionMethode(
+                    titre: 'Indicateur de base',
+                    etats: 'EP21 · EP22',
+                    choisie: _standard == false,
+                    onChoisir: () => _choisir(false),
+                  ),
+                  const SizedBox(width: 10),
+                  _OptionMethode(
+                    titre: 'Standard',
+                    etats: 'EP23 · EP24',
+                    precision: 'sur accord de la Commission bancaire',
+                    choisie: _standard == true,
+                    onChoisir: () => _choisir(true),
+                  ),
+                ],
+              ),
             ),
           if (_erreur != null) ...[
             const SizedBox(height: 10),

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rwa_calculator/core/services/rwa_api_service.dart';
 import 'package:rwa_calculator/modules/rapports/models/report_models.dart';
+import 'package:rwa_calculator/modules/risque_operationnel/models/ro_models.dart';
 import 'package:rwa_calculator/modules/rapports/screens/fodep_page.dart';
 
 /// API qui répond sans réseau : la page n'a besoin que du décompte des cases.
@@ -22,6 +23,16 @@ class _ApiBouchonnee extends RwaApiService {
           'total_cases': 27,
           'total_renseignees': 4,
         },
+      );
+
+  /// La méthode du risque opérationnel : l'écran la lit au chargement.
+  @override
+  Future<ParametresAs> fetchAsParametres() async => const ParametresAs(
+        asAutorisee: true,
+        dateAutorisation: '2026-01-15',
+        referenceAutorisation: 'CB/2026/014',
+        multiplicateurRwa: 12.5,
+        ratioSolvabiliteMin: 0.09,
       );
 }
 
@@ -81,5 +92,35 @@ void main() {
       find.textContaining('déduite de la date d\'analyse la plus récente'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('les deux méthodes se présentent à la même taille',
+      (tester) async {
+    // Elles se valent : l'une n'est pas plus grande que l'autre. Sans cela, la
+    // mention de l'accord de la Commission bancaire allonge la carte de
+    // l'approche standard, et le déséquilibre se lit comme une préférence de
+    // l'application.
+    await _poser(tester, dateArrete: DateTime(2026, 8, 18));
+
+    expect(find.text('Méthode du risque opérationnel'), findsOneWidget);
+
+    Size carte(String titre) => tester.getSize(
+          find
+              .ancestor(of: find.text(titre), matching: find.byType(InkWell))
+              .first,
+        );
+
+    final base = carte('Indicateur de base');
+    final standard = carte('Standard');
+    expect(base.height, standard.height);
+    expect(base.width, standard.width);
+
+    // L'egalite n'est pas acquise d'avance : la carte de l'approche standard
+    // porte une ligne de plus, et c'est elle qui la faisait depasser.
+    expect(find.text('sur accord de la Commission bancaire'), findsOneWidget);
+
+    // Et chacune annonce les états qu'elle renseigne.
+    expect(find.text('EP21 · EP22'), findsOneWidget);
+    expect(find.text('EP23 · EP24'), findsOneWidget);
   });
 }
