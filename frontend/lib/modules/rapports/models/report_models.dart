@@ -204,6 +204,7 @@ class CelluleFodep {
     this.droite = false,
     this.centre = false,
     this.couleur,
+    this.icone,
     this.colonnes = 1,
     this.fond,
     this.bordures = '',
@@ -227,6 +228,13 @@ class CelluleFodep {
   /// sa mise en forme conditionnelle dessine — vertes ou rouges, sur la
   /// feuille qui coche les états à renseigner.
   final String? couleur;
+
+  /// Icône à tracer plutôt qu'à écrire : « valide », « refus » ou « alerte ».
+  /// Le classeur ne montre pas un caractère mais un symbole dessiné, plein et
+  /// épais ; aucune police du document n'en porte l'équivalent — ni Aptos ni
+  /// IBM Plex Sans n'ont la coche grasse U+2714, et une coche maigre agrandie
+  /// reste maigre. [texte] garde le caractère le plus proche.
+  final String? icone;
 
   /// Colonnes couvertes, reprises des fusions du formulaire.
   final int colonnes;
@@ -256,6 +264,7 @@ class CelluleFodep {
         droite: json['droite'] == true,
         centre: json['centre'] == true,
         couleur: json['couleur'] as String?,
+        icone: json['icone'] as String?,
         colonnes: (json['colonnes'] as num?)?.toInt() ?? 1,
         fond: json['fond'] as String?,
         bordures: json['bordures'] as String? ?? '',

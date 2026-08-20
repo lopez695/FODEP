@@ -229,9 +229,13 @@ def test_le_perimetre_se_coche_en_symboles_et_non_en_nombres(contenu):
     croix = ep03.cellules[3]
     assert coche.couleur and croix.couleur
     assert coche.couleur != croix.couleur
-    # Excel trace ses icones pleines : un caractere de texte a la meme place
-    # doit peser autant, sinon la coche parait effacee a cote du classeur.
-    assert coche.gras and croix.gras
+    # Et elle se nomme : le PDF la DESSINE plutot que d'ecrire un caractere.
+    # Aucune police du document ne porte de coche grasse -- ni Aptos ni IBM
+    # Plex Sans n'ont U+2714 --, et une coche maigre agrandie reste maigre,
+    # sans rapport avec le symbole plein du classeur.
+    assert (coche.icone, croix.icone) == ("valide", "refus")
+    # Le caractere reste, pour un rendu qui ne saurait pas dessiner.
+    assert (coche.texte, croix.texte) == ("✓", "×")
 
 
 def test_les_largeurs_valent_pour_toute_la_plage_de_colonnes(contenu):

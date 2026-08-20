@@ -64,9 +64,23 @@ VERT = "3FA45B"
 AMBRE = "E8A33D"
 ROUGE = "C0504D"
 
-SYMBOLES_PAR_JEU: dict[str, tuple[tuple[str, str], ...]] = {
-    "3Symbols": (("×", ROUGE), ("!", AMBRE), ("✓", VERT)),
-    "3Symbols2": (("×", ROUGE), ("!", AMBRE), ("✓", VERT)),
+# Le troisieme terme nomme l'icone. Le PDF ne l'ecrit pas : il la DESSINE,
+# comme Excel. Aucune des polices du document ne porte de coche grasse -- ni
+# Aptos ni IBM Plex Sans n'ont U+2714 --, et une coche maigre agrandie reste
+# maigre, sans rapport avec le symbole plein du classeur. Le nom permet au
+# rendu de tracer le trait plutot que de chercher un caractere qui n'existe
+# pas. Le symbole, lui, reste : c'est le texte de la cellule.
+SYMBOLES_PAR_JEU: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "3Symbols": (
+        ("×", ROUGE, "refus"),
+        ("!", AMBRE, "alerte"),
+        ("✓", VERT, "valide"),
+    ),
+    "3Symbols2": (
+        ("×", ROUGE, "refus"),
+        ("!", AMBRE, "alerte"),
+        ("✓", VERT, "valide"),
+    ),
 }
 
 
@@ -88,6 +102,13 @@ class CelluleFodep(BaseModel):
     #: formulaire ne colore aucun texte : la seule couleur vient des icones que
     #: sa mise en forme conditionnelle dessine, vertes ou rouges.
     couleur: str | None = None
+
+    #: Icone a tracer plutot qu'a ecrire : « valide », « refus » ou
+    #: « alerte ». Le classeur ne montre pas un caractere mais un symbole
+    #: dessine, plein et epais ; aucune police du document n'en porte
+    #: l'equivalent. [texte] garde le caractere le plus proche, pour un rendu
+    #: qui ne saurait pas dessiner.
+    icone: str | None = None
 
     #: Nombre de colonnes couvertes, reprises des fusions du formulaire. Les
     #: titres d'etat et les intitules de section en couvrent plusieurs.
@@ -316,7 +337,7 @@ def _lignes_de_titre(feuille) -> set[int]:
         return set()
 
 
-def _icones(feuille) -> dict[tuple[int, int], tuple[str, str]]:
+def _icones(feuille) -> dict[tuple[int, int], tuple[str, str, str]]:
     """Cellules dont le classeur remplace la valeur par une icone.
 
     La feuille « Liste des etats prudentiels a renseigner » coche chaque etat
@@ -333,7 +354,7 @@ def _icones(feuille) -> dict[tuple[int, int], tuple[str, str]]:
     invente.
     """
 
-    icones: dict[tuple[int, int], tuple[str, str]] = {}
+    icones: dict[tuple[int, int], tuple[str, str, str]] = {}
     for mise_en_forme in feuille.conditional_formatting:
         for regle in mise_en_forme.rules:
             jeu = regle.iconSet
@@ -490,10 +511,8 @@ def _lignes_du_formulaire(feuille, derniere: int) -> list[LigneFodep]:
                 CelluleFodep(
                     texte=symbole if symbole is not None else _texte(cellule.value),
                     couleur=icone[1] if icone else None,
-                    # Excel trace ses icones pleines ; un caractere de texte a
-                    # la meme place doit peser autant, sinon la coche parait
-                    # effacee a cote de celle du classeur.
-                    gras=bool(icone) or bool(cellule.font and cellule.font.bold),
+                    icone=icone[2] if icone else None,
+                    gras=bool(cellule.font and cellule.font.bold),
                     droite=_est_a_droite(cellule, symbole),
                     centre=bool(
                         cellule.alignment

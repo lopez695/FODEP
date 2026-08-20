@@ -297,12 +297,62 @@ const double _hauteurImageParDefaut = 60;
 /// une plage de cellules ; c'est la hauteur de cette plage qui le dimensionne,
 /// comme dans le classeur, et non sa définition en pixels — sans quoi une image
 /// de mille cent pixels de large sortirait de la feuille.
+/// Les icônes du classeur, tracées et non écrites.
+///
+/// Excel ne pose pas un caractère : il dessine un symbole plein, épais, vert
+/// ou rouge. Aucune police du document n'en porte l'équivalent — ni Aptos ni
+/// IBM Plex Sans n'ont la coche grasse U+2714 — et agrandir la coche maigre
+/// U+2713 ne la remplit pas : elle reste un trait de plume à côté du symbole
+/// du classeur. Deux traits suffisent à la reproduire, et le trait a la
+/// largeur qu'on veut.
+pw.Widget _icone(String nature, PdfColor couleur, double taille) {
+  final cote = taille * 1.15;
+  final epaisseur = cote * 0.17;
+
+  return pw.CustomPaint(
+    size: PdfPoint(cote, cote),
+    painter: (canvas, size) {
+      canvas
+        ..setStrokeColor(couleur)
+        ..setLineWidth(epaisseur)
+        ..setLineCap(PdfLineCap.round)
+        ..setLineJoin(PdfLineJoin.round);
+
+      final l = size.x;
+      final h = size.y;
+      if (nature == 'valide') {
+        // Une coche : la descente courte, puis la longue montée.
+        canvas
+          ..moveTo(l * 0.16, h * 0.52)
+          ..lineTo(l * 0.40, h * 0.24)
+          ..lineTo(l * 0.86, h * 0.76);
+      } else {
+        // Une croix, ou le point d'exclamation du jeu à trois symboles, tracé
+        // comme une barre verticale : dans les deux cas, deux segments.
+        final aigu = nature == 'alerte';
+        canvas
+          ..moveTo(aigu ? l * 0.5 : l * 0.22, aigu ? h * 0.86 : h * 0.22)
+          ..lineTo(aigu ? l * 0.5 : l * 0.78, aigu ? h * 0.34 : h * 0.78)
+          ..moveTo(aigu ? l * 0.5 : l * 0.22, aigu ? h * 0.16 : h * 0.78)
+          ..lineTo(aigu ? l * 0.5 : l * 0.78, aigu ? h * 0.14 : h * 0.22);
+      }
+      canvas.strokePath();
+    },
+  );
+}
+
 pw.Widget _contenuDeCellule(
   CelluleFodep cellule,
   _Mise mise,
   double hauteur, {
   double largeur = 0,
 }) {
+  final nature = cellule.icone;
+  final teinte = _couleur(cellule.couleur);
+  if (nature != null && teinte != null) {
+    return _icone(nature, teinte, mise.taille(cellule));
+  }
+
   final image = cellule.image;
   if (image == null) {
     return pw.Text(

@@ -254,6 +254,49 @@ void main() {
     ]));
   });
 
+  test("une icône du classeur se trace et ne dépend d'aucune police",
+      () async {
+    // Le classeur coche les états à renseigner par une mise en forme
+    // conditionnelle : il ne montre pas un caractère mais un symbole dessiné,
+    // plein et épais. Aucune police du document n'en porte l'équivalent — ni
+    // Aptos ni IBM Plex Sans n'ont la coche grasse U+2714 — et agrandir la
+    // coche maigre ne la remplit pas. Le rendu la trace donc lui-même.
+    final octets = await construireFodepPdf(
+      contenu: _contenu([
+        EtatFodep(
+          nom: 'Liste_EP_à_renseigner',
+          largeurs: const [12, 60, 22, 22, 22],
+          lignes: [
+            _ligne([
+              _c('EP03'),
+              _c('Calcul des fonds propres sur base individuelle'),
+              const CelluleFodep(
+                texte: '✓',
+                icone: 'valide',
+                couleur: '3FA45B',
+                centre: true,
+              ),
+              const CelluleFodep(
+                texte: '×',
+                icone: 'refus',
+                couleur: 'C0504D',
+                centre: true,
+              ),
+              const CelluleFodep(
+                texte: '!',
+                icone: 'alerte',
+                couleur: 'E8A33D',
+                centre: true,
+              ),
+            ]),
+          ],
+        ),
+      ]),
+    );
+
+    expect(octets.lengthInBytes, greaterThan(1000));
+  });
+
   test('un contenu sans état produit tout de même un fichier lisible', () async {
     await _rend(_contenu(const []));
   });
