@@ -1,6 +1,8 @@
 // Le PDF du FODEP reproduit le classeur : ses lignes, ses colonnes à leur
-// largeur, ses fusions. Pas de page de garde, pas de bandeaux, pas d'encadrés :
-// ce qui ne figure pas dans le formulaire n'a pas à figurer dans son impression.
+// largeur, ses fusions. Rien de plus — pas de bandeau ni d'encadré inventés :
+// ce qui ne figure pas dans le formulaire n'a pas à figurer dans son
+// impression. La page de garde de la BCEAO, elle, est une feuille du classeur
+// comme les autres, et s'imprime avec lui.
 //
 // Ces cas reproduisent les formes qui ont fait échouer les versions
 // précédentes : un titre fusionné de cent trente caractères, un état à quatorze
@@ -46,6 +48,69 @@ CelluleFodep _c(
       droite: droite,
       colonnes: colonnes,
     );
+
+/// Une image minuscule, la ou le classeur porte le logo de la BCEAO : ce qui
+/// est teste ici est la place qu'elle prend, pas ce qu'elle represente.
+final _logo = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAECAIAAAA8r+mnAAAAEUlEQVR4nGOIshHBihioJwEAL'
+  '+AVQQRYB3cAAAAASUVORK5CYII=',
+);
+
+/// La page de garde telle que le backend l'extrait du formulaire.
+///
+/// Douze colonnes, dont deux tres larges ; un bandeau bleu de vingt-deux lignes
+/// que traversent des bandes jaunes et brunes ; le cartouche qui le ferme ; le
+/// logo ancre sur cinq lignes ; le titre en vingt-deux points.
+EtatFodep _pageDeGarde() {
+  const largeurs = [
+    9.73, 52.73, 2.0, 1.36, 0.54, 3.18, 1.82, 1.73, 0.36, 2.36, 31.73, 58.82,
+  ];
+  const bandeau = [
+    '83CAFF', '83CAFF', '83CAFF', 'FFD320', '83CAFF', 'FFD320', //
+    '83CAFF', '663300', '83CAFF', '663300', '83CAFF', '83CAFF',
+  ];
+  const cartouche = [
+    null, null, '663300', null, '663300', null, //
+    '663300', 'FFD320', '663300', 'FFD320', '663300', '663300',
+  ];
+
+  LigneFodep bande(List<String?> fonds) => LigneFodep(
+        hauteur: 30,
+        cellules: [for (final fond in fonds) CelluleFodep(fond: fond)],
+      );
+
+  return EtatFodep(
+    nom: 'Page_de_garde',
+    largeurs: largeurs,
+    paysage: false,
+    lignes: [
+      for (var ligne = 0; ligne < 22; ligne++) bande(bandeau),
+      bande(cartouche),
+      bande(cartouche),
+      LigneFodep(
+        hauteur: 363.75,
+        cellules: [
+          const CelluleFodep(),
+          CelluleFodep(colonnes: 11, centre: true, image: _logo),
+        ],
+      ),
+      const LigneFodep(
+        hauteur: 133.5,
+        cellules: [
+          CelluleFodep(),
+          CelluleFodep(),
+          CelluleFodep(
+            texte: 'FORMULAIRE DE DECLARATION PRUDENTIELLE DES ETABLISSEMENTS '
+                'DE CREDIT ET DES COMPAGNIES FINANCIERES (FODEP)',
+            gras: true,
+            colonnes: 10,
+            taille: 22,
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
 /// Formats des pages produites, lus dans le document.
 ///
@@ -257,6 +322,20 @@ void main() {
       expect(format.largeur, greaterThan(842),
           reason: 'Une A4 paysage ne suffit pas a cinquante-quatre colonnes.');
     }
+  });
+
+  test('la page de garde du formulaire tient sur une page, logo compris',
+      () async {
+    // La couverture de la BCEAO : un bandeau bleu de vingt-deux lignes traverse
+    // de bandes de couleur, un cartouche brun, le logo, puis le titre. Elle ne
+    // porte qu'un seul texte — tout le reste est de la couleur et une image —
+    // et c'est pourtant a elle qu'on reconnait le formulaire.
+    final pdf = await construireFodepPdf(
+      contenu: _contenu([_pageDeGarde()]),
+    );
+
+    expect(_formats(pdf), hasLength(1),
+        reason: 'La couverture du formulaire est une page, pas deux.');
   });
 
   test('un titre plus large que sa colonne ne fait pas paginer sans fin',

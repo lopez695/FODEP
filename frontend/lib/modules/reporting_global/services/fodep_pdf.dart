@@ -20,6 +20,11 @@ import '../../rapports/models/report_models.dart';
 /// le classeur règle lui-même : dix-neuf de ses états sont en portrait, et
 /// l'EP30 rappelle son en-tête sur chacune de ses pages.
 ///
+/// Il s'ouvre sur la page de garde de la BCEAO, qui est une feuille du classeur
+/// comme les autres : son bandeau bleu, les bandes de couleur qui le traversent
+/// et le logo de la Banque Centrale. Une déclaration qui ne commence pas par
+/// elle ne se reconnaît pas comme un FODEP.
+///
 /// Le contenu vient du backend, qui l'extrait du fichier qu'il vient d'écrire :
 /// le PDF n'est jamais un second calcul.
 
@@ -27,9 +32,17 @@ import '../../rapports/models/report_models.dart';
 const _filet = pw.BorderSide(color: PdfColor.fromInt(0xFF3F3F46), width: 0.35);
 const _texteEteint = PdfColor.fromInt(0xFF6B7280);
 
-/// Une unité de largeur d'Excel — la largeur d'un chiffre — vaut environ ce
-/// nombre de points.
-const double _pointsParCaractere = 5.25;
+/// Largeur d'une colonne en points, depuis l'unité d'Excel.
+///
+/// Excel compte les largeurs en chiffres, et sa conversion en pixels n'est pas
+/// une simple proportion : une colonne mesure `largeur × 7 + 5` pixels, les
+/// cinq pixels étant la marge que la cellule garde de chaque côté de son texte.
+/// Les ignorer ne se voyait pas sur une colonne de trente chiffres, mais les
+/// bandes de la page de garde en mesurent moins d'un : sans eux, elles se
+/// resserraient jusqu'à se toucher.
+///
+/// Les pixels d'Excel valent 96 par pouce, les points du PDF 72.
+double _points(double largeur) => (largeur * 7 + 5) * 0.75;
 
 /// Marges gauche et droite cumulées.
 const double _margesHorizontales = 40;
@@ -130,7 +143,7 @@ pw.Widget _pied(String etat, pw.Context contexte) => pw.Container(
 
 /// Largeur naturelle de l'état, en points, telle que le classeur la règle.
 double _largeurNaturelle(EtatFodep etat) => etat.largeurs
-    .fold<double>(0, (somme, largeur) => somme + largeur * _pointsParCaractere);
+    .fold<double>(0, (somme, largeur) => somme + _points(largeur));
 
 /// Feuille sur laquelle imprimer l'état.
 ///
@@ -169,7 +182,7 @@ class _Mise {
 
   factory _Mise.pour(EtatFodep etat, PdfPageFormat format) {
     final colonnes = [
-      for (final largeur in etat.largeurs) largeur * _pointsParCaractere,
+      for (final largeur in etat.largeurs) _points(largeur),
     ];
     final naturelle = colonnes.fold<double>(0, (somme, l) => somme + l);
     final disponible = format.width - _margesHorizontales;
@@ -189,10 +202,55 @@ class _Mise {
           .clamp(_tailleMinimale, 24.0);
 }
 
-pw.TextStyle _style(CelluleFodep cellule, _Mise mise) => pw.TextStyle(
-      fontSize: mise.taille(cellule),
+pw.TextStyle _style(CelluleFodep cellule, _Mise mise, double largeur) =>
+    pw.TextStyle(
+      fontSize: _tailleTenantLeMotLePlusLong(cellule, mise, largeur),
       fontWeight: cellule.gras ? pw.FontWeight.bold : pw.FontWeight.normal,
+      // Sans elle, la feuille des états à renseigner sort en colonnes de
+      // coches et de croix noires, où rien ne distingue au premier coup d'œil
+      // ce qui est exigé de ce qui ne l'est pas.
+      color: _couleur(cellule.couleur),
     );
+
+/// Largeur moyenne d'un caractere, en part de la taille de police.
+///
+/// Mesuree sur la police du document. Elle n'a pas a etre exacte : elle sert a
+/// savoir si un mot passe, pas a composer la ligne.
+const double _largeurMoyenneDuCaractere = 0.55;
+
+/// Taille de police retenue pour que le mot le plus long tienne dans sa case.
+///
+/// Le classeur mesure ses colonnes en caracteres de sa propre police ; celle du
+/// PDF est plus large. Une colonne juste dans Excel devient donc trop etroite
+/// ici, et le generateur coupe alors le mot n'importe ou : l'en-tete « N° Etat
+/// prudentiel » se lisait « prudentie / l ». Reduire la cellule de ce qu'il
+/// faut vaut mieux qu'un mot brise -- c'est d'ailleurs ce que fait Excel quand
+/// il ajuste une impression a la page.
+///
+/// La reduction ne descend jamais sous la taille minimale du document, et ne
+/// s'applique qu'a la cellule concernee : une colonne etroite ne rapetisse pas
+/// tout l'etat.
+double _tailleTenantLeMotLePlusLong(
+  CelluleFodep cellule,
+  _Mise mise,
+  double largeur,
+) {
+  final taille = mise.taille(cellule);
+  if (largeur <= 0 || cellule.texte.isEmpty) return taille;
+
+  var plusLong = 0;
+  for (final mot in cellule.texte.split(RegExp(r'\s+'))) {
+    if (mot.length > plusLong) plusLong = mot.length;
+  }
+  if (plusLong == 0) return taille;
+
+  // La cellule garde deux points de marge de chaque cote.
+  final disponible = largeur - 4;
+  if (disponible <= 0) return taille;
+
+  final tenable = disponible / (plusLong * _largeurMoyenneDuCaractere);
+  return tenable >= taille ? taille : tenable.clamp(_tailleMinimale, taille);
+}
 
 pw.TextAlign _cadrage(CelluleFodep cellule) {
   if (cellule.droite) return pw.TextAlign.right;
@@ -230,6 +288,68 @@ pw.BoxDecoration _decor(CelluleFodep cellule) {
   );
 }
 
+/// Hauteur retenue pour une image dont le classeur ne règle pas ses lignes.
+const double _hauteurImageParDefaut = 60;
+
+/// Ce que la cellule montre : son texte, ou l'image qui y est ancrée.
+///
+/// Le logo de la BCEAO tient la moitié de la page de garde. Il est ancré sur
+/// une plage de cellules ; c'est la hauteur de cette plage qui le dimensionne,
+/// comme dans le classeur, et non sa définition en pixels — sans quoi une image
+/// de mille cent pixels de large sortirait de la feuille.
+pw.Widget _contenuDeCellule(
+  CelluleFodep cellule,
+  _Mise mise,
+  double hauteur, {
+  double largeur = 0,
+}) {
+  final image = cellule.image;
+  if (image == null) {
+    return pw.Text(
+      cellule.texte,
+      textAlign: _cadrage(cellule),
+      style: _style(cellule, mise, largeur),
+    );
+  }
+  return pw.SizedBox(
+    height: hauteur > 0 ? hauteur : _hauteurImageParDefaut,
+    child: pw.Image(pw.MemoryImage(image), fit: pw.BoxFit.contain),
+  );
+}
+
+/// Place du titre dans la largeur de l'état, en points.
+///
+/// Un titre déborde vers la droite, mais il commence où le classeur l'a écrit :
+/// celui de la page de garde est en troisième colonne, après un tiers de la
+/// feuille, et le coller à la marge le déplaçait de trois centimètres.
+///
+/// Le décalage est abandonné s'il ne laisse pas de quoi écrire — dix fois la
+/// taille du texte, soit une dizaine de caractères par ligne. C'est la
+/// situation qui faisait paginer sans fin : un intitulé plus long que la place
+/// qui lui reste se replie lettre par lettre, et le générateur produit des
+/// pages jusqu'à lever.
+double _decalage(LigneFodep ligne, _Mise mise) {
+  var colonne = 0;
+  var decalage = 0.0;
+  for (final cellule in ligne.cellules) {
+    if (cellule.texte.isNotEmpty) break;
+    for (var i = colonne;
+        i < colonne + (cellule.colonnes < 1 ? 1 : cellule.colonnes) &&
+            i < mise.colonnes.length;
+        i++) {
+      decalage += mise.colonnes[i];
+    }
+    colonne += cellule.colonnes < 1 ? 1 : cellule.colonnes;
+  }
+
+  final totale = mise.colonnes.fold<double>(0, (somme, l) => somme + l);
+  final requise = 10 * mise.taille(ligne.cellules.firstWhere(
+        (cellule) => cellule.texte.isNotEmpty,
+        orElse: () => const CelluleFodep(),
+      ));
+  return totale - decalage >= requise ? decalage : 0;
+}
+
 pw.Widget _ligne(LigneFodep ligne, _Mise mise) {
   // Une ligne sans aucun filet, portant un seul texte : c'est un titre d'état
   // ou un intitulé de section, pas une ligne de tableau. Le formulaire ne les
@@ -240,7 +360,7 @@ pw.Widget _ligne(LigneFodep ligne, _Mise mise) {
   // paginer.
   final porteuses = ligne.cellules.where((c) => c.texte.isNotEmpty);
   final titre = porteuses.length == 1 &&
-      ligne.cellules.every((c) => c.bordures.isEmpty);
+      ligne.cellules.every((c) => c.bordures.isEmpty && c.image == null);
 
   final hauteur = (ligne.hauteur ?? 0) * mise.facteur;
 
@@ -249,12 +369,14 @@ pw.Widget _ligne(LigneFodep ligne, _Mise mise) {
     return pw.Container(
       width: double.infinity,
       constraints: pw.BoxConstraints(minHeight: hauteur),
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      padding: pw.EdgeInsets.only(left: _decalage(ligne, mise), top: 2, bottom: 2),
       alignment: _alignement(cellule),
       child: pw.Text(
         cellule.texte,
         textAlign: _cadrage(cellule),
-        style: _style(cellule, mise),
+        // Un titre court sur toute la largeur de la page : aucune colonne ne
+        // le contraint, sa taille reste celle du classeur.
+        style: _style(cellule, mise, 0),
       ),
     );
   }
@@ -285,7 +407,8 @@ pw.Widget _ligne(LigneFodep ligne, _Mise mise) {
         final suivante = ligne.cellules[index + 1];
         if (suivante.texte.isNotEmpty ||
             suivante.fond != null ||
-            suivante.bordures.isNotEmpty) {
+            suivante.bordures.isNotEmpty ||
+            suivante.image != null) {
           break;
         }
         portee += suivante.colonnes < 1 ? 1 : suivante.colonnes;
@@ -313,11 +436,7 @@ pw.Widget _ligne(LigneFodep ligne, _Mise mise) {
         padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 1.5),
         decoration: _decor(cellule),
         alignment: _alignement(cellule),
-        child: pw.Text(
-          cellule.texte,
-          textAlign: _cadrage(cellule),
-          style: _style(cellule, mise),
-        ),
+        child: _contenuDeCellule(cellule, mise, hauteur, largeur: largeur),
       ),
     );
   }

@@ -1,4 +1,5 @@
 // Ce fichier decrit les donnees du module rapports.
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../../core/utils/currency_conversion.dart';
@@ -202,10 +203,12 @@ class CelluleFodep {
     this.gras = false,
     this.droite = false,
     this.centre = false,
+    this.couleur,
     this.colonnes = 1,
     this.fond,
     this.bordures = '',
     this.taille,
+    this.image,
   });
 
   final String texte;
@@ -218,6 +221,12 @@ class CelluleFodep {
 
   /// Les en-têtes de colonne y sont centrés.
   final bool centre;
+
+  /// Couleur du texte en RVB (« 3FA45B »). Absente, le texte est noir. Le
+  /// formulaire ne colore aucun texte : la seule couleur vient des icônes que
+  /// sa mise en forme conditionnelle dessine — vertes ou rouges, sur la
+  /// feuille qui coche les états à renseigner.
+  final String? couleur;
 
   /// Colonnes couvertes, reprises des fusions du formulaire.
   final int colonnes;
@@ -236,16 +245,36 @@ class CelluleFodep {
   /// titres.
   final double? taille;
 
+  /// Image ancrée sur la cellule. Le formulaire n'en porte qu'une, le logo de
+  /// la BCEAO sur sa page de garde, et c'est à elle qu'on reconnaît la
+  /// couverture de la déclaration.
+  final Uint8List? image;
+
   factory CelluleFodep.fromJson(Map<String, dynamic> json) => CelluleFodep(
         texte: json['texte'] as String? ?? '',
         gras: json['gras'] == true,
         droite: json['droite'] == true,
         centre: json['centre'] == true,
+        couleur: json['couleur'] as String?,
         colonnes: (json['colonnes'] as num?)?.toInt() ?? 1,
         fond: json['fond'] as String?,
         bordures: json['bordures'] as String? ?? '',
         taille: (json['taille'] as num?)?.toDouble(),
+        image: _imageDepuisBase64(json['image']),
       );
+}
+
+/// Une image du classeur voyage encodée en base64.
+///
+/// Un encodage abîmé ne doit pas emporter la déclaration : la page se rendra
+/// sans son logo plutôt que pas du tout.
+Uint8List? _imageDepuisBase64(Object? valeur) {
+  if (valeur is! String || valeur.isEmpty) return null;
+  try {
+    return base64Decode(valeur);
+  } on FormatException {
+    return null;
+  }
 }
 
 /// Une ligne du formulaire.

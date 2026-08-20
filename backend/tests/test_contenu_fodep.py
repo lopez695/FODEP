@@ -106,7 +106,9 @@ def test_les_normes_de_l_ep01_portent_leur_niveau_observe(contenu):
 
 
 def _porte_quelque_chose(cellule) -> bool:
-    return bool(cellule.texte or cellule.bordures or cellule.fond)
+    return bool(
+        cellule.texte or cellule.bordures or cellule.fond or cellule.image
+    )
 
 
 def test_aucune_ligne_ni_colonne_de_queue_sans_objet(contenu):
@@ -134,6 +136,123 @@ def test_aucune_ligne_ni_colonne_de_queue_sans_objet(contenu):
                 max(cellule.colonnes, 1) for cellule in ligne.cellules
             )
             assert couvertes <= COLONNES_MAX, f"{etat.nom} : ligne trop large."
+
+
+def test_la_page_de_garde_du_formulaire_est_rendue_entiere(contenu):
+    """Le FODEP s'ouvre sur la couverture de la BCEAO, et elle doit y etre.
+
+    Cette page ne porte qu'un seul texte, son titre, en troisieme colonne : tout
+    le reste est de la couleur et une image. L'extraction s'arretait donc a la
+    troisieme colonne et n'en tirait qu'un rectangle bleu, sans les bandes de
+    couleur qui la traversent, sans le cartouche brun qui la ferme, et sans le
+    logo — c'est-a-dire sans rien de ce a quoi on reconnait le formulaire.
+    """
+
+    garde = next(etat for etat in contenu.etats if etat.nom == "Page_de_garde")
+    assert garde.nom == contenu.etats[0].nom, "La garde ouvre la declaration."
+    assert not garde.paysage
+
+    # Douze colonnes : le bandeau bleu, les bandes de couleur, le cartouche.
+    assert len(garde.largeurs) == 12
+
+    couleurs = {
+        cellule.fond
+        for ligne in garde.lignes
+        for cellule in ligne.cellules
+        if cellule.fond
+    }
+    assert {"83CAFF", "FFD320", "663300"} <= couleurs
+
+    # Les bandes sont fusionnees sur toute la hauteur du bandeau : leur couleur
+    # ne vit que sur la cellule de tete, et elles ne se coloraient donc que sur
+    # leur premiere ligne.
+    bandes = [
+        ligne
+        for ligne in garde.lignes
+        if any(cellule.fond == "FFD320" for cellule in ligne.cellules)
+    ]
+    assert len(bandes) > 15, "Les bandes de couleur doivent courir sur la page."
+
+    # Le logo de la BCEAO, ancre sur une plage de cellules.
+    logos = [
+        cellule
+        for ligne in garde.lignes
+        for cellule in ligne.cellules
+        if cellule.image
+    ]
+    assert len(logos) == 1, "Le logo de la BCEAO doit accompagner la garde."
+    assert logos[0].colonnes > 1, "Il est ancre sur toute la largeur du titre."
+
+    titre = next(
+        cellule
+        for ligne in garde.lignes
+        for cellule in ligne.cellules
+        if cellule.texte.startswith("FORMULAIRE DE DECLARATION")
+    )
+    assert titre.taille and titre.taille >= 20
+
+
+def test_le_perimetre_se_coche_en_symboles_et_non_en_nombres(contenu):
+    """La feuille qui coche les etats a renseigner n'affiche aucun nombre.
+
+    Elle en porte pourtant : 68 pour un etat exige, 32 sinon. Le classeur ne
+    les montre pas — une mise en forme conditionnelle « jeu d'icones » y
+    substitue une coche ou une croix et masque la valeur. Le PDF alignait donc
+    trois colonnes de 68 et de 32 la ou le declarant lit des coches.
+    """
+
+    liste = next(
+        etat for etat in contenu.etats if etat.nom.startswith("Liste_EP")
+    )
+    textes = {
+        cellule.texte
+        for ligne in liste.lignes
+        for cellule in ligne.cellules
+    }
+    assert "68" not in textes and "32" not in textes
+
+    # L'EP03 — les fonds propres sur base individuelle — n'est exige que sur
+    # cette base ; l'EP05, son pendant consolide, sur les deux autres.
+    ep03 = _ligne_du_code(liste, "EP03")
+    ep05 = _ligne_du_code(liste, "EP05")
+    assert ep03 is not None and ep05 is not None
+    assert _textes(ep03)[2:5] == ["✓", "×", "×"]
+    assert _textes(ep05)[2:5] == ["×", "✓", "✓"]
+
+    # Une coche n'est plus un nombre : elle se centre, comme dans le classeur.
+    coche = ep03.cellules[2]
+    assert coche.centre and not coche.droite
+
+    # Et elle porte la couleur qu'Excel donne a l'icone : sans elle, la feuille
+    # sort en colonnes de coches et de croix noires, ou plus rien ne distingue
+    # au premier coup d'oeil ce qui est exige de ce qui ne l'est pas.
+    croix = ep03.cellules[3]
+    assert coche.couleur and croix.couleur
+    assert coche.couleur != croix.couleur
+    # Excel trace ses icones pleines : un caractere de texte a la meme place
+    # doit peser autant, sinon la coche parait effacee a cote du classeur.
+    assert coche.gras and croix.gras
+
+
+def test_les_largeurs_valent_pour_toute_la_plage_de_colonnes(contenu):
+    """Le classeur regle ses colonnes par plages, pas une par une.
+
+    Une seule entree « C:E » vaut pour les trois colonnes. Les lire par lettre
+    ne servait que la premiere : « Individuelle » gardait ses 22 unites tandis
+    que « Sous-consolidee » et « Consolidee » tombaient a la largeur par
+    defaut, trop etroites pour leur propre intitule — coupe en plein mot. Le
+    classeur compte cent soixante-dix plages de ce genre : c'est toute la mise
+    en page du document qui en depend.
+    """
+
+    liste = next(
+        etat for etat in contenu.etats if etat.nom.startswith("Liste_EP")
+    )
+    individuelle, sous_consolidee, consolidee = liste.largeurs[2:5]
+    assert individuelle == sous_consolidee == consolidee
+
+    # La colonne des intitules reste la plus large, comme dans le classeur.
+    assert liste.largeurs[1] > individuelle
 
 
 def test_les_reserves_de_lecture_accompagnent_le_contenu(contenu):
