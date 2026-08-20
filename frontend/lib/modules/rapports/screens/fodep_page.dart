@@ -141,7 +141,7 @@ class _FodepPageState extends State<FodepPage> {
       );
       if (!mounted || emplacement == null) return;
 
-      final enregistre = await saveBytesAtLocation(
+      await saveBytesAtLocation(
         emplacement,
         octets,
         requiredExtension: extension,
@@ -149,26 +149,18 @@ class _FodepPageState extends State<FodepPage> {
       );
       if (!mounted) return;
 
-      // La boîte n'interrompt que s'il reste un geste à faire. Sinon les
-      // remarques restent consultables d'un clic : ce sont des constats et des
-      // conventions de report, qui doivent pouvoir être lus — celui qui signe
-      // les endosse — sans arrêter quelqu'un qui n'a rien à corriger.
-      final aFaire =
-          reserves.any((reserve) => reserve.nature == NatureReserve.aVerifier);
-
+      // L'export se termine sur sa confirmation, et rien d'autre. Les
+      // remarques n'arrêtent plus personne : elles restent atteignables d'un
+      // clic, pour qui veut les lire avant de signer.
       _annoncer(
-        'Enregistré : ${enregistre.path.split(RegExp(r'[\\/]')).last}',
-        action: reserves.isEmpty || aFaire
+        'Bien enregistré',
+        action: reserves.isEmpty
             ? null
             : (
                 libelle: 'Voir les remarques',
                 surAppui: () => _afficherLesReserves(reserves),
               ),
       );
-
-      // Personne ne relit une page de garde avant d'avoir enregistré le
-      // fichier : la boîte vient après, et seulement si elle a de quoi.
-      if (aFaire) await _afficherLesReserves(reserves);
     } on FichierVerrouilleException catch (erreur) {
       _signaler(erreur.message);
     } on ApiException catch (erreur) {
