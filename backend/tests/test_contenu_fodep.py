@@ -334,6 +334,39 @@ def test_les_pourcentages_s_arrondissent_comme_excel():
     assert _texte(1234567, "General") == f"1{ESPACE_FINE}234{ESPACE_FINE}567"
 
 
+def test_l_extraction_ne_fabrique_pas_de_cellules_pour_rien():
+    """L'apercu doit tenir dans la memoire de l'hebergeur.
+
+    openpyxl CREE une cellule a chaque coordonnee reclamee, meme vide, et la
+    garde. Un balayage sans borne de colonne allait donc jusqu'a la largeur
+    declaree de la feuille et fabriquait des centaines de mega-octets d'objets
+    sans contenu : l'apercu depassait les 512 Mo de l'offre d'hebergement, le
+    conteneur etait tue, et l'utilisateur recevait « Mauvaise passerelle » --
+    alors que l'export du classeur, lui, passait sans peine.
+
+    Le seuil n'est pas une mesure de performance : c'est la limite au-dela de
+    laquelle le service tombe.
+    """
+
+    import tracemalloc
+
+    from app.rapports.fodep.contenu import contenu_fodep
+
+    tracemalloc.start()
+    try:
+        resultat = contenu_fodep()
+        _, pic = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert resultat.etats, "l'extraction doit rendre les etats du formulaire"
+    pic_en_mo = pic / 1e6
+    assert pic_en_mo < 300, (
+        f"l'apercu a demande {pic_en_mo:,.0f} Mo : l'hebergement en offre "
+        "gratuite en plafonne 512, et le service tombe au-dela"
+    )
+
+
 def test_les_reserves_de_lecture_accompagnent_le_contenu(contenu):
     """Elles doivent figurer sur le PDF : une declaration relue sans ses
     reserves se signe sans les connaitre."""

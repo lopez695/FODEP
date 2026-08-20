@@ -279,7 +279,7 @@ _COMPARAISON = re.compile(
 )
 
 
-def _formules(feuille) -> dict[tuple[int, int], str]:
+def _formules(feuille, derniere: int) -> dict[tuple[int, int], str]:
     """Resultat des formules que ce module sait calculer.
 
     Le classeur est ecrit sans etre evalue : ses formules n'ont pas de valeur
@@ -294,7 +294,12 @@ def _formules(feuille) -> dict[tuple[int, int], str]:
     """
 
     resultats: dict[tuple[int, int], str] = {}
-    for ligne in feuille.iter_rows():
+    # Le balayage s'arrete a la derniere colonne utile. Sans cette borne, il
+    # allait jusqu'a la largeur declaree de la feuille -- et openpyxl CREE une
+    # cellule a chaque coordonnee reclamee, meme vide : des centaines de
+    # mega-octets d'objets sans contenu, qui faisaient depasser la memoire de
+    # l'hebergeur au moment de l'apercu.
+    for ligne in feuille.iter_rows(max_col=derniere):
         for cellule in ligne:
             if not isinstance(cellule.value, str):
                 continue
@@ -387,8 +392,19 @@ def _derniere_colonne(feuille) -> int:
     colonnes, sans ses bandes de couleur ni son cartouche.
     """
 
+    # La largeur du balayage est celle que la feuille declare, plafonnee par le
+    # garde-fou. Demander COLONNES_MAX partout coutait cher pour rien :
+    # openpyxl CREE une cellule a chaque coordonnee reclamee, meme vide, et la
+    # garde. Sur une feuille large de cinq colonnes, cinquante-cinq etaient
+    # fabriquees par ligne, sur quarante-quatre feuilles -- des centaines de
+    # mega-octets d'objets vides, qui faisaient depasser la memoire de
+    # l'hebergeur au moment de l'apercu.
+    largeur = min(feuille.max_column or 0, COLONNES_MAX)
+    if largeur <= 0:
+        return 0
+
     derniere = 0
-    for ligne in feuille.iter_rows(max_col=COLONNES_MAX):
+    for ligne in feuille.iter_rows(max_col=largeur):
         for cellule in ligne:
             if _texte(cellule.value) or _bordures(cellule) or _fond(cellule):
                 derniere = max(derniere, cellule.column)
@@ -649,7 +665,7 @@ def _lignes_du_formulaire(feuille, derniere: int) -> list[LigneFodep]:
     titres = _lignes_de_titre(feuille)
     images = _images_ancrees(feuille, derniere)
     icones = _icones(feuille)
-    formules = _formules(feuille)
+    formules = _formules(feuille, derniere)
     couleurs = _couleurs_conditionnelles(feuille)
     lignes: list[LigneFodep] = []
 
