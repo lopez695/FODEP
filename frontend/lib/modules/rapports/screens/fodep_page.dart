@@ -284,11 +284,11 @@ class _FodepPageState extends State<FodepPage> {
     await showDialog<void>(
       context: context,
       builder: (contexte) => AlertDialog(
-        title: Text(
-          aVerifier.isEmpty
-              ? 'Déclaration enregistrée'
-              : 'À faire avant de transmettre',
-        ),
+        // Le titre confirme d'abord : la boîte s'ouvre sur un export qui vient
+        // de réussir, et accueillir par « À faire avant de transmettre »
+        // laissait croire à un échec. Ce qui reste à faire est porté par
+        // l'intertitre rouge, qui s'ouvre déjà et compte ses points.
+        title: const Text('Bien enregistré'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -298,11 +298,11 @@ class _FodepPageState extends State<FodepPage> {
               children: [
                 Text(
                   aVerifier.isEmpty
-                      ? "Le FODEP est enregistré et rien n'appelle de correction. Les "
-                          "remarques ci-dessous disent comment l'application a rempli le "
+                      ? "Rien n'appelle de correction. Les remarques ci-dessous "
+                          "disent comment l'application a rempli le "
                           'formulaire : celui qui signe les endosse.'
-                      : 'Le FODEP est enregistré. Ce qui suit demande un geste avant de '
-                          "le déposer ; le reste dit comment l'application a rempli le "
+                      : 'Ce qui suit demande un geste avant de déposer la '
+                          "déclaration ; le reste dit comment l'application a rempli le "
                           'formulaire.',
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                 ),
