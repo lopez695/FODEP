@@ -79,6 +79,7 @@ from app.rapports.fodep.disposition import (
 from app.risque_operationnel.services import (
     calcul_aib,
     get_aib_parametres,
+    get_as_parametres,
     get_pertes_seuils,
 )
 from database.connection import database_manager
@@ -626,7 +627,8 @@ def _lire_pertes_operationnelles() -> list[dict[str, Any]]:
     with database_manager.read_connection() as connexion:
         lignes = connexion.execute(
             """
-            SELECT cause_racine, perte_brute, date_occurrence, date_comptabilisation
+            SELECT cause_racine, ligne_metier, perte_brute,
+                   date_occurrence, date_comptabilisation
             FROM ro_incidents
             """
         ).fetchall()
@@ -743,6 +745,298 @@ def _remplir_ep22(classeur, date_arrete: date) -> list[Reserve]:
     return anomalies
 
 
+# ─── EP24 : pertes opérationnelles par ligne de métier ────────────────────
+
+# Le formulaire croise les huit lignes de métier et les sept catégories
+# d'événement : quatre mesures par ligne — nombre, montant total, perte
+# maximale, total des cinq plus grandes — et une colonne par catégorie.
+CODE_PREMIERE_LIGNE_EP24 = 38  # RO038, « Financement d'entreprise »
+CODES_TOTAL_EP24 = ("RO070", "RO071", "RO072", "RO073")
+
+# Colonnes des sept catégories d'événement, dans l'ordre de l'EP22, puis le
+# total et les deux seuils de collecte.
+COLONNE_PREMIERE_CATEGORIE_EP24 = 4
+COLONNE_TOTAL_EP24 = 11
+COLONNE_SEUIL_HAUT_EP24 = 12
+COLONNE_SEUIL_BAS_EP24 = 13
+
+
+def _mesures_de_pertes(montants: list[float]) -> tuple[int, float, float, float]:
+    """Les quatre mesures que le formulaire demande d'un paquet de pertes."""
+
+    tries = sorted(montants, reverse=True)
+    return (
+        len(tries),
+        sum(tries),
+        tries[0] if tries else 0.0,
+        sum(tries[:5]),
+    )
+
+
+def _remplir_ep24(classeur, date_arrete: date) -> list[Reserve]:
+    """Renseigne les pertes de l'exercice, ligne de métier par ligne de métier.
+
+    Même collecte que l'EP22, croisée avec la ligne de métier que chaque
+    incident porte déjà. La classification par catégorie d'événement reste
+    celle de l'EP22 — la même convention, signalée de la même façon.
+    """
+
+    feuille = classeur["EP24"]
+    lignes = indexer_codes_dispru(feuille)
+    anomalies: list[Reserve] = []
+
+    debut, fin = _exercice_declare(date_arrete)
+    seuil = get_pertes_seuils().seuil_reporting_interne
+
+    # (ligne de métier, catégorie) -> montants
+    pertes: dict[tuple[int, str], list[float]] = {}
+    hors_ligne_metier = 0
+    index_par_metier = {
+        metier.casefold(): index
+        for index, (_, metier) in enumerate(LIGNES_METIER_EP23)
+    }
+
+    for perte in _lire_pertes_operationnelles():
+        montant = flottant(perte.get("perte_brute"))
+        if montant <= 0:
+            continue
+        jour = _date_de_comptabilisation(perte)
+        if jour is None or not debut <= jour <= fin:
+            continue
+        metier = str(perte.get("ligne_metier") or "").strip().casefold()
+        index = index_par_metier.get(metier)
+        if index is None:
+            hors_ligne_metier += 1
+            continue
+        cause = str(perte.get("cause_racine") or "").strip().casefold()
+        code_categorie = CATEGORIE_EP22_PAR_CAUSE.get(cause, CATEGORIE_EP22_RESIDUELLE)
+        pertes.setdefault((index, code_categorie), []).append(montant)
+
+    def _ecrire_bloc(premier_code: str, colonne: int, montants: list[float]) -> None:
+        rang = lignes.get(premier_code, 0)
+        nombre, total, maximale, cinq = _mesures_de_pertes(montants)
+        _ecrire(feuille, rang, colonne, nombre)
+        _ecrire_montant(feuille, rang + 1, colonne, total)
+        _ecrire_montant(feuille, rang + 2, colonne, maximale)
+        _ecrire_montant(feuille, rang + 3, colonne, cinq)
+
+    toutes: list[float] = []
+    for index, (_, _metier) in enumerate(LIGNES_METIER_EP23):
+        premier_code = f"RO{CODE_PREMIERE_LIGNE_EP24 + index * 4:03d}"
+        de_la_ligne: list[float] = []
+        for rang_categorie, code_categorie in enumerate(CODES_EP22):
+            montants = pertes.get((index, code_categorie), [])
+            de_la_ligne.extend(montants)
+            _ecrire_bloc(
+                premier_code,
+                COLONNE_PREMIERE_CATEGORIE_EP24 + rang_categorie,
+                montants,
+            )
+        _ecrire_bloc(premier_code, COLONNE_TOTAL_EP24, de_la_ligne)
+        toutes.extend(de_la_ligne)
+        if de_la_ligne:
+            rang = lignes.get(premier_code, 0)
+            for decalage in range(4):
+                _ecrire_montant(
+                    feuille, rang + decalage, COLONNE_SEUIL_HAUT_EP24, seuil
+                )
+                _ecrire_montant(
+                    feuille, rang + decalage, COLONNE_SEUIL_BAS_EP24, seuil
+                )
+
+    # Ligne de total : par catégorie, puis toutes catégories confondues.
+    rang_total = lignes.get(CODES_TOTAL_EP24[0], 0)
+    for rang_categorie, code_categorie in enumerate(CODES_EP22):
+        montants = [
+            montant
+            for (_, categorie), liste in pertes.items()
+            if categorie == code_categorie
+            for montant in liste
+        ]
+        _ecrire_bloc(
+            CODES_TOTAL_EP24[0],
+            COLONNE_PREMIERE_CATEGORIE_EP24 + rang_categorie,
+            montants,
+        )
+    _ecrire_bloc(CODES_TOTAL_EP24[0], COLONNE_TOTAL_EP24, toutes)
+    if toutes:
+        for decalage in range(4):
+            _ecrire_montant(
+                feuille, rang_total + decalage, COLONNE_SEUIL_HAUT_EP24, seuil
+            )
+            _ecrire_montant(
+                feuille, rang_total + decalage, COLONNE_SEUIL_BAS_EP24, seuil
+            )
+
+    if hors_ligne_metier:
+        anomalies.append(a_verifier(
+            f"EP24 : {hors_ligne_metier} perte(s) ne se rattachent à aucune des "
+            "huit lignes de métier du formulaire et n'ont pas été déclarées. "
+            "Renseignez leur ligne de métier au registre du risque opérationnel."
+        ))
+    if not toutes:
+        anomalies.append(a_verifier(
+            f"EP24 : aucune perte comptabilisée sur l'exercice du "
+            f"{debut.strftime('%d/%m/%Y')} au {fin.strftime('%d/%m/%Y')}. "
+            "L'état est déclaré à zéro."
+        ))
+
+    completer_a_zero(
+        feuille, lignes, range(COLONNE_C, COLONNE_SEUIL_BAS_EP24 + 1)
+    )
+    return anomalies
+
+
+# ─── EP23 : risque opérationnel, approche standard ────────────────────────
+
+# Les huit lignes de métier, dans l'ordre où le formulaire range ses codes.
+# Les libellés sont ceux du module Risque Opérationnel ; le rapprochement se
+# fait sans tenir compte de la casse, le formulaire écrivant « Banque
+# Commerciale » là où le module écrit « Banque commerciale ».
+LIGNES_METIER_EP23: tuple[tuple[str, str], ...] = (
+    ("RO027", "Financement d'entreprise"),
+    ("RO028", "Activités de marché"),
+    ("RO029", "Banque de détail"),
+    ("RO030", "Banque commerciale"),
+    ("RO031", "Paiements et règlements"),
+    ("RO032", "Fonctions d'agent"),
+    ("RO033", "Gestion d'actifs"),
+    ("RO034", "Courtage de détail"),
+)
+
+# Bloc B : trois exercices, chacun sur deux colonnes — le produit brut, puis
+# l'exigence qui en découle. L'exercice le plus récent occupe la dernière
+# paire, comme dans l'EP21.
+COLONNES_EXERCICES_EP23: tuple[tuple[int, int], ...] = (
+    (COLONNE_D, COLONNE_E),
+    (COLONNE_F, COLONNE_G),
+    (COLONNE_H, COLONNE_I),
+)
+
+# Colonne « Total » du bloc A, à droite des huit lignes de métier.
+COLONNE_TOTAL_EP23 = 11
+
+
+def _lire_produit_brut_par_ligne() -> dict[int, dict[str, float]]:
+    """Produit brut de chaque ligne de métier, exercice par exercice."""
+
+    with database_manager.read_connection() as connexion:
+        lignes = connexion.execute(
+            "SELECT annee, ligne_metier, produit_brut_ligne FROM op_pnb_par_ligne"
+        ).fetchall()
+    par_exercice: dict[int, dict[str, float]] = {}
+    for ligne in lignes:
+        exercice = par_exercice.setdefault(int(ligne["annee"]), {})
+        exercice[str(ligne["ligne_metier"]).casefold()] = float(
+            ligne["produit_brut_ligne"] or 0.0
+        )
+    return par_exercice
+
+
+def _lire_betas_par_ligne() -> dict[str, float]:
+    with database_manager.read_connection() as connexion:
+        lignes = connexion.execute(
+            "SELECT ligne_metier, beta FROM op_beta_lignes"
+        ).fetchall()
+    return {str(l["ligne_metier"]).casefold(): float(l["beta"] or 0.0) for l in lignes}
+
+
+def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
+    """Renseigne l'approche standard et retourne l'APR opérationnel.
+
+    L'état est le jumeau de l'EP21 : là où l'approche indicateur de base
+    applique un coefficient unique au produit brut total, l'approche standard
+    le ventile en huit lignes de métier, chacune avec son bêta. Le module
+    Risque Opérationnel tient déjà les deux — les bêtas réglementaires et le
+    produit brut par ligne, exercice par exercice.
+
+    L'exigence est la moyenne des trois derniers exercices, chacun plancher à
+    zéro : c'est la règle de Bâle, et c'est ce que dit la ligne RO035 du
+    formulaire, « total ou zéro, le plus élevé étant retenu ».
+    """
+
+    feuille = classeur["EP23"]
+    lignes = indexer_codes_dispru(feuille)
+    anomalies: list[Reserve] = []
+
+    betas = _lire_betas_par_ligne()
+    par_exercice = _lire_produit_brut_par_ligne()
+    exercices = sorted(par_exercice)[-3:]
+
+    # Bloc A : l'application ne stocke que le produit brut de chaque ligne, sans
+    # son détail comptable. Seule la ligne de total peut donc être renseignée,
+    # et pour le dernier exercice — le formulaire n'en présente qu'un.
+    if exercices:
+        produits = par_exercice[exercices[-1]]
+        total_bloc_a = 0.0
+        for index, (_, ligne_metier) in enumerate(LIGNES_METIER_EP23):
+            montant = produits.get(ligne_metier.casefold(), 0.0)
+            total_bloc_a += montant
+            _ecrire_montant(
+                feuille, lignes.get("RO026", 0), COLONNE_C + index, montant
+            )
+        _ecrire_montant(
+            feuille, lignes.get("RO026", 0), COLONNE_TOTAL_EP23, total_bloc_a
+        )
+
+    # Bloc B : les exercices manquants sont cadrés à gauche, le plus récent
+    # restant dans la dernière paire de colonnes.
+    decalage = 3 - len(exercices)
+    exigences_par_exercice: list[float] = []
+    for rang_exercice, exercice in enumerate(exercices):
+        produits = par_exercice[exercice]
+        colonne_brut, colonne_exigence = COLONNES_EXERCICES_EP23[rang_exercice + decalage]
+        total_brut = total_exigence = 0.0
+        for code, ligne_metier in LIGNES_METIER_EP23:
+            cle = ligne_metier.casefold()
+            brut = produits.get(cle, 0.0)
+            exigence = brut * betas.get(cle, 0.0)
+            total_brut += brut
+            total_exigence += exigence
+            _ecrire_montant(feuille, lignes.get(code, 0), colonne_brut, brut)
+            _ecrire_montant(feuille, lignes.get(code, 0), colonne_exigence, exigence)
+        # « Total ou zéro, le plus élevé étant retenu » : un exercice à produit
+        # brut négatif ne réduit pas l'exigence des autres.
+        retenu = max(total_exigence, 0.0)
+        exigences_par_exercice.append(retenu)
+        _ecrire_montant(feuille, lignes.get("RO035", 0), colonne_brut, total_brut)
+        _ecrire_montant(feuille, lignes.get("RO035", 0), colonne_exigence, retenu)
+
+    exigence_moyenne = (
+        sum(exigences_par_exercice) / len(exigences_par_exercice)
+        if exigences_par_exercice
+        else 0.0
+    )
+    apr = exigence_moyenne * MULTIPLICATEUR_APR_FODEP
+    _ecrire_montant(feuille, lignes.get("RO036", 0), COLONNE_I, exigence_moyenne)
+    _ecrire_montant(feuille, lignes.get("RO037", 0), COLONNE_I, apr)
+
+    if not exercices:
+        anomalies.append(a_verifier(
+            "EP23 : aucun produit brut par ligne de métier n'est enregistré. "
+            "L'approche standard est déclarée à zéro alors qu'elle est la "
+            "méthode retenue — renseignez les lignes de métier sur l'écran "
+            "Risque opérationnel."
+        ))
+    elif len(exercices) < 3:
+        anomalies.append(a_verifier(
+            f"EP23 : l'exigence est la moyenne des trois derniers exercices ; "
+            f"{len(exercices)} seulement {'est enregistré' if len(exercices) == 1 else 'sont enregistrés'} "
+            f"({', '.join(str(exercice) for exercice in exercices)}). Le montant "
+            "déclaré porte donc sur ce qui est disponible."
+        ))
+
+    anomalies.append(convention(
+        "EP23 : le détail comptable du produit brut (produit d'exploitation "
+        "bancaire, charges, plus et moins-values) n'est pas suivi par "
+        "l'application. Seule la ligne de total du bloc A est renseignée, à "
+        "partir du produit brut saisi pour chaque ligne de métier."
+    ))
+
+    completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_TOTAL_EP23 + 1))
+    return apr, anomalies
+
+
 # ─── EP08 et EP02 : totaux et ratios ──────────────────────────────────────
 
 
@@ -784,6 +1078,7 @@ def _remplir_ep08(
     apr_marche: float,
     apr_operationnel: float,
     ventilation_marche: dict[str, float] | None = None,
+    approche_standard: bool = False,
 ) -> float:
     feuille = classeur["EP08"]
     lignes = indexer_codes_dispru(feuille)
@@ -827,8 +1122,12 @@ def _remplir_ep08(
             _ecrire_montant(feuille, lignes.get(code, 0), COLONNE_E, 0.0)
     _ecrire_montant(feuille, lignes.get("APR02", 0), COLONNE_E, apr_marche)
 
-    _ecrire_montant(feuille, lignes.get("RO010", 0), COLONNE_E, apr_operationnel)
-    _ecrire_montant(feuille, lignes.get("RO037", 0), COLONNE_E, 0.0)
+    # L'APR opérationnel se porte sur la ligne de l'approche retenue, et l'autre
+    # reste à zéro : un établissement applique une méthode, pas les deux.
+    ligne_methode = "RO037" if approche_standard else "RO010"
+    ligne_ecartee = "RO010" if approche_standard else "RO037"
+    _ecrire_montant(feuille, lignes.get(ligne_methode, 0), COLONNE_E, apr_operationnel)
+    _ecrire_montant(feuille, lignes.get(ligne_ecartee, 0), COLONNE_E, 0.0)
     _ecrire_montant(feuille, lignes.get("APR03", 0), COLONNE_E, apr_operationnel)
 
     total = apr_credit + apr_marche + apr_operationnel
@@ -2288,9 +2587,19 @@ def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
         _remplir_ep10(classeur, synthese)
         apr_par_categorie = _remplir_etats_categories(classeur, synthese)
         apr_autres_actifs = _remplir_ep20(classeur, synthese)
-        apr_operationnel, anomalies_ro = _remplir_ep21(classeur)
-        anomalies.extend(anomalies_ro)
-        anomalies.extend(_remplir_ep22(classeur, date_effective))
+        # Un établissement applique une méthode de risque opérationnel, pas
+        # les deux : l'approche standard demande l'accord de la Commission
+        # bancaire, et c'est cet accord — enregistré sur l'écran du FODEP —
+        # qui décide de l'état renseigné. L'autre reste à zéro.
+        approche_standard = get_as_parametres().as_autorisee
+        if approche_standard:
+            apr_operationnel, anomalies_ro = _remplir_ep23(classeur)
+            anomalies.extend(anomalies_ro)
+            anomalies.extend(_remplir_ep24(classeur, date_effective))
+        else:
+            apr_operationnel, anomalies_ro = _remplir_ep21(classeur)
+            anomalies.extend(anomalies_ro)
+            anomalies.extend(_remplir_ep22(classeur, date_effective))
 
         participations = lister_participations()
         synthese_participations = calculer_synthese(
@@ -2354,6 +2663,7 @@ def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
             apr_marche,
             apr_operationnel,
             ventilation_marche,
+            approche_standard=approche_standard,
         )
         _remplir_ep02(classeur, fonds_propres, apr_total)
         groupes = _agreger_par_contrepartie(expositions)

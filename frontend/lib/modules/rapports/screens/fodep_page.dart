@@ -398,6 +398,11 @@ class _FodepPageState extends State<FodepPage> {
                 ),
               ),
               const SizedBox(height: 14),
+              // Entre les deux étapes, parce que ce choix décide de ce que
+              // l'export déclare : il n'est pas une action de plus, c'est un
+              // réglage de la déclaration.
+              _ChoixMethodeOperationnelle(api: widget.api),
+              const SizedBox(height: 14),
               _Etape(
                 numero: 2,
                 titre: 'Exporter le FODEP',
@@ -481,6 +486,226 @@ class _FodepPageState extends State<FodepPage> {
 }
 
 /// Une étape de la déclaration : ce qu'elle fait, où elle en est, son action.
+/// La méthode de calcul du risque opérationnel retenue par l'établissement.
+///
+/// Le formulaire porte les deux approches — indicateur de base en EP21 et
+/// EP22, standard en EP23 et EP24 — mais un établissement en applique une
+/// seule : l'autre reste à zéro, et l'EP08 porte l'exigence sur la ligne
+/// correspondante. Le choix vivait jusqu'ici en base sans qu'aucun écran ne
+/// permette de le poser, et l'export ne le consultait pas : la déclaration
+/// partait toujours en indicateur de base.
+///
+/// Ce n'est pas une préférence : l'approche standard s'utilise sur accord de
+/// la Commission bancaire, et le dire ici engage le déclarant.
+class _ChoixMethodeOperationnelle extends StatefulWidget {
+  const _ChoixMethodeOperationnelle({required this.api});
+
+  final RwaApiService api;
+
+  @override
+  State<_ChoixMethodeOperationnelle> createState() =>
+      _ChoixMethodeOperationnelleState();
+}
+
+class _ChoixMethodeOperationnelleState
+    extends State<_ChoixMethodeOperationnelle> {
+  bool? _standard;
+  bool _enregistrement = false;
+  String? _erreur;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    try {
+      final parametres = await widget.api.fetchAsParametres();
+      if (!mounted) return;
+      setState(() => _standard = parametres.asAutorisee);
+    } catch (erreur) {
+      if (!mounted) return;
+      setState(() => _erreur = 'Méthode illisible : $erreur');
+    }
+  }
+
+  Future<void> _choisir(bool standard) async {
+    if (_enregistrement || standard == _standard) return;
+    final precedent = _standard;
+    setState(() {
+      _standard = standard;
+      _enregistrement = true;
+      _erreur = null;
+    });
+    try {
+      await widget.api.updateAsParametres({'as_autorisee': standard});
+    } catch (erreur) {
+      if (!mounted) return;
+      // Le choix n'a pas été retenu : l'écran doit le montrer plutôt que
+      // laisser croire à un réglage enregistré.
+      setState(() {
+        _standard = precedent;
+        _erreur = 'Le choix n\'a pas été enregistré : $erreur';
+      });
+    } finally {
+      if (mounted) setState(() => _enregistrement = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Méthode du risque opérationnel',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'L\'établissement en applique une seule. Elle décide de l\'état '
+            'renseigné et de la ligne de l\'EP08 qui porte l\'exigence ; '
+            'l\'autre est déclarée à zéro.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_standard == null && _erreur == null)
+            const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _OptionMethode(
+                  titre: 'Indicateur de base',
+                  etats: 'EP21 · EP22',
+                  choisie: _standard == false,
+                  onChoisir: () => _choisir(false),
+                ),
+                _OptionMethode(
+                  titre: 'Standard',
+                  etats: 'EP23 · EP24',
+                  precision: 'sur accord de la Commission bancaire',
+                  choisie: _standard == true,
+                  onChoisir: () => _choisir(true),
+                ),
+              ],
+            ),
+          if (_erreur != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _erreur!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: AppTheme.danger),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Une des deux méthodes, avec les états qu'elle renseigne.
+class _OptionMethode extends StatelessWidget {
+  const _OptionMethode({
+    required this.titre,
+    required this.etats,
+    required this.choisie,
+    required this.onChoisir,
+    this.precision,
+  });
+
+  final String titre;
+  final String etats;
+  final String? precision;
+  final bool choisie;
+  final VoidCallback onChoisir;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+
+    return InkWell(
+      onTap: onChoisir,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 244,
+        padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: choisie ? accent : theme.dividerColor,
+            width: choisie ? 2 : 1,
+          ),
+          color: choisie ? accent.withValues(alpha: 0.06) : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              choisie
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 18,
+              color: choisie ? accent : theme.colorScheme.outline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    titre,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: choisie ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    etats,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  if (precision != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        precision!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Etape extends StatelessWidget {
   const _Etape({
     required this.numero,
