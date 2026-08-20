@@ -1479,23 +1479,47 @@ def update_as_parametres(data: ParametresAsUpdate) -> ParametresAs:
     )
 
 
-def calcul_as() -> AsCalculResult:
-    """K_AS sur UN seul exercice.
+def apr_operationnel_retenu() -> float:
+    """Actifs ponderes du risque operationnel, selon la methode appliquee.
 
-    L'Approche Standard est saisie pour l'exercice courant : le calcul porte
-    sur l'exercice le plus récent ayant un PNB par ligne enregistré
-    (K_AS = somme des PNB de ligne x beta, plancher a 0).
+    L'etablissement applique une methode, pas les deux : l'approche standard
+    sur accord de la Commission bancaire, l'indicateur de base sinon. Le
+    tableau de bord et le calcul des RWA lisaient l'indicateur de base sans
+    condition ; ils affichaient donc une exigence que la declaration
+    transmise ne portait plus.
+    """
+
+    if get_as_parametres().as_autorisee:
+        return calcul_as().apr_as
+    return calcul_aib().apr_aib
+
+
+def calcul_as() -> AsCalculResult:
+    """K_AS sur les trois derniers exercices, comme l'AIB et comme l'EP23.
+
+    L'exigence de l'approche standard est la MOYENNE, sur trois exercices, de
+    la somme des produits bruts de chaque ligne de metier multiplies par leur
+    beta, chaque exercice etant plancher a zero. C'est la regle de Bale, et
+    c'est ce que dit la ligne RO035 de l'EP23 : « total ou zero, le plus eleve
+    etant retenu », puis « (h) = moyenne des totaux c, e et g ».
+
+    Le calcul ne portait que sur l'exercice le plus recent. Tant qu'un seul
+    exercice etait saisi, les deux revenaient au meme ; des le deuxieme, cet
+    ecran et la declaration transmise a la BCEAO se seraient contredits sur la
+    meme exigence.
     """
     params = get_as_parametres()
 
     detail_par_annee: list[AsAnneeDetail] = []
     with database_manager.read_connection() as conn:
         betas = {r["ligne_metier"]: float(r["beta"]) for r in conn.execute("SELECT * FROM op_beta_lignes").fetchall()}
-        annee_row = conn.execute(
-            "SELECT MAX(annee) AS annee FROM op_pnb_par_ligne"
-        ).fetchone()
-        annee = annee_row["annee"]
-        if annee is not None:
+        annees = [
+            int(r["annee"])
+            for r in conn.execute(
+                "SELECT DISTINCT annee FROM op_pnb_par_ligne ORDER BY annee DESC LIMIT 3"
+            ).fetchall()
+        ]
+        for annee in sorted(annees):
             rows = conn.execute(
                 "SELECT * FROM op_pnb_par_ligne WHERE annee = ?", (annee,)
             ).fetchall()
@@ -1506,11 +1530,12 @@ def calcul_as() -> AsCalculResult:
                 lignes.append(AsLigneDetail(ligne_metier=r["ligne_metier"], pnb=pbl, beta=beta, k_ligne=pbl * beta))
             k_total = sum(l.k_ligne for l in lignes)
             detail_par_annee.append(AsAnneeDetail(
-                annee=int(annee), lignes=lignes, k_total=k_total,
-                k_retenu=max(k_total, 0.0), renseignee=True,
+                annee=annee, lignes=lignes, k_total=k_total,
+                k_retenu=max(k_total, 0.0), renseignee=bool(lignes),
             ))
 
-    k_as = detail_par_annee[0].k_retenu if detail_par_annee else 0.0
+    retenus = [detail.k_retenu for detail in detail_par_annee if detail.renseignee]
+    k_as = sum(retenus) / len(retenus) if retenus else 0.0
     # Meme regle que l'AIB : l'EP23 du FODEP pose APR = K_AS x 12,5. Les deux
     # approches doivent rester comparables dans la synthese, ce qu'un
     # multiplicateur different rendrait trompeur.

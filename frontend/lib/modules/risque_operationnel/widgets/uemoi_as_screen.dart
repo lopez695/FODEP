@@ -519,9 +519,53 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                 ),
               ),
               const SizedBox(width: 12),
+              // Combien des trois exercices sont saisis, comme sur l'onglet de
+              // l'indicateur de base. L'exigence est leur moyenne : sans ce
+              // compteur, rien ne disait ici qu'il en manquait, et l'EP23
+              // partait sur ce qui était disponible.
+              Builder(builder: (context) {
+                final saisis = _result?.detailParAnnee.length ?? 0;
+                final complet = saisis >= 3;
+                final couleur = complet ? AppTheme.success : _kPrimary;
+                return Tooltip(
+                  message: complet
+                      ? 'Les trois exercices attendus sont saisis'
+                      : 'L\'exigence est la moyenne des trois derniers '
+                          'exercices : ${3 - saisis} reste(nt) à saisir',
+                  child: Container(
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: couleur.withValues(alpha: isDark ? 0.20 : 0.10),
+                      border: Border.all(color: couleur.withValues(alpha: 0.55)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          complet
+                              ? Icons.check_circle_rounded
+                              : Icons.event_outlined,
+                          size: 12,
+                          color: couleur,
+                        ),
+                        const SizedBox(width: 5),
+                        Text('$saisis/3 exercices',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: couleur)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
               Tooltip(
-                message: 'L\'Approche Standard porte sur un seul exercice à la '
-                    'fois - cliquez pour changer d\'exercice',
+                message: 'L\'exigence porte sur les trois derniers exercices - '
+                    'cliquez pour changer celui que vous saisissez',
                 child: InkWell(
                   onTap: _changerExercice,
                   borderRadius: BorderRadius.circular(6),

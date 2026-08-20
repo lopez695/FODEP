@@ -11,7 +11,7 @@ from app.core.calculations import convert_currency_amount
 from app.market.services import resolve_market_capital
 from app.core.config import RWA_EXPECTED_WEIGHT_RANGES, settings
 from app.expositions.services import list_expositions
-from app.risque_operationnel.services import calcul_aib as _calcul_aib_uemoa
+from app.risque_operationnel.services import apr_operationnel_retenu
 from app.rwa_credit.models import (
     RwaCreditAgentRow,
     RwaCreditAnalysis,
@@ -139,7 +139,11 @@ def _load_capital_position(rwa_credit: float) -> dict[str, float | bool | None]:
     fp_calc = calculate_fonds_propres(fp_data)
     # RWA Opérationnel = APR de l'Approche Indicateur de Base (AIB, art. 301
     # BCEAO) — même source que le tableau de bord (voir dashboard/services.py).
-    rwa_operationnel = _calcul_aib_uemoa().apr_aib
+    # La methode appliquee decide : approche standard sur accord de la
+    # Commission bancaire, indicateur de base sinon. Lire l'indicateur de
+    # base sans condition affichait une exigence que la declaration
+    # transmise ne portait plus.
+    rwa_operationnel = apr_operationnel_retenu()
     rm_calc = resolve_market_capital(rm_data)
 
     own_funds = float(fp_calc["total_capital"])

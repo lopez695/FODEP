@@ -78,6 +78,7 @@ from app.rapports.fodep.disposition import (
 )
 from app.risque_operationnel.services import (
     calcul_aib,
+    calcul_as,
     get_aib_parametres,
     get_as_parametres,
     get_pertes_seuils,
@@ -917,30 +918,6 @@ COLONNES_EXERCICES_EP23: tuple[tuple[int, int], ...] = (
 COLONNE_TOTAL_EP23 = 11
 
 
-def _lire_produit_brut_par_ligne() -> dict[int, dict[str, float]]:
-    """Produit brut de chaque ligne de métier, exercice par exercice."""
-
-    with database_manager.read_connection() as connexion:
-        lignes = connexion.execute(
-            "SELECT annee, ligne_metier, produit_brut_ligne FROM op_pnb_par_ligne"
-        ).fetchall()
-    par_exercice: dict[int, dict[str, float]] = {}
-    for ligne in lignes:
-        exercice = par_exercice.setdefault(int(ligne["annee"]), {})
-        exercice[str(ligne["ligne_metier"]).casefold()] = float(
-            ligne["produit_brut_ligne"] or 0.0
-        )
-    return par_exercice
-
-
-def _lire_betas_par_ligne() -> dict[str, float]:
-    with database_manager.read_connection() as connexion:
-        lignes = connexion.execute(
-            "SELECT ligne_metier, beta FROM op_beta_lignes"
-        ).fetchall()
-    return {str(l["ligne_metier"]).casefold(): float(l["beta"] or 0.0) for l in lignes}
-
-
 def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
     """Renseigne l'approche standard et retourne l'APR opérationnel.
 
@@ -959,15 +936,19 @@ def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
     lignes = indexer_codes_dispru(feuille)
     anomalies: list[Reserve] = []
 
-    betas = _lire_betas_par_ligne()
-    par_exercice = _lire_produit_brut_par_ligne()
-    exercices = sorted(par_exercice)[-3:]
+    # Le calcul est celui du module Risque Opérationnel, pas un second : deux
+    # implémentations de la même règle finiraient par diverger, et l'écran
+    # contredirait la déclaration sur la même exigence.
+    calcul = calcul_as()
+    exercices = [detail for detail in calcul.detail_par_annee if detail.renseignee]
 
     # Bloc A : l'application ne stocke que le produit brut de chaque ligne, sans
     # son détail comptable. Seule la ligne de total peut donc être renseignée,
     # et pour le dernier exercice — le formulaire n'en présente qu'un.
     if exercices:
-        produits = par_exercice[exercices[-1]]
+        produits = {
+            ligne.ligne_metier.casefold(): ligne.pnb for ligne in exercices[-1].lignes
+        }
         total_bloc_a = 0.0
         for index, (_, ligne_metier) in enumerate(LIGNES_METIER_EP23):
             montant = produits.get(ligne_metier.casefold(), 0.0)
@@ -982,33 +963,32 @@ def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
     # Bloc B : les exercices manquants sont cadrés à gauche, le plus récent
     # restant dans la dernière paire de colonnes.
     decalage = 3 - len(exercices)
-    exigences_par_exercice: list[float] = []
     for rang_exercice, exercice in enumerate(exercices):
-        produits = par_exercice[exercice]
+        par_ligne = {
+            ligne.ligne_metier.casefold(): ligne for ligne in exercice.lignes
+        }
         colonne_brut, colonne_exigence = COLONNES_EXERCICES_EP23[rang_exercice + decalage]
-        total_brut = total_exigence = 0.0
+        total_brut = 0.0
         for code, ligne_metier in LIGNES_METIER_EP23:
-            cle = ligne_metier.casefold()
-            brut = produits.get(cle, 0.0)
-            exigence = brut * betas.get(cle, 0.0)
+            detail = par_ligne.get(ligne_metier.casefold())
+            brut = detail.pnb if detail else 0.0
             total_brut += brut
-            total_exigence += exigence
             _ecrire_montant(feuille, lignes.get(code, 0), colonne_brut, brut)
-            _ecrire_montant(feuille, lignes.get(code, 0), colonne_exigence, exigence)
+            _ecrire_montant(
+                feuille,
+                lignes.get(code, 0),
+                colonne_exigence,
+                detail.k_ligne if detail else 0.0,
+            )
         # « Total ou zéro, le plus élevé étant retenu » : un exercice à produit
         # brut négatif ne réduit pas l'exigence des autres.
-        retenu = max(total_exigence, 0.0)
-        exigences_par_exercice.append(retenu)
         _ecrire_montant(feuille, lignes.get("RO035", 0), colonne_brut, total_brut)
-        _ecrire_montant(feuille, lignes.get("RO035", 0), colonne_exigence, retenu)
+        _ecrire_montant(
+            feuille, lignes.get("RO035", 0), colonne_exigence, exercice.k_retenu
+        )
 
-    exigence_moyenne = (
-        sum(exigences_par_exercice) / len(exigences_par_exercice)
-        if exigences_par_exercice
-        else 0.0
-    )
-    apr = exigence_moyenne * MULTIPLICATEUR_APR_FODEP
-    _ecrire_montant(feuille, lignes.get("RO036", 0), COLONNE_I, exigence_moyenne)
+    apr = calcul.k_as * MULTIPLICATEUR_APR_FODEP
+    _ecrire_montant(feuille, lignes.get("RO036", 0), COLONNE_I, calcul.k_as)
     _ecrire_montant(feuille, lignes.get("RO037", 0), COLONNE_I, apr)
 
     if not exercices:
@@ -1022,7 +1002,7 @@ def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
         anomalies.append(a_verifier(
             f"EP23 : l'exigence est la moyenne des trois derniers exercices ; "
             f"{len(exercices)} seulement {'est enregistré' if len(exercices) == 1 else 'sont enregistrés'} "
-            f"({', '.join(str(exercice) for exercice in exercices)}). Le montant "
+            f"({', '.join(str(exercice.annee) for exercice in exercices)}). Le montant "
             "déclaré porte donc sur ce qui est disponible."
         ))
 

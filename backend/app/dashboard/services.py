@@ -17,7 +17,7 @@ from app.core.bceao_calculations import (
     evaluate_ratios
 )
 from app.market.services import resolve_market_capital
-from app.risque_operationnel.services import calcul_aib as _calcul_aib_uemoa
+from app.risque_operationnel.services import apr_operationnel_retenu
 from app.dashboard.models import (
     DashboardMetric,
     DashboardProjectionPoint,
@@ -441,7 +441,11 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
     # Risque Opérationnel). `apr_aib` est déjà exprimé en équivalent RWA
     # (K_IB × 12,5), comme le risque de marché (rwa_marche = capital requis
     # × 12,5) : pas de multiplicateur à réappliquer ici.
-    rwa_operationnel = _calcul_aib_uemoa().apr_aib
+    # La methode appliquee decide : approche standard sur accord de la
+    # Commission bancaire, indicateur de base sinon. Lire l'indicateur de
+    # base sans condition affichait une exigence que la declaration
+    # transmise ne portait plus.
+    rwa_operationnel = apr_operationnel_retenu()
 
     fp_detail = FondsPropresDetail(
         capital_ordinaire=fp_data.get("capital_ordinaire", 0.0),

@@ -98,6 +98,75 @@ def test_l_approche_standard_renseigne_l_ep23_et_vide_l_ep21(methode):
         produit.classeur.close()
 
 
+@pytest.fixture
+def trois_exercices():
+    """Ajoute deux exercices de produit brut par ligne, puis les retire."""
+
+    from app.risque_operationnel.services import calcul_as
+
+    reference = calcul_as().detail_par_annee
+    assert reference, "l'essai suppose un exercice deja saisi"
+    modele = {ligne.ligne_metier: ligne.pnb for ligne in reference[0].lignes}
+    annee_connue = reference[0].annee
+    ajoutees = (annee_connue - 2, annee_connue - 1)
+
+    with database_manager.transaction() as connexion:
+        for annee in ajoutees:
+            for ligne_metier, pnb in modele.items():
+                connexion.execute(
+                    """
+                    INSERT INTO op_pnb_par_ligne(annee, ligne_metier, produit_brut_ligne)
+                    VALUES (?, ?, ?)
+                    """,
+                    (annee, ligne_metier, pnb / 2),
+                )
+    yield annee_connue, ajoutees
+    with database_manager.transaction() as connexion:
+        connexion.execute(
+            "DELETE FROM op_pnb_par_ligne WHERE annee IN (?, ?)", ajoutees
+        )
+
+
+def test_l_exigence_est_la_moyenne_des_trois_exercices(methode, trois_exercices):
+    """La regle de Bale, et celle que le formulaire ecrit noir sur blanc.
+
+    Le module ne calculait que sur l'exercice le plus recent. Tant qu'un seul
+    etait saisi, les deux revenaient au meme ; des le deuxieme, cet ecran et la
+    declaration transmise a la BCEAO se seraient contredits sur la meme
+    exigence -- l'un affichant le dernier exercice, l'autre leur moyenne.
+    """
+
+    from app.risque_operationnel.services import calcul_as
+
+    calcul = calcul_as()
+    assert len(calcul.detail_par_annee) == 3
+
+    retenus = [detail.k_retenu for detail in calcul.detail_par_annee]
+    assert calcul.k_as == pytest.approx(sum(retenus) / 3)
+    # Les deux exercices ajoutes valent la moitie du troisieme : la moyenne
+    # vaut donc les deux tiers du plus recent.
+    assert calcul.k_as == pytest.approx(max(retenus) * 2 / 3, rel=1e-6)
+
+    # Et l'EP23 declare cette moyenne, pas le dernier exercice.
+    methode(True)
+    produit = renseigner_classeur_fodep()
+    try:
+        classeur = produit.classeur
+        feuille = classeur["EP23"]
+        lignes = indexer_codes_dispru(feuille)
+        # Les trois exercices occupent leurs trois paires de colonnes.
+        for colonne in (5, 7, 9):
+            assert feuille.cell(row=lignes["RO035"], column=colonne).value
+        exigence = feuille.cell(row=lignes["RO036"], column=9).value
+        dernier = feuille.cell(row=lignes["RO035"], column=9).value
+        assert exigence < dernier, (
+            "l'exigence doit etre la moyenne des trois exercices, "
+            "donc inferieure au plus eleve d'entre eux"
+        )
+    finally:
+        produit.classeur.close()
+
+
 def test_l_ep23_ventile_les_huit_lignes_de_metier(methode):
     """Chaque ligne de metier porte son produit brut et son exigence.
 
