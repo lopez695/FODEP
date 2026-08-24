@@ -32,6 +32,26 @@ ETATS_ALIMENTES: frozenset[str] = frozenset(
 # Y ecrire des zeros donnerait une contrepartie nommee « 0 ».
 PREMIERE_COLONNE_NUMERIQUE: dict[str, int] = {"EP30": 8}
 
+# Etats qui declarent une liste : les grands risques, les clients des groupes
+# lies, les cinquante plus gros engagements, les participations, les parties
+# liees. Leur grille compte des dizaines de lignes pour le nombre d'entrees que
+# l'etablissement a reellement, et une ligne vierge n'est pas une contrepartie
+# qui ne doit rien -- c'est une ligne dont il n'a pas l'usage.
+#
+# Le balayage a zero les remplissait toutes : l'EP29 et l'EP32 partaient avec
+# des contreparties dont le nom, le pays et le secteur valaient « 0 », l'EP30
+# -- protege du zero par PREMIERE_COLONNE_NUMERIQUE mais pas du balayage -- avec
+# des lignes portant des montants nuls sans aucune identification en face, et
+# l'EP34, l'EP35 et l'EP39 avec respectivement 98, 22 et 49 lignes garnies sans
+# denomination. Sur ces etats, le complement ne touche que les lignes entamees.
+#
+# L'EP31 et l'EP38 n'y figurent pas : leur grille compte exactement le nombre de
+# lignes qu'ils declarent (les vingt plus grandes expositions, les categories de
+# beneficiaires), sans ligne de reserve a garnir.
+ETATS_EN_LISTE: frozenset[str] = frozenset(
+    {"EP29", "EP30", "EP32", "EP34", "EP35", "EP39"}
+)
+
 # Etats sans source de donnees dans l'application. Ils sont declares a zero
 # faute de mieux, sauf pour les cellules que le declarant a saisies a la main
 # (voir `saisies.py`) : une saisie prime toujours sur le zero automatique.

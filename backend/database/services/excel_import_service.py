@@ -1209,7 +1209,14 @@ class ExcelImportService:
             # Relu sur les lignes brutes : ces colonnes ne participent pas au
             # calcul prudentiel et n'ont donc pas leur place dans un
             # enregistrement d'exposition.
-            identifications=collecter_identifications(template_rows),
+            #
+            # `_read_sheet_rows` rend des couples (numero de ligne Excel,
+            # valeurs) : c'est le dictionnaire de valeurs qu'attend la collecte,
+            # pas le couple. Lui passer la liste telle quelle faisait echouer
+            # tout import sur `'tuple' object has no attribute 'get'`.
+            identifications=collecter_identifications(
+                [valeurs for _, valeurs in template_rows]
+            ),
         )
 
 

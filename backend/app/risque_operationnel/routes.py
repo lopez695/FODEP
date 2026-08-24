@@ -293,6 +293,11 @@ def upsert_pnb_ligne(annee: int, ligne_metier: str, data: PnbParLigneCreate) -> 
     return services.upsert_pnb_ligne(annee, ligne_metier, data)
 
 
+@router.delete("/as/pnb-lignes/{annee}", status_code=204)
+def delete_pnb_lignes(annee: int) -> None:
+    services.delete_pnb_lignes(annee)
+
+
 @router.get("/as/parametres", response_model=ParametresAs)
 def get_as_parametres() -> ParametresAs:
     return services.get_as_parametres()

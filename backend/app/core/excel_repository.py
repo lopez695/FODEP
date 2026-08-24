@@ -108,6 +108,23 @@ EXPECTED_COLUMNS_BY_SHEET: dict[str, tuple[str, ...]] = {
 # ligne.
 OPTIONAL_COLUMNS_BY_SHEET: dict[str, tuple[str, ...]] = {
     "Template données": (
+        # ── Identification de la contrepartie, exigée par le FODEP ──────────
+        # Elles décrivent la contrepartie et non l'exposition : elles se
+        # répètent sur chacune de ses lignes, et la dernière valeur non vide
+        # fait foi (voir app/groupes_clients/identification_import.py).
+        #
+        # Le validateur les déclarait déjà, l'import les lisait déjà — mais
+        # elles manquaient ici, donc au modèle livré : aucun classeur ne
+        # pouvait les porter. L'EP29 et l'EP32 partaient sans numéro Centrale
+        # des risques, l'EP30 sans catégorie de lien, l'EP38 et l'EP39 sans
+        # bénéficiaire, et il ne restait qu'à les saisir contrepartie par
+        # contrepartie.
+        "N_Centrale_risques",
+        "Secteur_activite",
+        "Groupe_clients_lies",
+        "N_Centrale_risques_groupe",
+        "Categorie_lien",
+        "Partie_liee",
         "Date d'octroi",
         "Date d'échéance",
         "PRÊT TOTAL",

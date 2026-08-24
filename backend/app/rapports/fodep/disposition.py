@@ -20,6 +20,14 @@ import re
 
 from openpyxl.cell.cell import MergedCell
 
+from app.core.runtime_paths import resource_path
+
+# Le formulaire officiel, vierge. Il vit ici parce que ce module est celui qui
+# relit la disposition des états : le service de remplissage et le catalogue des
+# saisies manuelles s'y réfèrent tous les deux, et un chemin recopié dans deux
+# fichiers finit par diverger.
+CHEMIN_MODELE = resource_path("app", "rapports", "fodep", "modele_fodep.xlsx")
+
 
 # Les quatre blocs des états EP12 à EP19, dans leur ordre d'apparition. Tous
 # les états n'en comportent pas quatre : EP17, EP18 et EP19 s'arrêtent aux
@@ -254,22 +262,94 @@ def _est_a_completer(cellule, styles_de_saisie: frozenset[int] | None = None) ->
     return style is not None and style.protectionId in styles_de_saisie
 
 
-def completer_a_zero(feuille, lignes: dict[str, int], colonnes: range) -> None:
+def _ligne_entamee(feuille, ligne: int, premiere_colonne: int = 2) -> bool:
+    """La ligne porte-t-elle déjà une déclaration ?
+
+    Sert aux états qui déclarent une liste — grands risques, clients des
+    groupes liés, cinquante plus gros engagements. Leur grille compte une
+    centaine de lignes pour le nombre d'entrées que l'établissement a
+    réellement ; le balayage à zéro les remplissait toutes, et le formulaire
+    partait avec des dizaines de contreparties sans nom déclarant zéro. Une
+    ligne à laquelle rien n'a été écrit n'est pas une contrepartie qui ne doit
+    rien : c'est une ligne dont l'établissement n'a pas l'usage.
+
+    Un zéro écrit par le remplissage compte comme une déclaration : c'est une
+    valeur, pas une case oubliée.
+
+    Le verdict se prend à partir de la colonne B, et non de la première colonne
+    à compléter : sur plusieurs de ces états — participations, parties liées —
+    c'est là que le nom est porté, et une ligne nommée dont aucune case n'est
+    encore cochée reste une ligne à compléter. La colonne A est écartée, son
+    code DISPRU étant imprimé sur toutes les lignes, servantes ou non.
+    """
+
+    for cellule in feuille[ligne]:
+        if cellule.column >= premiere_colonne and cellule.value not in (None, ""):
+            return True
+    return False
+
+
+def porte_une_valeur_saisie(feuille) -> bool:
+    """L'état a-t-il reçu un montant non nul dans une case de saisie ?
+
+    Seules les cases que la BCEAO a ouvertes comptent : le gabarit porte aussi
+    des coefficients réglementaires — pondérations, facteurs de conversion —
+    qui sont des nombres non nuls sans être des déclarations.
+
+    Sert à distinguer, avant le balayage à zéro, l'état qu'aucune donnée n'a
+    touché de celui qu'un module a renseigné. Après le balayage, tout est à
+    zéro et les deux se ressemblent.
+    """
+
+    styles_de_saisie = styles_ouverts(feuille.parent)
+    for cellule in tuple(feuille._cells.values()):
+        if cellule.row < PREMIERE_LIGNE_UTILE or isinstance(cellule, MergedCell):
+            continue
+        valeur = cellule.value
+        if not isinstance(valeur, (int, float)) or isinstance(valeur, bool) or not valeur:
+            continue
+        if styles_de_saisie is None:
+            ouverte = cellule.protection is not None and not cellule.protection.locked
+        else:
+            style = cellule._style
+            ouverte = style is not None and style.protectionId in styles_de_saisie
+        if ouverte:
+            return True
+    return False
+
+
+def completer_a_zero(
+    feuille,
+    lignes: dict[str, int],
+    colonnes: range,
+    *,
+    seulement_lignes_entamees: bool = False,
+) -> None:
     """Met à zéro les cases de saisie encore vides des lignes indiquées.
 
     Le FODEP n'admet pas de case à renseigner laissée vide : « toutes les
     cellules non verrouillées doivent être renseignées » (notice, § 3.3).
+
+    `seulement_lignes_entamees` réserve ce complément aux lignes qui portent
+    déjà quelque chose — voir `_ligne_entamee`.
     """
 
     styles_de_saisie = styles_ouverts(feuille.parent)
     for ligne in lignes.values():
+        if seulement_lignes_entamees and not _ligne_entamee(feuille, ligne):
+            continue
         for colonne in colonnes:
             cellule = feuille.cell(row=ligne, column=colonne)
             if _est_a_completer(cellule, styles_de_saisie):
                 cellule.value = 0
 
 
-def completer_etat_a_zero(feuille, *, premiere_colonne: int = 3) -> None:
+def completer_etat_a_zero(
+    feuille,
+    *,
+    premiere_colonne: int = 3,
+    seulement_lignes_entamees: bool = False,
+) -> None:
     """Met à zéro toutes les cases de saisie d'un état non alimenté.
 
     Les états que l'application ne sait pas encore renseigner — risque de
@@ -277,9 +357,13 @@ def completer_etat_a_zero(feuille, *, premiere_colonne: int = 3) -> None:
     de marché — doivent tout de même être déclarés à zéro plutôt que rendus
     vides. Les deux premières colonnes, qui portent les codes DISPRU et les
     intitulés, ne sont jamais touchées.
+
+    `seulement_lignes_entamees` épargne les lignes vierges des états qui
+    déclarent une liste — voir `_ligne_entamee`.
     """
 
     styles_de_saisie = styles_ouverts(feuille.parent)
+    lignes_entamees: dict[int, bool] = {}
 
     # Ne pas passer par ``iter_rows`` sans borne haute : le modèle BCEAO porte
     # parfois une mise en forme résiduelle jusqu'à la colonne 1025. Openpyxl
@@ -291,9 +375,19 @@ def completer_etat_a_zero(feuille, *, premiere_colonne: int = 3) -> None:
     # l'affectation des zéros.
     cellules = tuple(feuille._cells.values())
     for cellule in cellules:
-        if (
+        if not (
             cellule.row >= PREMIERE_LIGNE_UTILE
             and cellule.column >= premiere_colonne
             and _est_a_completer(cellule, styles_de_saisie)
         ):
-            cellule.value = 0
+            continue
+        if seulement_lignes_entamees:
+            # Un état porte jusqu'à une centaine de lignes : le verdict est
+            # retenu une fois par ligne plutôt que recalculé à chaque case.
+            entamee = lignes_entamees.get(cellule.row)
+            if entamee is None:
+                entamee = _ligne_entamee(feuille, cellule.row, premiere_colonne)
+                lignes_entamees[cellule.row] = entamee
+            if not entamee:
+                continue
+        cellule.value = 0

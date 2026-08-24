@@ -21,8 +21,10 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
   bool _loading = true;
   String? _error;
 
-  // L'Approche Standard porte sur UN seul exercice : celui affiché ici.
-  // Déterminé au premier chargement (l'exercice déjà renseigné s'il existe,
+  // Exercice que le formulaire de saisie vise. L'exigence porte sur les trois
+  // derniers, tous conservés ; celui-ci ne dit donc pas « le » millésime de
+  // l'établissement, seulement lequel on est en train de renseigner.
+  // Déterminé au premier chargement (le plus récent des exercices déjà saisis,
   // sinon l'année en cours), puis conservé : ni un enregistrement ni un
   // rafraîchissement ne doivent changer l'exercice choisi par l'utilisateur.
   int _anneeSelect = DateTime.now().year;
@@ -55,12 +57,14 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
       final r = results[0] as AsCalculResult;
       final b = results[2] as List<BetaLigneView>;
 
-      // Un seul exercice : au premier chargement uniquement, se caler sur
-      // celui déjà renseigné (sinon l'année en cours). Ensuite l'exercice
-      // choisi par l'utilisateur est conservé à travers les rechargements.
+      // Au premier chargement uniquement, se caler sur le plus récent des
+      // exercices déjà saisis (sinon l'année en cours) : c'est celui qu'on
+      // vient compléter. `detailParAnnee` est trié par année croissante, le
+      // dernier est donc le plus récent. Ensuite l'exercice choisi par
+      // l'utilisateur est conservé à travers les rechargements.
       if (!_anneeInitialisee) {
         _anneeSelect = r.detailParAnnee.isNotEmpty
-            ? r.detailParAnnee.first.annee
+            ? r.detailParAnnee.last.annee
             : DateTime.now().year;
         _anneeInitialisee = true;
       }
@@ -142,6 +146,55 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     });
   }
 
+  // Retire un exercice de la moyenne. Tant que l'enregistrement effaçait les
+  // autres années, se tromper d'exercice se corrigeait en ressaisissant sur la
+  // bonne ; maintenant que les trois se cumulent, il faut pouvoir en retirer
+  // un — sans quoi une année saisie par erreur pèserait sur l'exigence
+  // déclarée à la BCEAO sans aucun moyen de la reprendre.
+  Future<void> _retirerExercice(int annee) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Retirer l\'exercice $annee ?'),
+        content: Text(
+          'Les produits bruts des huit lignes de métier saisis pour $annee '
+          'seront supprimés, et l\'exercice sortira de la moyenne sur laquelle '
+          'repose l\'exigence de fonds propres.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Retirer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+    try {
+      await widget.api.deletePnbLignes(annee);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Exercice $annee retiré'),
+              backgroundColor: AppTheme.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erreur : $e'), backgroundColor: AppTheme.danger),
+        );
+      }
+    }
+  }
+
   Future<void> _saveAllLignes() async {
     setState(() => _saving = true);
     try {
@@ -205,14 +258,30 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
               color: AppTheme.warning,
               icon: Icons.warning_amber_outlined,
               text: 'Aucune donnée PNB par ligne de métier saisie.'
-                  ' Renseignez les 8 lignes pour l\'exercice en cours.',
+                  ' Renseignez les 8 lignes pour chacun des trois derniers'
+                  ' exercices.',
+            ),
+            AppSpacing.gapSm,
+          ] else if (r.detailParAnnee.length < 3) ...[
+            // L'exigence est une moyenne sur trois exercices : tant qu'il en
+            // manque, elle porte sur ce qui est disponible, et l'EP23 transmis
+            // à la BCEAO le signale. Autant le dire ici, là où on saisit.
+            _NoticeBanner(
+              color: AppTheme.warning,
+              icon: Icons.event_busy_outlined,
+              text: '${r.detailParAnnee.length} exercice(s) sur 3 saisi(s)'
+                  ' (${r.detailParAnnee.map((d) => d.annee).join(', ')}).'
+                  ' L\'exigence est la moyenne des trois derniers exercices :'
+                  ' elle porte pour l\'instant sur ce qui est disponible.',
             ),
             AppSpacing.gapSm,
           ],
 
-          // Détail du calcul - un seul exercice désormais
-          if (r.detailParAnnee.isNotEmpty) ...[
-            _buildDetailCard(context, isDark, r.detailParAnnee.first),
+          // Détail du calcul, un tableau par exercice retenu dans la moyenne.
+          // Du plus récent au plus ancien : c'est celui qu'on vient de saisir
+          // qu'on relit en premier.
+          for (final detail in r.detailParAnnee.reversed) ...[
+            _buildDetailCard(context, isDark, detail),
             AppSpacing.gapSm,
           ],
 
@@ -229,7 +298,7 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
 
   static const _kPrimary = Color(0xFF2563EB);
 
-  // ── Carte "Détail du calcul" - un seul exercice : tableau des 8 lignes
+  // ── Carte "Détail du calcul" - un exercice : tableau des 8 lignes
   // avec K = PNB × β par ligne et total en pied de tableau. ─────────────────
 
   Widget _buildDetailCard(BuildContext context, bool isDark, AsAnneeDetail d) {
@@ -599,6 +668,32 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                   ),
                 ),
               ),
+              // Retrait de l'exercice affiché, proposé seulement s'il porte
+              // des données : rien à retirer d'une année encore vierge.
+              if (_result?.detailParAnnee
+                      .any((d) => d.annee == _anneeSelect) ??
+                  false) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Retirer l\'exercice $_anneeSelect de la moyenne',
+                  child: InkWell(
+                    onTap: () => _retirerExercice(_anneeSelect),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      height: 28,
+                      width: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: AppTheme.danger.withValues(alpha: 0.55)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.delete_outline,
+                          size: 14, color: AppTheme.danger),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),

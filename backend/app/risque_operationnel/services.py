@@ -133,6 +133,7 @@ def _row_to_incident(row) -> IncidentView:
         id=row["id"],
         reference=row["reference"],
         date_occurrence=row["date_occurrence"],
+        date_comptabilisation=row["date_comptabilisation"] or "",
         description=row["description"],
         ligne_metier=row["ligne_metier"],
         type_evenement=row["type_evenement"],
@@ -168,10 +169,12 @@ def create_incident(data: IncidentCreate) -> IncidentView:
     with database_manager.transaction() as conn:
         ref = _seq_reference("INC", conn)
         conn.execute(
-            """INSERT INTO ro_incidents (id, reference, date_occurrence, description, ligne_metier,
-               type_evenement, cause_racine, perte_brute, perte_recuperee, statut, cree_le, modifie_le)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (id_, ref, data.date_occurrence, data.description, data.ligne_metier,
+            """INSERT INTO ro_incidents (id, reference, date_occurrence, date_comptabilisation,
+               description, ligne_metier, type_evenement, cause_racine, perte_brute,
+               perte_recuperee, statut, cree_le, modifie_le)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (id_, ref, data.date_occurrence, data.date_comptabilisation,
+             data.description, data.ligne_metier,
              data.type_evenement, data.cause_racine, data.perte_brute,
              data.perte_recuperee, data.statut, now, now),
         )
@@ -255,7 +258,7 @@ def build_ro_import_template() -> bytes:
 
     # Titre
     ws.row_dimensions[1].height = 32
-    ws.merge_cells("A1:H1")
+    ws.merge_cells("A1:I1")
     title_cell = ws["A1"]
     title_cell.value = "Modèle d'import — Pertes Opérationnelles (Risque Opérationnel BCEAO)"
     title_cell.font = Font(bold=True, size=13, color="FFFFFF")
@@ -263,15 +266,19 @@ def build_ro_import_template() -> bytes:
     title_cell.alignment = center()
 
     # En-têtes colonnes
+    # La date de comptabilisation suit celle d'occurrence : c'est elle qui
+    # rattache la perte a un exercice dans l'EP22 et l'EP24 (notice, § 9.4.2
+    # et § 9.4.4). Facultative — vide, l'export retombe sur l'occurrence.
     headers = [
         ("A", "date_occurrence",  "Date d'occurrence",    "AAAA-MM-JJ ou JJ/MM/AAAA",   True,  15),
-        ("B", "description",      "Description",           "Libellé de l'incident",       True,  35),
-        ("C", "ligne_metier",     "Ligne de métier",       "Voir onglet Lignes_Métier",   True,  22),
-        ("D", "type_evenement",   "Type d'événement",      "Voir onglet Types_Événement", True,  18),
-        ("E", "cause_racine",     "Cause racine",          "Optionnel",                   False, 20),
-        ("F", "perte_brute",      "Perte brute (FCFA)",    "Montant numérique",           True,  18),
-        ("G", "perte_recuperee",  "Perte récupérée (FCFA)","Assurance / provisions",      False, 20),
-        ("H", "statut",           "Statut",                "Optionnel — défaut: Ouvert",  False, 14),
+        ("B", "date_comptabilisation", "Date de comptabilisation", "Rattachement FODEP — défaut : date d'occurrence", False, 20),
+        ("C", "description",      "Description",           "Libellé de l'incident",       True,  35),
+        ("D", "ligne_metier",     "Ligne de métier",       "Voir onglet Lignes_Métier",   True,  22),
+        ("E", "type_evenement",   "Type d'événement",      "Voir onglet Types_Événement", True,  18),
+        ("F", "cause_racine",     "Cause racine",          "Optionnel",                   False, 20),
+        ("G", "perte_brute",      "Perte brute (FCFA)",    "Montant numérique",           True,  18),
+        ("H", "perte_recuperee",  "Perte récupérée (FCFA)","Assurance / provisions",      False, 20),
+        ("I", "statut",           "Statut",                "Optionnel — défaut: Ouvert",  False, 14),
     ]
 
     ws.row_dimensions[2].height = 40
@@ -296,14 +303,14 @@ def build_ro_import_template() -> bytes:
 
     # Lignes d'exemple (une par type d'événement)
     exemples = [
-        ("2025-01-15", "Erreur de saisie virement client — doublon déclenché",            "Banque de détail",   "Processus", "Erreur humaine",       450000, 0,       "Résolu"),
-        ("2025-02-03", "Tentative de phishing — données compromises employé",              "Banque commerciale", "Interne",   "Fraude interne",       0,      0,       "En cours"),
-        ("2025-03-10", "Fraude carte bancaire — 12 transactions non autorisées",           "Banque de détail",   "Externe",   "Fraude externe",       1800000, 600000, "Résolu"),
-        ("2025-03-22", "Panne du core banking 6h — transactions en attente",               "Paiements et règlements", "Système", "Défaillance système", 3200000, 0,    "Clôturé"),
-        ("2025-04-08", "Litige client — mauvais conseil produit structuré",                "Financement d'entreprise", "Juridique", "Processus inadéquat", 7500000, 2500000, "En cours"),
-        ("2025-05-14", "Accident du travail — blessure caissier",                          "Banque de détail",   "Personnel", "Événement externe",    0,      0,       "Clôturé"),
-        ("2025-06-01", "Erreur règlement titre — mauvaise quantité exécutée",              "Activités de marché","Processus", "Erreur humaine",       950000, 950000, "Clôturé"),
-        ("2025-06-20", "Perte physique fonds — vol agence",                                "Banque de détail",   "Externe",   "Fraude externe",       2100000, 400000, "En cours"),
+        ("2025-01-15", "2025-01-31", "Erreur de saisie virement client — doublon déclenché",            "Banque de détail",   "Processus", "Erreur humaine",       450000, 0,       "Résolu"),
+        ("2025-02-03", "2025-02-28", "Tentative de phishing — données compromises employé",              "Banque commerciale", "Interne",   "Fraude interne",       0,      0,       "En cours"),
+        ("2025-03-10", "2025-03-31", "Fraude carte bancaire — 12 transactions non autorisées",           "Banque de détail",   "Externe",   "Fraude externe",       1800000, 600000, "Résolu"),
+        ("2025-03-22", "2025-04-15", "Panne du core banking 6h — transactions en attente",               "Paiements et règlements", "Système", "Défaillance système", 3200000, 0,    "Clôturé"),
+        ("2025-04-08", "2025-04-30", "Litige client — mauvais conseil produit structuré",                "Financement d'entreprise", "Juridique", "Processus inadéquat", 7500000, 2500000, "En cours"),
+        ("2025-05-14", "",           "Accident du travail — blessure caissier",                          "Banque de détail",   "Personnel", "Événement externe",    0,      0,       "Clôturé"),
+        ("2025-06-01", "2025-06-30", "Erreur règlement titre — mauvaise quantité exécutée",              "Activités de marché","Processus", "Erreur humaine",       950000, 950000, "Clôturé"),
+        ("2025-06-20", "2025-07-10", "Perte physique fonds — vol agence",                                "Banque de détail",   "Externe",   "Fraude externe",       2100000, 400000, "En cours"),
     ]
 
     for row_idx, ex in enumerate(exemples, start=4):
@@ -313,7 +320,7 @@ def build_ro_import_template() -> bytes:
             c = ws.cell(row=row_idx, column=ci, value=val)
             c.border = thin_b
             c.fill = row_fill
-            c.alignment = left(wrap=(ci == 2))
+            c.alignment = left(wrap=(ci == 3))
             c.font = Font(size=10)
 
     # ── Feuille 2 : Instructions ────────────────────────────────────────────
@@ -331,6 +338,7 @@ def build_ro_import_template() -> bytes:
         ("Feuille de saisie",   "Saisir vos incidents dans la feuille « Incidents » à partir de la ligne 4."),
         ("Ligne 2",             "★ = colonne OBLIGATOIRE   ○ = colonne optionnelle (peut rester vide)"),
         ("date_occurrence",     "Format ISO AAAA-MM-JJ (ex : 2025-06-15) ou JJ/MM/AAAA (ex : 15/06/2025)."),
+        ("date_comptabilisation", "Optionnel, même format. C'est elle qui rattache la perte à un exercice dans le FODEP (EP22, EP24). Laissée vide, la date d'occurrence en tient lieu."),
         ("ligne_metier",        "Valeur exacte parmi les 8 options."),
         ("type_evenement",      "Valeur exacte parmi 6 options (Interne, Externe, Processus, Système, Personnel, Juridique)."),
         ("cause_racine",        "Optionnel : Erreur humaine | Défaillance système | Processus inadéquat | Fraude interne | Fraude externe | Événement externe | Non définie."),
@@ -551,10 +559,12 @@ def bulk_import_incidents(data: IncidentBulkImportRequest) -> IncidentImportResu
                 now = utcnow_iso()
                 ref = _seq_reference("INC", conn)
                 conn.execute(
-                    """INSERT INTO ro_incidents (id, reference, date_occurrence, description,
-                       ligne_metier, type_evenement, cause_racine, perte_brute, perte_recuperee,
-                       statut, cree_le, modifie_le) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (id_, ref, item.date_occurrence, item.description, item.ligne_metier,
+                    """INSERT INTO ro_incidents (id, reference, date_occurrence,
+                       date_comptabilisation, description, ligne_metier, type_evenement,
+                       cause_racine, perte_brute, perte_recuperee, statut, cree_le,
+                       modifie_le) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (id_, ref, item.date_occurrence, item.date_comptabilisation,
+                     item.description, item.ligne_metier,
                      item.type_evenement, item.cause_racine, item.perte_brute,
                      item.perte_recuperee, item.statut, now, now),
                 )
@@ -1414,10 +1424,12 @@ def get_pnb_lignes(annee: int) -> list[PnbParLigneView]:
 def upsert_pnb_ligne(annee: int, ligne_metier: str, data: PnbParLigneCreate) -> PnbParLigneView:
     now = utcnow_iso()
     with database_manager.transaction() as conn:
-        # L'Approche Standard ne conserve qu'UN exercice : enregistrer une
-        # ligne pour une nouvelle année remplace l'exercice précédent - le
-        # calcul K_AS porte toujours sur le seul exercice présent en base.
-        conn.execute("DELETE FROM op_pnb_par_ligne WHERE annee != ?", (annee,))
+        # Les exercices s'accumulent. L'exigence de l'Approche Standard est la
+        # moyenne des TROIS derniers (Bale, et ligne RO035 de l'EP23) : effacer
+        # les autres années a chaque enregistrement rendait cette moyenne
+        # inatteignable, et la declaration transmise a la BCEAO ne portait
+        # jamais que sur un exercice. `calcul_as` lit les trois plus recents,
+        # `delete_pnb_lignes` retire un exercice saisi par erreur.
         existing = conn.execute(
             "SELECT annee FROM op_pnb_par_ligne WHERE annee=? AND ligne_metier=?",
             (annee, ligne_metier),
@@ -1442,6 +1454,19 @@ def upsert_pnb_ligne(annee: int, ligne_metier: str, data: PnbParLigneCreate) -> 
     beta = betas.get(ligne_metier, 0.0)
     pbl = float(row["produit_brut_ligne"])
     return PnbParLigneView(annee=annee, ligne_metier=ligne_metier, produit_brut_ligne=pbl, beta=beta, k_ligne=pbl * beta)
+
+
+def delete_pnb_lignes(annee: int) -> None:
+    """Retire un exercice entier du produit brut par ligne de metier.
+
+    Pendant du `delete_pnb_annuel` de l'Approche Indicateur de Base. Tant que
+    l'enregistrement effacait les autres annees, se tromper d'exercice se
+    corrigeait en ressaisissant sur la bonne ; maintenant que les exercices
+    s'accumulent, il faut pouvoir en retirer un.
+    """
+
+    with database_manager.transaction() as conn:
+        conn.execute("DELETE FROM op_pnb_par_ligne WHERE annee = ?", (annee,))
 
 
 def get_as_parametres() -> ParametresAs:

@@ -214,3 +214,45 @@ def test_l_ep23_ventile_les_huit_lignes_de_metier(methode):
         assert float(total_exigence) >= 0
     finally:
         produit.classeur.close()
+
+
+def test_enregistrer_un_exercice_ne_retire_pas_les_autres():
+    """Les trois exercices de l'approche standard doivent pouvoir coexister.
+
+    `upsert_pnb_ligne` effacait toutes les autres annees a chaque
+    enregistrement -- « l'Approche Standard ne conserve qu'UN exercice »,
+    disait son commentaire. La moyenne sur trois exercices qu'exigent Bale, la
+    notice (§ 9.2) et la ligne RO035 de l'EP23 etait donc inatteignable : la
+    declaration transmise a la BCEAO ne portait jamais que sur l'exercice
+    saisi en dernier, sans que rien ne signale les deux autres comme perdus.
+    """
+
+    from app.risque_operationnel.models import PnbParLigneCreate
+    from app.risque_operationnel.services import (
+        delete_pnb_lignes,
+        get_pnb_lignes,
+        upsert_pnb_ligne,
+    )
+
+    # Deux millesimes hors de portee des donnees reelles, retires ensuite.
+    ancien, recent = 2001, 2002
+    ligne_metier = "Banque de détail"
+    try:
+        upsert_pnb_ligne(ancien, ligne_metier, PnbParLigneCreate(produit_brut_ligne=100.0))
+        upsert_pnb_ligne(recent, ligne_metier, PnbParLigneCreate(produit_brut_ligne=200.0))
+
+        conserve = get_pnb_lignes(ancien)
+        assert conserve, (
+            "enregistrer l'exercice suivant a efface le precedent : "
+            "la moyenne sur trois exercices redevient inatteignable"
+        )
+        assert conserve[0].produit_brut_ligne == pytest.approx(100.0)
+        assert get_pnb_lignes(recent)[0].produit_brut_ligne == pytest.approx(200.0)
+
+        # Et un exercice saisi par erreur se retire, seul.
+        delete_pnb_lignes(ancien)
+        assert not get_pnb_lignes(ancien)
+        assert get_pnb_lignes(recent), "le retrait a emporte l'exercice voisin"
+    finally:
+        delete_pnb_lignes(ancien)
+        delete_pnb_lignes(recent)

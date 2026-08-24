@@ -5,8 +5,18 @@ from pydantic import BaseModel, Field
 
 # ─── Incidents ────────────────────────────────────────────────────────────────
 
+# La date de comptabilisation decide de l'exercice auquel une perte est
+# rattachee dans le FODEP : « sur la base de la premiere date de
+# comptabilisation de la perte », disent les § 9.4.2 et 9.4.4 de la notice, pour
+# l'EP22 comme pour l'EP24. Elle vit en base depuis toujours, mais aucun chemin
+# de saisie ne la portait : l'export retombait donc systematiquement sur la date
+# d'occurrence, qui est celle du sinistre, pas celle de son passage en compte.
+# Facultative, la date d'occurrence prenant le relais quand elle manque.
 class IncidentCreate(BaseModel):
     date_occurrence: str = Field(..., description="JJ/MM/AAAA")
+    date_comptabilisation: str = Field(
+        "", description="JJ/MM/AAAA — rattachement FODEP, défaut : date d'occurrence"
+    )
     description: str
     ligne_metier: str
     type_evenement: str
@@ -18,6 +28,7 @@ class IncidentCreate(BaseModel):
 
 class IncidentUpdate(BaseModel):
     date_occurrence: str | None = None
+    date_comptabilisation: str | None = None
     description: str | None = None
     ligne_metier: str | None = None
     type_evenement: str | None = None
@@ -31,6 +42,7 @@ class IncidentView(BaseModel):
     id: str
     reference: str
     date_occurrence: str
+    date_comptabilisation: str
     description: str
     ligne_metier: str
     type_evenement: str
@@ -225,6 +237,7 @@ class PlanView(BaseModel):
 
 class IncidentImportItem(BaseModel):
     date_occurrence: str
+    date_comptabilisation: str = ""
     description: str
     ligne_metier: str
     type_evenement: str

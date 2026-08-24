@@ -1213,6 +1213,10 @@ class RwaApiService {
     return PnbParLigneView.fromJson(json);
   }
 
+  Future<void> deletePnbLignes(int annee) async {
+    await _client.delete('/risque-operationnel/as/pnb-lignes/$annee');
+  }
+
   Future<ParametresAs> fetchAsParametres() async {
     final json = await _client.get('/risque-operationnel/as/parametres')
         as Map<String, dynamic>;

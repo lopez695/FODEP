@@ -733,12 +733,17 @@ class EtatASaisir {
     required this.cases,
     required this.renseignees,
     this.obligatoire = false,
+    this.note = '',
   });
 
   final String etat;
   final String intitule;
   final List<CaseFodep> cases;
   final int renseignees;
+
+  /// Ce que l'écran doit dire de l'état au-delà de son intitulé : l'unité de
+  /// déclaration, et pourquoi certaines cases du formulaire n'y figurent pas.
+  final String note;
 
   /// Vrai pour ce que l'outil ne produira jamais — l'identité de
   /// l'établissement et les signatures. Les autres feuilles sont déjà
@@ -772,6 +777,7 @@ class EtatASaisir {
             .toList(),
         renseignees: (json['renseignees'] as num?)?.toInt() ?? 0,
         obligatoire: json['obligatoire'] == true,
+        note: json['note'] as String? ?? '',
       );
 }
 

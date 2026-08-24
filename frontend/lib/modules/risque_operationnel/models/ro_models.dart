@@ -18,6 +18,7 @@ class RoIncident {
     required this.id,
     required this.reference,
     required this.dateOccurrence,
+    required this.dateComptabilisation,
     required this.description,
     required this.ligneMetier,
     required this.typeEvenement,
@@ -34,6 +35,10 @@ class RoIncident {
   final String id;
   final String reference;
   final String dateOccurrence;
+  // Date de passage en compte de la perte. C'est elle qui rattache l'incident
+  // a un exercice dans l'EP22 et l'EP24 du FODEP (notice, § 9.4.2 et § 9.4.4) ;
+  // vide, la date d'occurrence en tient lieu.
+  final String dateComptabilisation;
   final String description;
   final String ligneMetier;
   final String typeEvenement;
@@ -50,6 +55,7 @@ class RoIncident {
         id: j['id'] as String,
         reference: j['reference'] as String,
         dateOccurrence: j['date_occurrence'] as String,
+        dateComptabilisation: j['date_comptabilisation'] as String? ?? '',
         description: j['description'] as String,
         ligneMetier: j['ligne_metier'] as String,
         typeEvenement: j['type_evenement'] as String,

@@ -85,6 +85,10 @@ class EtatASaisir(BaseModel):
     intitule: str
     cases: list[CaseFodep]
     renseignees: int
+    # Ce que l'ecran doit dire de l'etat au-dela de son intitule : pourquoi des
+    # cases du formulaire n'y figurent pas, par exemple parce que l'export les
+    # calcule. Vide, l'ecran n'affiche rien.
+    note: str = ""
     obligatoire: bool = False
 
 

@@ -11,17 +11,34 @@ avant le balayage final. L'ordre compte : une case saisie n'est jamais
 recouverte par un zero automatique, `completer_etat_a_zero` ne touchant que
 les cases restees vides.
 
-Les etats prudentiels n'y figurent plus. Ceux que l'application n'alimente pas
-encore ont leur source ailleurs dans l'outil — coefficients beta, produit brut
-par ligne de metier, incidents de pertes — et demandent d'etre cables, pas
-saisis. Un ecran de saisie n'a pas a redemander ce que la base contient deja.
+Trois etats prudentiels s'y ajoutent : l'EP04, l'EP11 et l'EP28. Ils ne sont pas
+la par oubli de cablage — l'application n'a aucune source pour eux, et n'en aura
+pas tant qu'elle ne suivra ni derives, ni produits de base, ni instruments de
+fonds propres en retrait progressif. Ils partaient donc a zero, et le formulaire
+affirmait en silence que l'etablissement n'en detenait aucun.
+
+Les autres etats non alimentes n'y figurent pas, et c'est delibere : leur source
+existe ailleurs dans l'outil — coefficients beta, produit brut par ligne de
+metier, incidents de pertes — et ils demandent d'etre cables, pas saisis. Un
+ecran de saisie n'a pas a redemander ce que la base contient deja.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from functools import lru_cache
+import re
 
+from openpyxl import load_workbook
+from openpyxl.cell.cell import MergedCell
+
+from app.rapports.fodep.disposition import (
+    CHEMIN_MODELE,
+    MOTIF_CODE_DISPRU,
+    PREMIERE_LIGNE_UTILE,
+    styles_ouverts,
+)
 from database.connection import database_manager
 
 
@@ -162,6 +179,251 @@ def catalogue_adpe() -> list[CaseASaisir]:
             CHAMPS_ADPE
         )
     ]
+
+
+# ─── Etats prudentiels sans source dans l'application ────────────────────────
+
+# Ce que le declarant renseigne lui-meme, faute que l'outil sache le produire.
+# L'intitule est celui du formulaire, abrege ; il dit ce que l'etat affirme
+# quand il part a zero.
+# L'unite de declaration vaut pour tout le formulaire : « tous les montants
+# doivent etre declares en millions de franc CFA » (notice, § 2.3). Ce qui est
+# saisi ici est ecrit tel quel dans le classeur, sans conversion — contrairement
+# aux montants que l'application calcule, qu'elle ramene au million elle-meme.
+# Le rappeler sur l'ecran evite l'erreur d'un facteur un million.
+UNITE_DE_DECLARATION = (
+    "Montants en millions de FCFA, comme tout le formulaire (notice, § 2.3). "
+    "Ce qui est laissé vide part à zéro."
+)
+
+ETATS_A_SAISIR: tuple[tuple[str, str, str], ...] = (
+    (
+        "EP04",
+        "Dispositions transitoires : reclassement et retrait progressif des "
+        "éléments de fonds propres non admissibles",
+        UNITE_DE_DECLARATION,
+    ),
+    (
+        "EP11",
+        "Expositions au risque de contrepartie : engagements sur instruments "
+        "de taux, de change, de propriété et produits de base",
+        UNITE_DE_DECLARATION
+        + " Le montant notionnel pondéré (d = b × c) et l'exposition "
+        "(e = a + d) ne se saisissent pas : l'export les calcule à partir du "
+        "coût de remplacement, du montant notionnel et de la pondération "
+        "imprimée sur le formulaire. La ligne de total non plus — elle somme "
+        "les lignes ci-dessus, colonne par colonne.",
+    ),
+    (
+        "EP28",
+        "Risque de marché : exigences de fonds propres au titre du risque de "
+        "position sur produits de base",
+        UNITE_DE_DECLARATION,
+    ),
+)
+
+
+# « A. », « B) » — la numerotation des blocs du formulaire.
+MARQUEUR_DE_SECTION = re.compile(r"^[A-Z]\s*[.)]\s*")
+
+# Colonnes que l'export calcule lui-meme, etat par etat. Le formulaire imprime
+# leur formule en tete de colonne — l'EP11 annonce « d=b x c » et « e= a + d » —
+# mais il ne porte aucune formule vivante hors de l'EP01 (notice, § 3.3) : la
+# case attend un resultat, pas un calcul. Les proposer a la saisie reviendrait a
+# demander trente-deux multiplications a la main, et a accepter qu'elles soient
+# fausses sans que rien ne le dise.
+COLONNES_CALCULEES: dict[str, frozenset[str]] = {"EP11": frozenset({"F", "G"})}
+
+# Ligne de total de l'etat, sommee par l'export sur les lignes qui la precedent.
+LIGNES_DE_TOTAL: dict[str, str] = {"EP11": "RC064"}
+
+
+def _est_calculee(etat: str, code: str, colonne_lettre: str) -> bool:
+    """La case est-elle produite par l'export plutot que saisie ?"""
+
+    return (
+        colonne_lettre in COLONNES_CALCULEES.get(etat, frozenset())
+        or code == LIGNES_DE_TOTAL.get(etat)
+    )
+
+
+def _texte(feuille, ligne: int, colonne: int) -> str:
+    """Texte d'une cellule, en atteignant l'ancre des cellules fusionnees.
+
+    Les en-tetes du formulaire chevauchent plusieurs colonnes : « Toutes les
+    positions » couvre C et D, et seule C porte la valeur. Lire D directement
+    rendrait une colonne nommee « Courtes » sans dire courtes de quoi.
+    """
+
+    cellule = feuille.cell(row=ligne, column=colonne)
+    if isinstance(cellule, MergedCell):
+        for plage in feuille.merged_cells.ranges:
+            if (ligne, colonne) in plage.cells:
+                cellule = feuille.cell(row=plage.min_row, column=plage.min_col)
+                break
+    valeur = cellule.value
+    if not isinstance(valeur, str):
+        return ""
+    return " ".join(valeur.split())
+
+
+def _ouvre_un_tableau(feuille, ligne: int) -> bool:
+    """La ligne est-elle l'en-tete « Code DISPRU » d'un bloc ?
+
+    Le test porte sur la valeur brute, pas sur l'ancre d'une fusion : l'EP28
+    fusionne A9:A11, et resoudre la fusion ferait passer les rangs 10 et 11 pour
+    des en-tetes de bloc — la remontee s'arreterait avant d'avoir ramasse
+    « Positions » et « Toutes les positions ».
+    """
+
+    valeur = feuille.cell(row=ligne, column=1).value
+    return isinstance(valeur, str) and valeur.strip().lower().startswith("code dispru")
+
+
+def _entete_de_colonne(feuille, ligne: int, colonne: int) -> str:
+    """En-tete de la colonne, reconstitue en remontant depuis la case.
+
+    Le formulaire empile ses en-tetes sur deux ou trois rangs — « Positions /
+    Toutes les positions / Longues ». Les remonter jusqu'a la ligne qui porte
+    « Code DISPRU » les rassemble dans l'ordre de lecture : sans ce contexte,
+    l'ecran proposerait trois colonnes nommees « Longues » sans dire
+    lesquelles. Cette ligne-la est incluse : c'est elle qui nomme la colonne
+    quand le formulaire n'empile rien au-dessus.
+
+    La remontee n'est pas bornee a quelques rangs : l'EP11 aligne vingt-huit
+    lignes de saisie sous un unique en-tete, et l'EP04 autant. C'est la ligne
+    d'en-tete qui ferme la recherche, pas une distance.
+    """
+
+    fragments: list[str] = []
+    for rang in range(ligne - 1, 0, -1):
+        texte = _texte(feuille, rang, colonne)
+        # Une fusion verticale rend le meme texte sur chacun de ses rangs :
+        # « Montant — Montant — Montant » ne nomme pas mieux la colonne.
+        if texte and texte not in fragments:
+            fragments.append(texte)
+        if _ouvre_un_tableau(feuille, rang):
+            break
+    return " — ".join(reversed(fragments))
+
+
+def _libelle_de_ligne(feuille, ligne: int) -> str:
+    """Le poste, tel que la colonne B le nomme."""
+
+    return _texte(feuille, ligne, 2).lstrip("- ").strip()
+
+
+def _titre_de_bloc(feuille, ligne: int) -> str:
+    """Titre du groupe de lignes auquel la ligne appartient, s'il en a un.
+
+    Le formulaire le met a deux endroits : en colonne B au-dessus d'un groupe
+    de lignes (EP04, EP11), ou en colonne A au-dessus de la ligne « Code
+    DISPRU » quand l'etat compte plusieurs tableaux (EP28). Les lignes deja
+    codees sont traversees : le titre vaut pour tout le bloc, pas seulement
+    pour sa premiere ligne.
+
+    La colonne A se lit brute, sans resoudre les fusions : l'EP28 fusionne
+    A9:A11, et l'ancre resolue ferait passer « Code DISPRU » pour un titre.
+
+    Le marqueur de section — « A. », « B. » — est retire : il numerote le bloc
+    dans le formulaire, il ne dit rien de la case.
+    """
+
+    for rang in range(ligne - 1, 0, -1):
+        if _ouvre_un_tableau(feuille, rang):
+            continue  # l'en-tete du tableau : le titre de section est au-dessus
+        brut = feuille.cell(row=rang, column=1).value
+        premiere = " ".join(brut.split()) if isinstance(brut, str) else ""
+        if premiere:
+            if MOTIF_CODE_DISPRU.fullmatch(premiere):
+                continue  # une ligne du meme bloc
+            return MARQUEUR_DE_SECTION.sub("", premiere)
+        titre = MARQUEUR_DE_SECTION.sub("", _texte(feuille, rang, 2))
+        if titre and not titre.lower().startswith("poste"):
+            return titre
+    return ""
+
+
+@lru_cache(maxsize=1)
+def _catalogue_prudentiel() -> tuple[CaseASaisir, ...]:
+    """Cases ouvertes des etats sans source, relues dans le formulaire.
+
+    Elles ne sont pas enumerees ici : c'est le verrouillage pose par la BCEAO
+    qui les designe, comme pour le reste de l'export. Une case ajoutee par une
+    nouvelle version du formulaire apparait donc a l'ecran sans toucher au
+    code.
+
+    Le resultat est mis en cache : le modele est un fichier fige de 600 Ko, et
+    l'ecran de saisie le redemande a chaque ouverture.
+    """
+
+    classeur = load_workbook(CHEMIN_MODELE)
+    try:
+        styles = styles_ouverts(classeur)
+        cases: list[CaseASaisir] = []
+        for etat, _, _note in ETATS_A_SAISIR:
+            if etat not in classeur.sheetnames:
+                continue
+            feuille = classeur[etat]
+            ouvertes = sorted(
+                (cellule.row, cellule.column)
+                for cellule in tuple(feuille._cells.values())
+                if cellule.row >= PREMIERE_LIGNE_UTILE
+                and not isinstance(cellule, MergedCell)
+                and (
+                    cellule._style is not None
+                    and styles is not None
+                    and cellule._style.protectionId in styles
+                )
+            )
+            # Le titre de bloc ne prefixe que les libelles qui se repetent :
+            # l'EP11 nomme cinq fois « Durée > 5 ans », sous cinq natures
+            # d'engagement qui seules les distinguent. Ailleurs, le prefixer
+            # noierait le poste sous un titre identique d'une ligne a l'autre.
+            rangs_par_libelle: dict[str, set[int]] = {}
+            for ligne, _ in ouvertes:
+                rangs_par_libelle.setdefault(
+                    _libelle_de_ligne(feuille, ligne), set()
+                ).add(ligne)
+            ambigus = {
+                libelle
+                for libelle, rangs in rangs_par_libelle.items()
+                if libelle and len(rangs) > 1
+            }
+            for ligne, colonne in ouvertes:
+                code = _texte(feuille, ligne, 1)
+                if not MOTIF_CODE_DISPRU.fullmatch(code):
+                    # Une case ouverte hors d'une ligne codee n'a pas d'adresse
+                    # dans la nomenclature : la plate-forme ne saurait pas la
+                    # lire, et le declarant pas la nommer.
+                    continue
+                case = feuille.cell(row=ligne, column=colonne)
+                if _est_calculee(etat, code, case.column_letter):
+                    continue
+                libelle = _libelle_de_ligne(feuille, ligne)
+                if libelle in ambigus:
+                    titre = _titre_de_bloc(feuille, ligne)
+                    if titre:
+                        libelle = f"{titre} — {libelle}"
+                cases.append(
+                    CaseASaisir(
+                        etat=etat,
+                        cellule=case.coordinate,
+                        ligne=ligne,
+                        code=code,
+                        libelle=libelle,
+                        colonne=_entete_de_colonne(feuille, ligne, colonne),
+                    )
+                )
+        return tuple(cases)
+    finally:
+        classeur.close()
+
+
+def catalogue_etat(nom_etat: str) -> list[CaseASaisir]:
+    """Cases a saisir d'un etat prudentiel, dans l'ordre du formulaire."""
+
+    return [case for case in _catalogue_prudentiel() if case.etat == nom_etat]
 
 
 def _horodatage() -> str:

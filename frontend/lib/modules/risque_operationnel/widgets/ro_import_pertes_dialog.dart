@@ -35,6 +35,18 @@ const _colAliases = <String, List<String>>{
     'date_occ',
     'date_incident',
   ],
+  // Facultative, mais c'est elle qui décide de l'exercice auquel le FODEP
+  // rattache la perte (notice, § 9.4.2 et 9.4.4). Sans elle, l'export retombe
+  // sur la date d'occurrence — celle du sinistre, pas de son passage en compte.
+  'date_comptabilisation': [
+    'date_comptabilisation',
+    'date comptabilisation',
+    'date de comptabilisation',
+    'date_compta',
+    'date compta',
+    'date_comptable',
+    'booking_date',
+  ],
   'description': ['description', 'desc', 'libelle', 'libellé', 'objet'],
   'ligne_metier': [
     'ligne_metier',
@@ -124,6 +136,7 @@ Future<bool?> showRoImportPertesDialog(
 class _ParsedRow {
   _ParsedRow({
     required this.dateOccurrence,
+    required this.dateComptabilisation,
     required this.description,
     required this.ligneMetier,
     required this.typeEvenement,
@@ -135,6 +148,7 @@ class _ParsedRow {
   });
 
   final String dateOccurrence;
+  final String dateComptabilisation;
   final String description;
   final String ligneMetier;
   final String typeEvenement;
@@ -148,6 +162,7 @@ class _ParsedRow {
 
   Map<String, dynamic> toJson() => {
         'date_occurrence': dateOccurrence,
+        'date_comptabilisation': dateComptabilisation,
         'description': description,
         'ligne_metier': ligneMetier,
         'type_evenement': typeEvenement,
@@ -493,6 +508,10 @@ class _RoImportPertesDialogState extends State<_RoImportPertesDialog> {
 
       result.add(_ParsedRow(
         dateOccurrence: dateStr,
+        // Colonne facultative : vide, l'export retombera sur la date
+        // d'occurrence, comme il le faisait pour tous les incidents jusqu'ici.
+        dateComptabilisation:
+            _parseDate(getField(row, 'date_comptabilisation')),
         description: desc,
         ligneMetier: ligne,
         typeEvenement: type,
@@ -1459,6 +1478,9 @@ class _RoImportPertesDialogState extends State<_RoImportPertesDialog> {
 
       setState(() => _parsedRows![index] = _ParsedRow(
             dateOccurrence: dateStr,
+            // Non modifiable dans cette correction de ligne : on reporte ce que
+            // le fichier portait, plutôt que de l'effacer en passant.
+            dateComptabilisation: original.dateComptabilisation,
             description: desc,
             ligneMetier: ligne,
             typeEvenement: type,

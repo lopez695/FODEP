@@ -30,6 +30,7 @@ from app.rapports.fodep.disposition import (
     indexer_codes_dispru,
     lire_disposition_categorie,
     lire_etats_requis,
+    porte_une_valeur_saisie,
 )
 from app.rapports.fodep.service import (
     BASE_DE_DECLARATION,
@@ -39,6 +40,7 @@ from app.rapports.fodep.service import (
     COLONNES_PARTIES_LIEES,
     ETATS_ALIMENTES,
     ETATS_DECLARES_A_ZERO,
+    ETATS_EN_LISTE,
     PREMIERE_COLONNE_NUMERIQUE,
     SyntheseImmobilisations,
     _exercice_declare,
@@ -448,6 +450,13 @@ def test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare(classeur):
     d'identification — nom de contrepartie, numéro Centrale des risques — en
     sont exclues : un zéro n'y remplace rien, il inventerait une contrepartie
     nommée « 0 ». Leur absence est signalée en anomalie, pas comblée.
+
+    Les états qui déclarent une liste (`ETATS_EN_LISTE`) n'y sont tenus que sur
+    les lignes qu'ils ont entamées : leur grille compte une centaine de lignes
+    pour le nombre d'entrées que l'établissement a réellement, et une ligne à
+    laquelle rien n'a été écrit n'est pas une contrepartie qui ne doit rien.
+    `test_les_etats_en_liste_ne_fabriquent_pas_de_contrepartie` garde l'autre
+    versant de la règle.
     """
 
     declares = sorted(ETATS_ALIMENTES | ETATS_DECLARES_A_ZERO)
@@ -457,6 +466,7 @@ def test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare(classeur):
         if code not in classeur.sheetnames:
             continue
         feuille = classeur[code]
+        en_liste = code in ETATS_EN_LISTE
         # La mise en forme gonfle `max_column` bien au-delà du tableau : la
         # largeur utile est celle du bloc d'en-tête, seul à porter des
         # libellés de colonnes.
@@ -473,6 +483,12 @@ def test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare(classeur):
         if largeur < premiere:
             continue
         for ligne in feuille.iter_rows(min_row=9, min_col=premiere, max_col=largeur):
+            if en_liste and all(
+                cellule.value in (None, "")
+                for cellule in ligne
+                if not isinstance(cellule, MergedCell)
+            ):
+                continue
             for cellule in ligne:
                 if isinstance(cellule, MergedCell) or cellule.value is not None:
                     continue
@@ -484,6 +500,107 @@ def test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare(classeur):
         f"déclaré : {', '.join(vides[:20])}"
         + (f" (et {len(vides) - 20} autres)" if len(vides) > 20 else "")
     )
+
+
+def test_les_etats_en_liste_ne_fabriquent_pas_de_contrepartie(classeur):
+    """Une ligne sans entrée reste vierge, montants compris.
+
+    L'EP29, l'EP30 et l'EP32 déclarent des listes : autant de lignes que
+    l'établissement a de contreparties, sur une grille qui en offre une
+    centaine. Le balayage à zéro les remplissait toutes — l'EP29 et l'EP32
+    partaient avec des dizaines de contreparties dont le nom, le pays et le
+    secteur valaient « 0 », l'EP30 avec des lignes portant des montants nuls
+    sans la moindre identification en face.
+
+    Une ligne entamée, elle, doit rester complète : c'est l'objet de
+    `test_aucune_case_de_saisie_ne_reste_vide_sur_un_etat_declare`.
+    """
+
+    # Colonnes qui identifient la contrepartie, relevées sur le bloc d'en-tête
+    # de chaque état. Une ligne qui porte des montants doit en renseigner au
+    # moins une ; sinon elle déclare un encours sans dire de qui.
+    colonnes_identification = {
+        "EP29": range(2, 7),   # n° Centrale des risques, portée, nom, pays, secteur
+        "EP30": range(2, 8),   # n° groupe, n° contrepartie, lien, nom, pays, secteur
+        "EP32": range(2, 6),   # n° Centrale des risques, nom, pays, secteur
+        "EP34": range(2, 3),   # dénomination de l'entreprise
+        # L'EP35 porte la dénomination en B et, sur son poste mémoire, le
+        # libellé du poste en C : les deux identifient une ligne servante.
+        "EP35": range(2, 4),
+        "EP39": range(2, 3),   # nom de la partie liée
+    }
+    fautives: list[str] = []
+
+    # Lignes de total : elles portent des montants sans contrepartie, et c'est
+    # leur nature. L'EP29 place la sienne au milieu de l'état, son poste
+    # mémoire venant ensuite ; l'EP34 en compte une par section, plus la
+    # générale. L'EP35 n'en a aucune.
+    totaux = {
+        "EP29": {"GR051"},
+        "EP30": {"GR172"},
+        "EP32": {"GR244"},
+        "EP34": {"PA021", "PA042", "PA063", "PA084", "PA105", "PA106"},
+        "EP35": set(),
+        "EP39": {"PR055"},
+    }
+
+    for code in sorted(ETATS_EN_LISTE):
+        feuille = classeur[code]
+        identification = colonnes_identification[code]
+        codes_de_ligne = indexer_codes_dispru(feuille)
+        lignes_de_code = [
+            rang
+            for nom_code, rang in codes_de_ligne.items()
+            if nom_code not in totaux[code]
+        ]
+        for rang in lignes_de_code:
+            montants = any(
+                feuille.cell(row=rang, column=colonne).value not in (None, "")
+                for colonne in range(max(identification) + 1, feuille.max_column + 1)
+            )
+            if not montants:
+                continue
+            identifiee = any(
+                feuille.cell(row=rang, column=colonne).value not in (None, "")
+                for colonne in identification
+            )
+            if not identifiee:
+                fautives.append(f"{code}!ligne {rang}")
+
+    assert not fautives, (
+        "Ces lignes portent des montants sans aucune identification : "
+        + ", ".join(fautives[:20])
+        + (f" (et {len(fautives) - 20} autres)" if len(fautives) > 20 else "")
+    )
+
+
+def test_les_colonnes_de_nomenclature_ne_portent_pas_de_zero(classeur):
+    """« Groupe ou individuel » et « Catégorie de lien » sont codées.
+
+    Le § 11.1 code la portée de l'EP29 sur « 1 » (client individuel) ou « 2 »
+    (groupe de clients liés) ; le § 11.2 code le lien de l'EP30 sur « a »
+    (contrôle) ou « b » (interdépendance économique). L'export y écrivait
+    respectivement un zéro, laissé par le balayage, et le libellé en clair de
+    l'application — deux valeurs hors nomenclature.
+    """
+
+    def valeurs_declarees(etat: str, colonne: int, colonne_nom: int) -> set:
+        feuille = classeur[etat]
+        return {
+            feuille.cell(row=rang, column=colonne).value
+            for rang in indexer_codes_dispru(feuille).values()
+            if feuille.cell(row=rang, column=colonne_nom).value not in (None, "")
+        }
+
+    # EP29 : colonne C, en face du nom porté en D.
+    portees = valeurs_declarees("EP29", 3, 4)
+    assert portees, "aucun grand risque déclaré : le contrôle ne prouve rien"
+    assert portees <= {"1", "2"}, f"portées hors nomenclature : {portees}"
+
+    # EP30 : colonne D, en face du nom porté en E.
+    liens = valeurs_declarees("EP30", 4, 5)
+    assert liens, "aucun client de groupe déclaré : le contrôle ne prouve rien"
+    assert liens <= {"a", "b"}, f"catégories de lien hors nomenclature : {liens}"
 
 
 def test_completer_etat_a_zero_ne_materialise_pas_la_grille_vide():
@@ -1293,3 +1410,123 @@ def test_l_ep20_offre_une_ligne_pour_chacun_de_ses_paliers(classeur):
             f"pas à {ponderation:.0%}."
         )
     assert PALIERS_EP20 == tuple(sorted(LIGNES_EP20_PAR_PONDERATION))
+
+
+def test_un_depassement_de_limite_est_signale_comme_non_deduit():
+    """Franchir une norme de l'EP01 doit s'entendre sur les fonds propres.
+
+    L'EP03 porte une ligne de deduction par limite prudentielle -- PA149 pour
+    les participations, IM006 et IM010 pour les immobilisations, PR004 pour les
+    prets aux parties liees. L'export renseigne les etats qui *mesurent* ces
+    limites (EP35 a EP38) mais ne reporte pas leur excedent sur les fonds
+    propres : au premier depassement, le CET1 declare serait surestime, et les
+    trois ratios de solvabilite avec lui, sans que rien ne le dise.
+
+    Tant que le report n'est pas cable, l'export doit au moins refuser de
+    laisser passer le depassement en silence.
+    """
+
+    # Sucrivoire portee a 30 % du capital de son emetteur : au-dela des 25 %
+    # de la norme RA006.
+    au_dela = [
+        (denomination, categorie, capital, 12e9 if index == 4 else brut, net)
+        for index, (denomination, categorie, capital, brut, net) in enumerate(
+            PARTICIPATIONS_D_ESSAI
+        )
+    ]
+    participations = [
+        ParticipationView(
+            id=index,
+            denomination=denomination,
+            categorie=categorie,
+            capital_entreprise=capital,
+            montant_brut=brut,
+            montant_net=net,
+            commentaire=None,
+            cree_le="2026-01-01",
+            modifie_le="2026-01-01",
+        )
+        for index, (denomination, categorie, capital, brut, net) in enumerate(
+            au_dela, start=1
+        )
+    ]
+    with mock.patch(
+        "app.rapports.fodep.service.lister_participations", return_value=participations
+    ):
+        resultat = construire_fodep()
+
+    signalees = [
+        reserve.message
+        for reserve in resultat.anomalies
+        if "n'est pas déduit des fonds propres" in reserve.message
+    ]
+    assert signalees, (
+        "une limite franchie doit etre signalee comme non deduite des fonds "
+        "propres ; reserves emises : "
+        + " | ".join(reserve.message[:60] for reserve in resultat.anomalies)
+    )
+    assert "PA149" in signalees[0]
+
+    # Et le silence reste la regle quand aucune limite n'est franchie.
+    with mock.patch(
+        "app.rapports.fodep.service.lister_participations",
+        return_value=[
+            ParticipationView(
+                id=index,
+                denomination=denomination,
+                categorie=categorie,
+                capital_entreprise=capital,
+                montant_brut=brut,
+                montant_net=net,
+                commentaire=None,
+                cree_le="2026-01-01",
+                modifie_le="2026-01-01",
+            )
+            for index, (denomination, categorie, capital, brut, net) in enumerate(
+                PARTICIPATIONS_D_ESSAI, start=1
+            )
+        ],
+    ):
+        sans_depassement = construire_fodep()
+    assert not [
+        reserve
+        for reserve in sans_depassement.anomalies
+        if "n'est pas déduit des fonds propres" in reserve.message
+    ]
+
+
+def test_les_etats_declares_a_zero_sont_nommes(classeur):
+    """Un zero transmis affirme quelque chose : il doit se lire.
+
+    L'EP04, l'EP11, l'EP28 et l'EP3M partent a zero parce que l'application n'a
+    aucune source pour ces postes -- pas parce qu'elle a constate leur absence.
+    Le formulaire affirme pourtant que l'etablissement ne detient ni derive, ni
+    produit de base, ni disposition transitoire, et celui qui signe l'endosse.
+
+    Le piege est de dresser cette liste apres le balayage a zero : tout y est
+    alors nul, et l'etat qu'aucune donnee n'a touche ne se distingue plus de
+    celui qu'un module a renseigne. L'EP23 et les EP25 a EP27 appartiennent a la
+    meme liste mais sont alimentes des que la methode ou le portefeuille de
+    marche les concerne -- ils ne doivent pas etre annonces comme vides.
+    """
+
+    resultat = construire_fodep()
+    annonces = [
+        reserve.message
+        for reserve in resultat.anomalies
+        if "déclarés à zéro faute de source" in reserve.message
+    ]
+    assert annonces, "aucun état n'est annoncé comme déclaré à zéro"
+    message = annonces[0]
+
+    for code in ("EP04", "EP11", "EP3M"):
+        assert code in message, f"{code} devrait être annoncé : {message}"
+
+    # Les etats alimentes par le module de marche portent des valeurs : les
+    # annoncer comme vides serait faux.
+    for code in ("EP25", "EP26", "EP27"):
+        feuille = classeur[code]
+        if porte_une_valeur_saisie(feuille):
+            assert code not in message, (
+                f"{code} porte des valeurs et ne doit pas être annoncé vide"
+            )

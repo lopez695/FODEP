@@ -5675,6 +5675,7 @@ class _RegistreViewState extends State<_RegistreView> {
 
   Future<void> _showEditForm(RoIncident edit) async {
     final dateCtrl  = TextEditingController(text: edit.dateOccurrence);
+    final comptaCtrl = TextEditingController(text: edit.dateComptabilisation);
     final descCtrl  = TextEditingController(text: edit.description);
     final brutCtrl  = TextEditingController(text: edit.perteBrute.toStringAsFixed(0));
     final recupCtrl = TextEditingController(text: edit.perteRecuperee.toStringAsFixed(0));
@@ -5750,6 +5751,35 @@ class _RegistreViewState extends State<_RegistreView> {
                             );
                             if (picked != null) {
                               setD(() => dateCtrl.text = picked.toIso8601String().substring(0, 10));
+                            }
+                          },
+                        ),
+                        // C'est cette date, et non celle d'occurrence, qui
+                        // rattache la perte a un exercice dans l'EP22 et
+                        // l'EP24 du FODEP (notice, § 9.4.2 et § 9.4.4). Elle
+                        // reste facultative : laissee vide, l'export retombe
+                        // sur la date d'occurrence.
+                        UemoiFormField(
+                          label: 'Date de comptabilisation',
+                          controller: comptaCtrl,
+                          readOnly: true,
+                          numeric: false,
+                          hint: "Facultatif — défaut : date d'occurrence",
+                          suffixIcon: const Icon(Icons.calendar_month_outlined, size: 16, color: _kBlue),
+                          onTap: () async {
+                            DateTime? current;
+                            try {
+                              if (comptaCtrl.text.isNotEmpty) current = DateTime.parse(comptaCtrl.text);
+                            } catch (_) {}
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: current ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                              helpText: 'Date de passage en compte',
+                            );
+                            if (picked != null) {
+                              setD(() => comptaCtrl.text = picked.toIso8601String().substring(0, 10));
                             }
                           },
                         ),
@@ -5843,6 +5873,7 @@ class _RegistreViewState extends State<_RegistreView> {
                 try {
                   await widget.api.updateRoIncident(edit.id, {
                     'date_occurrence': dateCtrl.text.trim(),
+                    'date_comptabilisation': comptaCtrl.text.trim(),
                     'description':     descCtrl.text.trim(),
                     'ligne_metier':    ligne,
                     'type_evenement':  type,
@@ -10125,6 +10156,10 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
 
   // Étape 1 - Identification
   final _dateCtrl = TextEditingController();
+  // Facultative : c'est elle qui rattache la perte à un exercice dans l'EP22
+  // et l'EP24 du FODEP (notice, § 9.4.2 et § 9.4.4), la date d'occurrence
+  // prenant le relais quand elle manque.
+  final _comptaCtrl = TextEditingController();
   String _ligne = _lignesMetier.first;
   String _type = _typesEvenement.first;
 
@@ -10160,6 +10195,7 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
   @override
   void dispose() {
     _dateCtrl.dispose();
+    _comptaCtrl.dispose();
     _descCtrl.dispose();
     _brutCtrl.dispose();
     _recupCtrl.dispose();
@@ -10183,6 +10219,7 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
     try {
       await widget.api.createRoIncident({
         'date_occurrence': _dateCtrl.text.trim(),
+        'date_comptabilisation': _comptaCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
         'ligne_metier': _ligne,
         'type_evenement': _type,
@@ -10356,6 +10393,32 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
                 }
               },
             ),
+            // Facultative, mais c'est elle qui rattache la perte à un exercice
+            // dans l'EP22 et l'EP24 du FODEP (notice, § 9.4.2 et § 9.4.4).
+            UemoiFormField(
+              label: 'Date de comptabilisation',
+              controller: _comptaCtrl,
+              readOnly: true,
+              numeric: false,
+              hint: "Facultatif — défaut : date d'occurrence",
+              suffixIcon: const Icon(Icons.calendar_month_outlined, size: 16, color: _kBlue),
+              onTap: () async {
+                DateTime? current;
+                try {
+                  if (_comptaCtrl.text.isNotEmpty) current = DateTime.parse(_comptaCtrl.text);
+                } catch (_) {}
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: current ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  helpText: 'Date de passage en compte',
+                );
+                if (picked != null) {
+                  setState(() => _comptaCtrl.text = picked.toIso8601String().substring(0, 10));
+                }
+              },
+            ),
             UemoiFormDropdown<String>(
               label: 'Ligne de métier',
               value: _ligne,
@@ -10512,6 +10575,8 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
           color: _kSuccess,
           children: [
             _recap('Date d\'occurrence', _dateCtrl.text.isEmpty ? '-' : _dateCtrl.text),
+            _recap('Date de comptabilisation',
+                _comptaCtrl.text.isEmpty ? "Date d'occurrence" : _comptaCtrl.text),
             _recap('Ligne de métier', _ligne),
             _recap('Type d\'événement', _type),
             _recap('Cause racine', _causeRacine),

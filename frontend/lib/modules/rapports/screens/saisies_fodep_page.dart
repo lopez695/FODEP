@@ -7,15 +7,22 @@ import '../models/report_models.dart';
 
 /// Saisie de ce que l'application ne produira jamais.
 ///
-/// Aujourd'hui, c'est l'attestation seule : l'identité de l'établissement, les
-/// deux responsables, et les signataires qui engagent leur nom. Aucune donnée
-/// du portefeuille ne peut les déduire.
+/// L'attestation d'abord : l'identité de l'établissement, les deux
+/// responsables, et les signataires qui engagent leur nom. Aucune donnée du
+/// portefeuille ne peut les déduire, et elle est obligatoire.
 ///
-/// Les états prudentiels n'y figurent pas, et c'est délibéré. Ceux que
-/// l'application n'alimente pas encore ont leur source ailleurs dans l'outil —
-/// coefficients bêta, produit brut par ligne de métier, incidents de pertes —
-/// et demandent d'être câblés, pas saisis. Les offrir ici laisserait croire à
-/// un travail de saisie qui n'en est pas un.
+/// Puis trois états prudentiels — EP04, EP11, EP28 — pour lesquels l'outil n'a
+/// aucune source, et n'en aura pas tant qu'il ne suivra ni dérivés, ni produits
+/// de base, ni instruments de fonds propres en retrait progressif. Ils
+/// partaient à zéro, et le formulaire affirmait ainsi que l'établissement n'en
+/// détenait aucun. Ils restent facultatifs : on ne les complète que si
+/// l'établissement est concerné.
+///
+/// Les autres états non alimentés n'y figurent pas, et c'est délibéré : leur
+/// source existe ailleurs dans l'outil — coefficients bêta, produit brut par
+/// ligne de métier, incidents de pertes — et ils demandent d'être câblés, pas
+/// saisis. Les offrir ici laisserait croire à un travail de saisie qui n'en est
+/// pas un.
 ///
 /// Ce qui est saisi prime sur le zéro automatique de l'export ; ce qui est
 /// laissé vide y retombe.
@@ -645,7 +652,8 @@ class _BlocEtat extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '${etat.renseignees} / ${etat.cases.length} champ(s) '
-                    'renseigné(s) · rien de ceci ne vient de l\'outil',
+                    'renseigné(s) · '
+                    '${etat.obligatoire ? 'rien de ceci ne vient de l\'outil' : 'laissé vide, l\'état part à zéro'}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
@@ -656,13 +664,217 @@ class _BlocEtat extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: theme.dividerColor),
-          _Attestation(
-            etat: etat,
-            enAttente: enAttente,
-            onModifier: onModifier,
-            dateArrete: dateArrete,
-            onChoisirLaDate: onChoisirLaDate,
+          // L'unité de déclaration et les colonnes que l'export calcule : sans
+          // ce rappel, un montant se saisit en francs au lieu de millions, et
+          // les cases absentes passent pour un oubli.
+          if (etat.note.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 15, color: theme.colorScheme.outline),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      etat.note,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // L'attestation est une lettre posée sur un quadrillage ; les états
+          // prudentiels sont des tableaux. Les rendre pareil rendrait l'un des
+          // deux illisible.
+          if (etat.etat == 'ADPE')
+            _Attestation(
+              etat: etat,
+              enAttente: enAttente,
+              onModifier: onModifier,
+              dateArrete: dateArrete,
+              onChoisirLaDate: onChoisirLaDate,
+            )
+          else
+            _Grille(
+              etat: etat,
+              enAttente: enAttente,
+              onModifier: onModifier,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un état prudentiel, rendu comme le formulaire le présente : un tableau.
+///
+/// Une ligne par code DISPRU, une colonne par en-tête. C'est la disposition du
+/// FODEP lui-même, et c'est ce qui permet de retrouver une case dans le
+/// formulaire papier sans la chercher.
+///
+/// Le tableau défile horizontalement : l'EP11 porte neuf colonnes, dont cinq
+/// pour la seule ventilation par catégorie de contrepartie. Les comprimer pour
+/// tenir dans la largeur rendrait les en-têtes illisibles.
+class _Grille extends StatelessWidget {
+  const _Grille({
+    required this.etat,
+    required this.enAttente,
+    required this.onModifier,
+  });
+
+  final EtatASaisir etat;
+  final Map<String, CaseFodep> enAttente;
+  final void Function(CaseFodep, String) onModifier;
+
+  static const double _largeurLibelle = 320;
+  static const double _largeurColonne = 168;
+
+  /// Les en-têtes, dans l'ordre où le formulaire les pose.
+  List<String> get _colonnes {
+    final vues = <String>[];
+    for (final case_ in etat.cases) {
+      if (!vues.contains(case_.colonne)) vues.add(case_.colonne);
+    }
+    return vues;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colonnes = _colonnes;
+    final lignes = etat.parLigne;
+    final rangs = lignes.keys.toList()..sort();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SizedBox(
+                width: _largeurLibelle,
+                child: Text(
+                  'Poste',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              for (final colonne in colonnes)
+                SizedBox(
+                  width: _largeurColonne,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8, bottom: 4),
+                    child: Text(
+                      // Une case ouverte sans en-tête existe dans le gabarit :
+                      // la nommer par sa colonne vaut mieux que l'effacer.
+                      colonne.isEmpty ? '(sans en-tête)' : colonne,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
+          Divider(height: 12, color: theme.dividerColor),
+          for (final rang in rangs)
+            _LigneDeGrille(
+              cases: lignes[rang]!,
+              colonnes: colonnes,
+              enAttente: enAttente,
+              onModifier: onModifier,
+              largeurLibelle: _largeurLibelle,
+              largeurColonne: _largeurColonne,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LigneDeGrille extends StatelessWidget {
+  const _LigneDeGrille({
+    required this.cases,
+    required this.colonnes,
+    required this.enAttente,
+    required this.onModifier,
+    required this.largeurLibelle,
+    required this.largeurColonne,
+  });
+
+  final List<CaseFodep> cases;
+  final List<String> colonnes;
+  final Map<String, CaseFodep> enAttente;
+  final void Function(CaseFodep, String) onModifier;
+  final double largeurLibelle;
+  final double largeurColonne;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final premiere = cases.first;
+    final parColonne = {for (final case_ in cases) case_.colonne: case_};
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: largeurLibelle,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12, right: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    premiere.libelle,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    premiere.code,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          for (final colonne in colonnes)
+            SizedBox(
+              width: largeurColonne,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: parColonne[colonne] == null
+                    // Toutes les lignes n'ouvrent pas toutes les colonnes :
+                    // le formulaire verrouille les cases sans objet.
+                    ? const SizedBox.shrink()
+                    : _ChampCase(
+                        case_: enAttente[
+                                '${premiere.etat}!${parColonne[colonne]!.cellule}'] ??
+                            parColonne[colonne]!,
+                        modifiee: enAttente.containsKey(
+                            '${premiere.etat}!${parColonne[colonne]!.cellule}'),
+                        largeur: largeurColonne - 8,
+                        etiquetteVisible: false,
+                        onModifier: (texte) =>
+                            onModifier(parColonne[colonne]!, texte),
+                      ),
+              ),
+            ),
         ],
       ),
     );
