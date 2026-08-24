@@ -216,6 +216,14 @@ WORLD_COUNTRY_OPTIONS: tuple[str, ...] = (
     "Vietnam", "Yemen", "Zambie", "Zimbabwe",
 )
 
+STATUS_OPTIONS: tuple[str, ...] = (
+    "Active",
+    "En recouvrement",
+    "Restructurée",
+    "Contentieux",
+    "Clôturée",
+)
+
 # Colonnes à choix fixes -> liste d'options associée. Les colonnes de type
 # "oui/non" (cf. IMPORT_SHEET_SPECS) sont traitées séparément et n'ont pas
 # besoin d'être répétées ici.
@@ -228,6 +236,7 @@ FIXED_OPTIONS_BY_COLUMN: dict[str, tuple] = {
     "Notation_externe_pays": RATING_OPTIONS,
     "Pays_contrepartie": WORLD_COUNTRY_OPTIONS,
     "Niveau de risque HB": OFF_BALANCE_RISK_LEVEL_OPTIONS,
+    "Statut": STATUS_OPTIONS,
     "Cas_particulier_souverain": SOVEREIGN_SPECIAL_CASE_OPTIONS,
     "Souverain_note_OCE": SOVEREIGN_OCE_NOTE_OPTIONS,
     "Cas_institution_bancaire": BANK_INSTITUTION_CASE_OPTIONS,
@@ -417,11 +426,6 @@ class ExcelImportService:
         return build_excel_import_spec()
 
     def build_template_workbook(self) -> bytes:
-        template_candidates = (seed_data_path("modele_import_rwa.xlsx"),)
-        for candidate in template_candidates:
-            if candidate.is_file():
-                return candidate.read_bytes()
-
         return self._build_fallback_template_workbook()
 
     def _build_fallback_template_workbook(self) -> bytes:
@@ -755,9 +759,20 @@ class ExcelImportService:
             sheet.row_dimensions[1].height = 30
             for col_index, header in enumerate(headers, start=1):
                 is_required = header in required_columns
+                is_oui_non = value_type_by_column.get(header) == "oui/non"
+                if is_required:
+                    font_color = BLUE_DARK
+                    fill_color = BLUE_LIGHT
+                elif is_oui_non:
+                    font_color = "065F46"
+                    fill_color = "D1FAE5"
+                else:
+                    font_color = "475569"
+                    fill_color = GREY_HEADER
+
                 cell = sheet.cell(row=1, column=col_index, value=header)
-                cell.font = Font(bold=True, size=10, color=BLUE_DARK if is_required else "475569")
-                cell.fill = hdr_fill(BLUE_LIGHT if is_required else GREY_HEADER)
+                cell.font = Font(bold=True, size=10, color=font_color)
+                cell.fill = hdr_fill(fill_color)
                 cell.border = thin_b
                 cell.alignment = center(wrap=True)
                 width = max(16, min(38, len(header) + 4))
@@ -846,6 +861,7 @@ class ExcelImportService:
             ("Catégorie d'exposition", CATEGORY_PRUDENTIAL_LABELS),
             ("Type_CRM", CRM_TYPE_OPTIONS),
             ("Niveau de risque HB", OFF_BALANCE_RISK_LEVEL_OPTIONS),
+            ("Statut (gestion)", STATUS_OPTIONS),
             ("Catégorie du garant (CRM non financée)", GUARANTOR_CATEGORY_OPTIONS),
             ("Notation (contrepartie / pays / garant)", RATING_OPTIONS),
             ("Notation (collatéral CRM financée)", FINANCED_CRM_DEBT_RATING_OPTIONS),

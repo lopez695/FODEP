@@ -9,6 +9,8 @@ from openpyxl.utils import get_column_letter
 NAVY = "0F1B3D"
 NAVY_LIGHT = "1D4ED8"
 BLUE_LIGHT = "DBEAFE"
+EMERALD_DARK = "065F46"
+EMERALD_LIGHT = "D1FAE5"
 GREY_HEADER = "F1F5F9"
 GREY_ROW = "F8FAFC"
 BORDER_CLR = "CBD5E1"
@@ -46,18 +48,31 @@ def titre_bandeau(ws, texte: str, derniere_colonne: int, hauteur: int = 30) -> N
     ws.row_dimensions[1].height = hauteur
 
 
-def ecrire_entetes(ws, entetes, ligne: int = 1, obligatoires=None) -> None:
-    """Écrit la ligne d'en-tête. Les colonnes obligatoires sont en bleu,
-    les optionnelles en gris — même code couleur que le modèle de l'outil."""
+def ecrire_entetes(ws, entetes, ligne: int = 1, obligatoires=None, oui_non=None) -> None:
+    """Écrit la ligne d'en-tête :
+    - Colonnes obligatoires en BLEU
+    - Colonnes Oui/Non en VERT ÉMERAUDE CLAIR
+    - Colonnes optionnelles standard en GRIS
+    """
     obligatoires = set(obligatoires or entetes)
+    oui_non = set(oui_non or ())
     ws.row_dimensions[ligne].height = 30
     for index, entete in enumerate(entetes, start=1):
         est_obligatoire = entete in obligatoires
+        est_oui_non = entete in oui_non
+        if est_obligatoire:
+            couleur_texte = NAVY_LIGHT
+            couleur_fond = BLUE_LIGHT
+        elif est_oui_non:
+            couleur_texte = EMERALD_DARK
+            couleur_fond = EMERALD_LIGHT
+        else:
+            couleur_texte = "475569"
+            couleur_fond = GREY_HEADER
+
         cell = ws.cell(row=ligne, column=index, value=entete)
-        cell.font = Font(
-            bold=True, size=9.5, color=NAVY_LIGHT if est_obligatoire else "475569"
-        )
-        cell.fill = fill(BLUE_LIGHT if est_obligatoire else GREY_HEADER)
+        cell.font = Font(bold=True, size=9.5, color=couleur_texte)
+        cell.fill = fill(couleur_fond)
         cell.border = BORDER
         cell.alignment = center(wrap=True)
         largeur = max(13, min(34, len(str(entete)) + 3))

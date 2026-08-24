@@ -49,6 +49,11 @@ NIVEAUX_RISQUE_HB = (
     "Risque élevé", "Risque très élevé",
 )
 
+STATUTS_GESTION = (
+    "Active", "En recouvrement", "Restructurée",
+    "Contentieux", "Clôturée",
+)
+
 TYPES_AUTRES_ACTIFS = (
     "Encaisse",
     "Valeurs assimilées à l’encaisse, y compris l’or",

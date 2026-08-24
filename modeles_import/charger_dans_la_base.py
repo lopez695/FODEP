@@ -87,8 +87,8 @@ def main() -> int:
     from app.dashboard.models import FondsPropresUpdate
     from app.dashboard.services import get_dashboard_snapshot, update_fonds_propres
     from app.market.services import MARKET_CAPITAL_REQUIREMENT_KEY
-    from app.risque_operationnel.models import OpRiskInputUpdate
-    from app.risque_operationnel.services import upsert_op_risk_input
+    from app.risque_operationnel.models import OpRiskInputUpdate, PnbAnnuelCreate
+    from app.risque_operationnel.services import upsert_op_risk_input, upsert_pnb_annuel
     from database.connection import database_manager
     from database.services.excel_import_service import excel_import_service
 
@@ -124,12 +124,16 @@ def main() -> int:
         "Résultat net Ptf négociation": "resultat_portefeuille_negociation",
         "Résultat net Ptf bancaire": "resultat_portefeuille_bancaire",
     }
+    with database_manager.transaction() as conn:
+        conn.execute("DELETE FROM op_pnb_annuel")
     for annee in gen_op.ANNEES_BIC:
         postes = gen_op.BIC_PAR_ANNEE[annee]
         charge = {
             champ: float(postes[libelle]) for libelle, champ in correspondances.items()
         }
         upsert_op_risk_input(annee, OpRiskInputUpdate(**charge))
+        pnb_valeur = float(postes.get("Total Produit Brut", 55_000_000_000))
+        upsert_pnb_annuel(annee, PnbAnnuelCreate(produit_brut_total=pnb_valeur, source_document="Import modèle"))
     resultat_bic = gen_op.calculer_bic()
     print(
         f"[2] Operationnel: exercices {list(gen_op.ANNEES_BIC)} enregistres, "

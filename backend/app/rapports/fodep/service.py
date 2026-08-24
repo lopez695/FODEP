@@ -242,6 +242,9 @@ def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, flo
     dettes_t2 = flottant(donnees_fp.get("dettes_subordonnees_t2"))
     provisions_t2 = flottant(donnees_fp.get("provisions_generales_t2"))
     deductions_t2 = flottant(donnees_fp.get("deductions_prud_t2"))
+    fpi07_transitoire = flottant(donnees_fp.get("fpi07_transitoire"))
+    fpi25_transitoire = flottant(donnees_fp.get("fpi25_transitoire"))
+    fpi33_transitoire = flottant(donnees_fp.get("fpi33_transitoire"))
 
     # Le FODEP sépare ce que l'application agrège : un report à nouveau ou un
     # résultat négatif ne se déclare pas en creux sur la ligne créditrice mais
@@ -253,7 +256,7 @@ def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, flo
         "FPI04": reserves,
         "FPI05": max(report, 0.0),
         "FPI06": max(resultat, 0.0),
-        "FPI07": 0.0,
+        "FPI07": fpi07_transitoire,
         "FPI09": -max(-report, 0.0),
         "FPI10": -max(-resultat, 0.0),
     }
@@ -273,17 +276,18 @@ def _remplir_ep03(classeur, donnees_fp: dict[str, float]) -> tuple[dict[str, flo
 
     montants["FPI23"] = instruments_at1
     montants["FPI24"] = primes_at1
-    montants["FPI25"] = 0.0
-    montants["FPI26"] = instruments_at1 + primes_at1
+    montants["FPI25"] = fpi25_transitoire
+    montants["FPI26"] = instruments_at1 + primes_at1 + fpi25_transitoire
     montants["FPI27"] = -deductions_at1
-    at1 = max(instruments_at1 + primes_at1 - deductions_at1, 0.0)
+    at1 = max(montants["FPI26"] - deductions_at1, 0.0)
     montants["FPI28"] = at1
     montants["FPI29"] = cet1 + at1
 
     montants["FPI30"] = dettes_t2
+    montants["FPI33"] = fpi33_transitoire
     montants["FPI35"] = provisions_t2
-    montants["FPI39"] = dettes_t2 + provisions_t2
-    t2 = max(dettes_t2 + provisions_t2 - deductions_t2, 0.0)
+    montants["FPI39"] = dettes_t2 + provisions_t2 + fpi33_transitoire
+    t2 = max(montants["FPI39"] - deductions_t2, 0.0)
     montants["FPI40"] = t2
     montants["FPI41"] = cet1 + at1 + t2
 
@@ -1940,6 +1944,96 @@ def _remplir_ep27(classeur, positions: dict[str, Any] | None) -> list[Reserve]:
     ]
 
 
+# ─── EP28 : risque de position sur produits de base ───────────────────────
+
+
+def _remplir_ep28(classeur, positions: dict[str, Any] | None) -> list[Reserve]:
+    """Déclare les positions sur produits de base et leur exigence de fonds propres."""
+
+    feuille = classeur["EP28"]
+    lignes = indexer_codes_dispru(feuille)
+    anomalies: list[Reserve] = []
+
+    produits_base = (positions or {}).get("produits_de_base")
+    if not isinstance(produits_base, dict):
+        completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_G + 1))
+        return []
+
+    codes_section_a = {
+        "metaux_precieux": "RM110",
+        "metaux_de_base": "RM111",
+        "produits_agricoles": "RM112",
+        "energie": "RM113",
+        "autres": "RM114",
+    }
+
+    total_longues = 0.0
+    total_courtes = 0.0
+    total_nettes = 0.0
+
+    for cle, code in codes_section_a.items():
+        data = produits_base.get(cle) or {}
+        longues = flottant(data.get("longues"))
+        courtes = flottant(data.get("courtes"))
+        nette = abs(longues - courtes)
+
+        ligne = lignes.get(code, 0)
+        if ligne:
+            _ecrire_montant(feuille, ligne, COLONNE_C, longues)
+            _ecrire_montant(feuille, ligne, COLONNE_D, courtes)
+            _ecrire_montant(feuille, ligne, COLONNE_E, nette)
+
+        total_longues += longues
+        total_courtes += courtes
+        total_nettes += nette
+
+    ligne_total_a = lignes.get("RM116", 0)
+    if ligne_total_a:
+        _ecrire_montant(feuille, ligne_total_a, COLONNE_C, total_longues)
+        _ecrire_montant(feuille, ligne_total_a, COLONNE_D, total_courtes)
+        _ecrire_montant(feuille, ligne_total_a, COLONNE_E, total_nettes)
+
+    # Section B : Risque général (15% position nette + 3% position brute)
+    total_brutes = total_longues + total_courtes
+    exigence_nette = total_nettes * 0.15
+    exigence_brute = total_brutes * 0.03
+    exigence_generale = exigence_nette + exigence_brute
+
+    ligne_nette = lignes.get("RM117", 0)
+    if ligne_nette:
+        _ecrire_montant(feuille, ligne_nette, COLONNE_C, total_nettes)
+        _ecrire(feuille, ligne_nette, COLONNE_D, 0.15)
+        _ecrire_montant(feuille, ligne_nette, COLONNE_E, exigence_nette)
+
+    ligne_brute = lignes.get("RM118", 0)
+    if ligne_brute:
+        _ecrire_montant(feuille, ligne_brute, COLONNE_C, total_brutes)
+        _ecrire(feuille, ligne_brute, COLONNE_D, 0.03)
+        _ecrire_montant(feuille, ligne_brute, COLONNE_E, exigence_brute)
+
+    ligne_fp_gen = lignes.get("RM119", 0)
+    if ligne_fp_gen:
+        _ecrire_montant(feuille, ligne_fp_gen, COLONNE_E, exigence_generale)
+
+    # Section C : Options
+    options = produits_base.get("options") or {}
+    exigence_options = flottant(options.get("exigence_totale", 0.0))
+    ligne_opt = lignes.get("RM123", 0)
+    if ligne_opt:
+        _ecrire_montant(feuille, ligne_opt, COLONNE_E, exigence_options)
+
+    # Section D : TOTAL
+    exigence_totale = exigence_generale + exigence_options
+    apr_total = exigence_totale * 12.5
+    ligne_total_d = lignes.get("RM124", 0)
+    if ligne_total_d:
+        _ecrire_montant(feuille, ligne_total_d, COLONNE_E, exigence_totale)
+        _ecrire_montant(feuille, ligne_total_d, COLONNE_F, apr_total)
+
+    completer_a_zero(feuille, lignes, range(COLONNE_C, COLONNE_F + 1))
+    return anomalies
+
+
 # ─── EP30 : détail des clients au sein des groupes ────────────────────────
 
 
@@ -2998,11 +3092,14 @@ def renseigner_classeur_fodep(date_arrete: date | None = None) -> ClasseurFodep:
                 anomalies.extend(_remplir_ep25(classeur, positions_marche))
                 anomalies.extend(_remplir_ep26(classeur, positions_marche))
                 anomalies.extend(_remplir_ep27(classeur, positions_marche))
-                anomalies.append(information(
-                    "Risque de marché : l'EP28 (produits de base), les "
-                    "positions sur or et les exigences sur options sont "
-                    "déclarées à zéro. L'établissement n'en détient aucune."
-                ))
+                if positions_marche.get("produits_de_base"):
+                    anomalies.extend(_remplir_ep28(classeur, positions_marche))
+                else:
+                    anomalies.append(information(
+                        "Risque de marché : l'EP28 (produits de base), les "
+                        "positions sur or et les exigences sur options sont "
+                        "déclarées à zéro. L'établissement n'en détient aucune."
+                    ))
             else:
                 anomalies.append(a_verifier(
                     "Risque de marché : les lignes de détail de l'EP08 sont "

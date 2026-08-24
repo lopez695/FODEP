@@ -14,6 +14,8 @@ import random
 from datetime import date, timedelta
 
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from _referentiels import (
     BANQUE, CAS_INSTITUTION_BANCAIRE, CAS_SOUVERAIN_AUCUN, CAS_SOUVERAIN_BCEAO,
@@ -54,6 +56,25 @@ COLONNES_OPTIONNELLES_TEMPLATE = [
 
 COLONNES_TEMPLATE = COLONNES_OBLIGATOIRES_TEMPLATE + COLONNES_OPTIONNELLES_TEMPLATE
 
+COLONNES_OUI_NON_TEMPLATE = [
+    "Souverain_ponderation_pref_nulle",
+    "Souverain_OCE_etabli",
+    "Organisme_public_cas_UEMOA_FCFA",
+    "Organisme_public_activite_non_publique",
+    "BMD_cas_haute_qualite",
+    "BMD_cas_UEMOA_FCFA",
+    "BMD_criteres_UEMOA_respectes",
+    "BMD_institution_listee_FCFA",
+    "Clientele_detail_criteres_respectes",
+    "Immobilier_residentiel_eligible",
+    "Immobilier_commercial_eligible",
+    "Defaut_pret_immo_residentiel",
+    "Defaut_provision_min_20pct",
+    "Entreprise_depasse_seuil_degradation_BCEAO",
+    "Entreprise_procedure_prudentielle",
+    "Entreprise_investissement_hors_loi_bancaire",
+]
+
 COLONNES_CRM_NON_FIN = [
     "ID_Exposition", "Nom du garant", "Catégorie du garant", "Note_garant",
     "Pays_garant", "Note_pays_garant", "Part couverte",
@@ -68,6 +89,10 @@ COLONNES_CRM_FIN_OPTIONNELLES = [
     "Obligation_convertible_indice_principal", "Decote_OPCVM_max",
 ]
 COLONNES_CRM_FIN = COLONNES_CRM_FIN_OBLIGATOIRES + COLONNES_CRM_FIN_OPTIONNELLES
+
+COLONNES_OUI_NON_CRM_FIN = [
+    "Obligation_convertible_indice_principal",
+]
 
 # ── Répartition du portefeuille (1 000 lignes) ──────────────────────────────
 # Calquée sur la structure d'une banque universelle de l'UMOA : forte
@@ -732,10 +757,27 @@ def construire_classeur(chemin, template, crm_non_fin, crm_fin):
 
     ws = wb.create_sheet("Template données")
     ecrire_entetes(ws, COLONNES_TEMPLATE, ligne=1,
-                   obligatoires=COLONNES_OBLIGATOIRES_TEMPLATE)
+                   obligatoires=COLONNES_OBLIGATOIRES_TEMPLATE,
+                   oui_non=COLONNES_OUI_NON_TEMPLATE)
     ecrire_lignes(ws, template, COLONNES_TEMPLATE, 2, formats_template)
     ws.freeze_panes = "C2"
     ws.auto_filter.ref = f"A1:{ws.cell(row=1, column=len(COLONNES_TEMPLATE)).column_letter}{len(template) + 1}"
+
+    # Validation Oui/Non sur Template données
+    dv_ouinon = DataValidation(
+        type="list",
+        formula1='"Oui,Non"',
+        allow_blank=True,
+        showErrorMessage=True,
+        errorTitle="Valeur non reconnue",
+        error="Veuillez sélectionner Oui ou Non dans la liste déroulante.",
+    )
+    ws.add_data_validation(dv_ouinon)
+    for col_nom in COLONNES_OUI_NON_TEMPLATE:
+        if col_nom in COLONNES_TEMPLATE:
+            col_idx = COLONNES_TEMPLATE.index(col_nom) + 1
+            col_letter = get_column_letter(col_idx)
+            dv_ouinon.add(f"{col_letter}2:{col_letter}{len(template) + 500}")
 
     ws_nf = wb.create_sheet("CRM_non_financee")
     ecrire_entetes(ws_nf, COLONNES_CRM_NON_FIN, ligne=1)
@@ -745,10 +787,24 @@ def construire_classeur(chemin, template, crm_non_fin, crm_fin):
 
     ws_f = wb.create_sheet("CRM_financée")
     ecrire_entetes(ws_f, COLONNES_CRM_FIN, ligne=1,
-                   obligatoires=COLONNES_CRM_FIN_OBLIGATOIRES)
+                   obligatoires=COLONNES_CRM_FIN_OBLIGATOIRES,
+                   oui_non=COLONNES_OUI_NON_CRM_FIN)
     ecrire_lignes(ws_f, crm_fin, COLONNES_CRM_FIN, 2,
                   {"Valeur_Collatéral": FMT_MONTANT})
     ws_f.freeze_panes = "B2"
+
+    # Validation Oui/Non sur CRM financée
+    dv_ouinon_f = DataValidation(
+        type="list",
+        formula1='"Oui,Non"',
+        allow_blank=True,
+    )
+    ws_f.add_data_validation(dv_ouinon_f)
+    for col_nom in COLONNES_OUI_NON_CRM_FIN:
+        if col_nom in COLONNES_CRM_FIN:
+            col_idx = COLONNES_CRM_FIN.index(col_nom) + 1
+            col_letter = get_column_letter(col_idx)
+            dv_ouinon_f.add(f"{col_letter}2:{col_letter}{len(crm_fin) + 500}")
 
     feuille_notice(
         wb,
