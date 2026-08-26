@@ -3,6 +3,8 @@
 // Seule la gestion des comptes reste réservée au rôle « edition », parce que
 // les comptes, eux, sont communs à tous les espaces.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -28,6 +30,17 @@ class _ClientFactice extends http.BaseClient {
       code,
       request: request,
     );
+  }
+}
+
+/// Client qui échoue comme le ferait un serveur éteint.
+class _ClientSansReseau extends http.BaseClient {
+  int appels = 0;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    appels++;
+    throw const SocketException('Connection refused');
   }
 }
 
@@ -85,6 +98,25 @@ void main() {
       expect(controller.etat, SessionState.deconnecte);
       expect(controller.accessToken, isNull);
       expect(controller.peutEditer, isFalse);
+    });
+
+    test('serveur éteint : on le signale, on ne demande pas de mot de passe',
+        () async {
+      // Un identifiant ne ferait apparaître aucun serveur au bout de
+      // l'adresse. L'écran de connexion enverrait chercher la faute au
+      // mauvais endroit.
+      final client = _ClientSansReseau();
+      final controller = SessionController(
+        baseUrl: 'http://test',
+        client: client,
+      );
+      await controller.initialiser();
+
+      expect(controller.etat, SessionState.injoignable);
+      expect(controller.etat, isNot(SessionState.deconnecte));
+      // Plusieurs essais : un backend démarré en même temps que l'interface
+      // met parfois une seconde ou deux à ouvrir son port.
+      expect(client.appels, greaterThan(1));
     });
 
     test('un cookie encore valide rouvre la session sans mot de passe', () async {

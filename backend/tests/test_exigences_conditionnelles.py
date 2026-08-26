@@ -54,12 +54,10 @@ def test_ligne_complete_conforme_aucun_manque():
     assert not manques
 
 
-def test_regime_prudentiel_specifique_manquant_est_signale():
+def test_regime_prudentiel_specifique_vide_est_accepte_par_defaut():
     ligne = _ligne_base(Regime_prudentiel_specifique="")
     manques = controler_exigences_conditionnelles([(2, ligne)])
-    assert len(manques) == 1
-    assert manques[0]["colonne"] == "Regime_prudentiel_specifique"
-    assert manques[0]["ligne"] == 2
+    assert not manques
 
 
 def test_immobilier_residentiel_sans_pret_total_est_signale():
@@ -98,7 +96,7 @@ def test_autres_actifs_sans_type_autre_actif_est_signale():
     assert "Type_autre_actif" in colonnes_manquantes
 
 
-def test_creances_en_souffrance_sans_provisions_ni_jours_ni_ponderation_est_signale():
+def test_creances_en_souffrance_sans_jours_ni_ponderation_est_signale():
     ligne = _ligne_base(
         **{
             "Catégorie d'exposition": "Créances en souffrance",
@@ -109,7 +107,6 @@ def test_creances_en_souffrance_sans_provisions_ni_jours_ni_ponderation_est_sign
     )
     manques = controler_exigences_conditionnelles([(6, ligne)])
     colonnes_manquantes = {m["colonne"] for m in manques}
-    assert "Provisions" in colonnes_manquantes
     assert "Jours_impayes" in colonnes_manquantes
     assert "Ponderation_initiale_avant_defaut" in colonnes_manquantes
 
@@ -152,12 +149,13 @@ def test_identification_secteur_activite_manquant_ou_neant_est_signale():
     assert "Secteur_activite" in colonnes_manquantes
 
 
-def test_groupe_clients_lies_neant_est_accepte():
+def test_groupe_clients_lies_et_partie_liee_vides_sont_acceptes():
     ligne = _ligne_base(
-        Groupe_clients_lies="Néant",
-        N_Centrale_risques_groupe="Néant",
-        Categorie_lien="Néant",
-        Partie_liee="Néant",
+        Groupe_clients_lies="",
+        N_Centrale_risques_groupe="",
+        Categorie_lien="",
+        Partie_liee="",
+        Regime_prudentiel_specifique="",
     )
     manques = controler_exigences_conditionnelles([(11, ligne)])
     assert not manques

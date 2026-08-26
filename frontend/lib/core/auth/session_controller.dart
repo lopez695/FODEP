@@ -41,7 +41,14 @@ enum SessionState {
   /// Vérification en cours : ni connecté, ni écran de connexion.
   verification,
 
-  /// Aucune session : l'écran de connexion doit être affiché.
+  /// Le backend n'a pas répondu du tout : éteint, ou à l'écoute d'un autre
+  /// port. Distinct de [deconnecte], parce qu'un identifiant n'y changerait
+  /// rien — c'est l'adresse qu'il faut corriger, pas l'utilisateur.
+  injoignable,
+
+  /// Aucune session alors que le backend en exige une : l'écran de connexion
+  /// doit être affiché. N'arrive que si `RWA_AUTH_ENABLED` est activé côté
+  /// serveur, c'est-à-dire en déploiement web.
   deconnecte,
 
   /// Session ouverte.
@@ -81,30 +88,60 @@ class SessionController extends ChangeNotifier {
 
   Uri _uri(String chemin) => Uri.parse('$baseUrl$chemin');
 
+  /// Nombre d'essais pour joindre le backend au lancement, et délai entre
+  /// deux. Le serveur local met parfois quelques secondes à ouvrir son port
+  /// quand les deux sont démarrés ensemble : trancher au premier échec ferait
+  /// apparaître un écran alors qu'il suffisait d'attendre.
+  static const int _essaisDeContact = 5;
+  static const Duration _delaiEntreEssais = Duration(seconds: 1);
+
   /// Détermine l'état de session au lancement.
   ///
-  /// Trois cas : le backend n'exige rien (poste local), un cookie de
+  /// Quatre cas, dans cet ordre : le backend ne répond pas ([injoignable]), il
+  /// n'exige rien (poste local — le cas normal ici), un cookie de
   /// renouvellement est encore valide (retour sur l'onglet), ou il faut se
   /// connecter.
   Future<void> initialiser() async {
     _etat = SessionState.verification;
     notifyListeners();
 
-    try {
-      final reponse = await _client.get(_uri('/auth/me'));
-      if (reponse.statusCode == 200) {
-        // L'API répond sans jeton : l'authentification est désactivée.
-        _authentificationRequise = false;
+    http.Response? reponse;
+    for (var essai = 1; essai <= _essaisDeContact; essai++) {
+      try {
+        reponse = await _client.get(_uri('/auth/me'));
+        break;
+      } catch (_) {
+        if (essai < _essaisDeContact) {
+          await Future<void>.delayed(_delaiEntreEssais);
+        }
+      }
+    }
+
+    if (reponse == null) {
+      // Aucune réponse après plusieurs essais. Réclamer un mot de passe ici
+      // serait trompeur : rien ne se trouve au bout de l'adresse, et aucun
+      // identifiant ne l'y mettrait. L'écran dédié nomme le vrai problème.
+      _authentificationRequise = false;
+      _etat = SessionState.injoignable;
+      notifyListeners();
+      return;
+    }
+
+    if (reponse.statusCode == 200) {
+      // L'API répond sans jeton : l'authentification est désactivée.
+      _authentificationRequise = false;
+      try {
         _profil = SessionProfile.fromJson(
           jsonDecode(reponse.body) as Map<String, dynamic>,
         );
-        _etat = SessionState.connecte;
-        notifyListeners();
-        return;
+      } catch (_) {
+        // Corps inattendu : la session s'ouvre quand même, puisque l'API a
+        // accepté un appel sans jeton. Seul le libellé du profil manque.
+        _profil = const SessionProfile(identifiant: 'local', role: 'edition');
       }
-    } catch (_) {
-      // Backend injoignable : on présente l'écran de connexion, qui affichera
-      // l'erreur au premier essai plutôt que de bloquer sur un écran vide.
+      _etat = SessionState.connecte;
+      notifyListeners();
+      return;
     }
 
     _authentificationRequise = true;

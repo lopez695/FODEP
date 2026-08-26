@@ -36,6 +36,7 @@ import 'modules/auth/screens/login_screen.dart';
 import 'modules/rwa_engine/screens/rwa_engine_screen.dart';
 import 'modules/vue_ensemble/screens/vue_ensemble_screen.dart';
 import 'shared/widgets/app_shell.dart';
+import 'shared/widgets/backend_injoignable_screen.dart';
 import 'shared/widgets/under_construction_screen.dart';
 
 /// Widget racine qui pilote le thème et la navigation principale.
@@ -160,10 +161,15 @@ class _RwaAppState extends State<RwaApp> {
     );
   }
 
-  /// Porte d'entrée : vérification, connexion, ou application.
+  /// Porte d'entrée : vérification, serveur absent, connexion, ou application.
   ///
   /// Tant que la session n'est pas tranchée, rien de l'application n'est
   /// construit : aucun appel API ne part avant de savoir au nom de qui.
+  ///
+  /// Sur un poste de travail, seuls les deux premiers cas et le dernier se
+  /// présentent : le backend local n'exige aucun compte, il répond à
+  /// `/auth/me` sans jeton et la session s'ouvre seule. L'écran de connexion
+  /// ne sert qu'au déploiement web, où le serveur active `RWA_AUTH_ENABLED`.
   Widget _buildPorte() {
     switch (_session.etat) {
       case SessionState.verification:
@@ -176,6 +182,11 @@ class _RwaAppState extends State<RwaApp> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
+        );
+      case SessionState.injoignable:
+        return BackendInjoignableScreen(
+          adresse: RwaApiService.resolveDefaultBaseUrl(),
+          onReessayer: _session.initialiser,
         );
       case SessionState.deconnecte:
         return LoginScreen(session: _session);

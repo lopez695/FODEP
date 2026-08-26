@@ -435,43 +435,25 @@ EXIGENCES_PAR_CATEGORIE: dict[str, tuple[tuple[str, str], ...]] = {
         ("Type_autre_actif", "la nature de l'actif, qui porte sa ponderation"),
     ),
     "Créances en souffrance": (
-        ("Provisions", "le taux de provisionnement, qui decide de la ponderation"),
         ("Jours_impayes", "l'anciennete de l'impaye"),
         (
             "Ponderation_initiale_avant_defaut",
             "la ponderation d'origine, base du traitement du defaut",
         ),
     ),
-    "Créances à risque élevé": (
-        ("Provisions", "le taux de provisionnement, qui decide de la ponderation"),
-    ),
 }
 
-# Exigees sur toute ligne, quelle que soit la categorie.
-EXIGENCES_TOUTES_LIGNES: tuple[tuple[str, str], ...] = (
-    (
-        "Regime_prudentiel_specifique",
-        "le traitement prudentiel retenu ; « Standard (aucun traitement "
-        "particulier) » si la ligne n'en releve pas",
-    ),
-)
+# Exigées sur toute ligne (vide par défaut car le régime prudentiel spécifique
+# vaut "Standard" lorsqu'il est laissé vide).
+EXIGENCES_TOUTES_LIGNES: tuple[tuple[str, str], ...] = ()
 
-# Identification de la contrepartie : exigee une fois par contrepartie, pas par
-# ligne -- elle la decrit, elle ne decrit pas l'exposition. Sans elle, l'EP29,
-# l'EP30, l'EP32, l'EP38 et l'EP39 partent vides.
-# Le troisieme terme dit si « Neant » vaut reponse. Une contrepartie hors groupe
-# n'a rien d'honnete a porter dans les trois colonnes de groupe, et la plupart
-# des contreparties ne sont pas des parties liees : exiger une valeur reelle
-# rendrait la regle insatisfiable. Le numero a la Centrale des risques et le
-# secteur, eux, existent toujours -- s'en dispenser serait ne pas identifier la
-# contrepartie du tout.
+# Identification de la contrepartie : exigée une fois par contrepartie.
+# Le numéro à la Centrale des risques et le secteur d'activité sont exigés.
+# En revanche, l'appartenance à un groupe ou la qualité de partie liée ne
+# concernent pas toutes les contreparties (laissées vides pour un client indépendant).
 EXIGENCES_PAR_CONTREPARTIE: tuple[tuple[str, str, bool], ...] = (
     ("N_Centrale_risques", "l'identifiant de la contrepartie sur l'EP29 et l'EP32", False),
     ("Secteur_activite", "le secteur declare sur l'EP29 et l'EP30", False),
-    ("Groupe_clients_lies", "le groupe de clients lies de l'EP30", True),
-    ("N_Centrale_risques_groupe", "l'identifiant du groupe sur l'EP30", True),
-    ("Categorie_lien", "la nature du lien au groupe, codee « a » ou « b » sur l'EP30", True),
-    ("Partie_liee", "la qualite au titre de l'EP38 et de l'EP39", True),
 )
 
 # Une contrepartie hors groupe n'a rien d'honnete a porter dans les trois
