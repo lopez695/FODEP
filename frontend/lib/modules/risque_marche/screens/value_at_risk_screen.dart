@@ -2537,7 +2537,7 @@ class _PanneauVarHistoriqueMethodologie extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 _EncadreFormule(
-                  formule: 'VaR = perte de rang ⌈n × (1 − c)⌉',
+                  formule: 'VaR = perte de rang arrondi.sup(n × (1 − c))',
                   legende: 'n = nombre de séances observées, '
                       'c = niveau de confiance',
                 ),
@@ -2601,8 +2601,8 @@ class _PanneauVarHistoriqueMethodologie extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 const _EncadreFormule(
-                  formule: 'Rang = ⌈250 × (1 − 0,99)⌉ = ⌈2,5⌉ = 3',
-                  legende: 'La VaR est donc la 3ᵉ perte du classement',
+                  formule: 'Rang = arrondi.sup(250 × (1 − 0,99)) = arrondi.sup(2,5) = 3',
+                  legende: 'La VaR est donc la 3e perte du classement',
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -2611,7 +2611,7 @@ class _PanneauVarHistoriqueMethodologie extends StatelessWidget {
                       child: _ResultatCas(
                         libelle: 'VaR 99 % à 1 jour',
                         valeur: '${_var.toStringAsFixed(0)} M FCFA',
-                        note: '3ᵉ perte du classement',
+                        note: '3e perte du classement',
                         couleur: _varDanger,
                       ),
                     ),

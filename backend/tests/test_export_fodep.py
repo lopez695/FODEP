@@ -1455,17 +1455,26 @@ def test_un_depassement_de_limite_est_signale_comme_non_deduit():
     ):
         resultat = construire_fodep()
 
-    signalees = [
-        reserve.message
-        for reserve in resultat.anomalies
-        if "n'est pas déduit des fonds propres" in reserve.message
-    ]
-    assert signalees, (
+    def signalement(anomalies) -> str:
+        signalees = [
+            reserve.message
+            for reserve in anomalies
+            if "n'est pas déduit des fonds propres" in reserve.message
+        ]
+        return signalees[0] if signalees else ""
+
+    # La norme visee est la limite individuelle sur les participations dans
+    # les entites commerciales (RA006), celle que la fixture fait franchir.
+    NORME_VISEE = "Limite individuelle sur les participations"
+
+    message = signalement(resultat.anomalies)
+    assert message, (
         "une limite franchie doit etre signalee comme non deduite des fonds "
         "propres ; reserves emises : "
         + " | ".join(reserve.message[:60] for reserve in resultat.anomalies)
     )
-    assert "PA149" in signalees[0]
+    assert "PA149" in message
+    assert NORME_VISEE in message
 
     # Et le silence reste la regle quand aucune limite n'est franchie.
     with mock.patch(
@@ -1488,11 +1497,12 @@ def test_un_depassement_de_limite_est_signale_comme_non_deduit():
         ],
     ):
         sans_depassement = construire_fodep()
-    assert not [
-        reserve
-        for reserve in sans_depassement.anomalies
-        if "n'est pas déduit des fonds propres" in reserve.message
-    ]
+    # Le contrôle porte sur cette norme-là, pas sur la réserve entière : les
+    # cinq autres limites de l'EP01 dépendent du portefeuille chargé, et l'une
+    # d'elles peut être franchie sans que les participations y soient pour
+    # quoi que ce soit. Assurer le silence complet ferait échouer le test au
+    # premier jeu de données où une immobilisation dépasse son plafond.
+    assert NORME_VISEE not in signalement(sans_depassement.anomalies)
 
 
 def test_les_etats_declares_a_zero_sont_nommes(classeur):
@@ -1519,14 +1529,19 @@ def test_les_etats_declares_a_zero_sont_nommes(classeur):
     assert annonces, "aucun état n'est annoncé comme déclaré à zéro"
     message = annonces[0]
 
-    for code in ("EP04", "EP11", "EP3M"):
-        assert code in message, f"{code} devrait être annoncé : {message}"
-
-    # Les etats alimentes par le module de marche portent des valeurs : les
-    # annoncer comme vides serait faux.
-    for code in ("EP25", "EP26", "EP27"):
-        feuille = classeur[code]
-        if porte_une_valeur_saisie(feuille):
+    # Le controle porte sur la regle, pas sur une liste d'etats : lesquels
+    # partent a zero depend du portefeuille charge et de la methode de risque
+    # operationnel retenue. Un etat vide doit etre nomme, un etat renseigne
+    # doit se taire -- c'est tout ce qui doit tenir, quel que soit le jeu de
+    # donnees.
+    requis = lire_etats_requis(classeur, base=BASE_DE_DECLARATION)
+    for code in sorted(requis & ETATS_DECLARES_A_ZERO):
+        vide = not porte_une_valeur_saisie(classeur[code])
+        if vide:
+            assert code in message, (
+                f"{code} ne porte aucune valeur et devrait être annoncé : {message}"
+            )
+        else:
             assert code not in message, (
-                f"{code} porte des valeurs et ne doit pas être annoncé vide"
+                f"{code} porte des valeurs et ne doit pas être annoncé vide : {message}"
             )

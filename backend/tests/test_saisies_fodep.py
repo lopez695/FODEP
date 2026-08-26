@@ -177,6 +177,17 @@ def test_la_date_d_arrete_choisie_est_conservee(saisies_restaurees):
             enregistrer_saisies_fodep([], depart)
 
 
+def test_seul_l_adpe_est_expose_a_la_saisie_manuelle():
+    """L'écran de saisie manuelle n'expose que l'ADPE (20 champs), rien d'autre."""
+    from app.rapports.services import lire_cases_a_saisir
+
+    saisies = lire_cases_a_saisir()
+    assert len(saisies.etats) == 1
+    assert saisies.etats[0].etat == "ADPE"
+    assert len(saisies.etats[0].cases) == 20
+    assert saisies.total_cases == 20
+
+
 # ─── Etats prudentiels sans source ───────────────────────────────────────────
 
 
@@ -199,7 +210,7 @@ def test_le_catalogue_des_etats_sans_source_suit_le_formulaire():
         styles_ouverts,
     )
     from app.rapports.fodep.saisies import (
-        ETATS_A_SAISIR,
+        ETATS_FACULTATIFS_CATALOGUE,
         _est_calculee,
         catalogue_etat,
     )
@@ -207,7 +218,7 @@ def test_le_catalogue_des_etats_sans_source_suit_le_formulaire():
     classeur = load_workbook(CHEMIN_MODELE)
     try:
         styles = styles_ouverts(classeur)
-        for nom, _, _note in ETATS_A_SAISIR:
+        for nom, _, _note in ETATS_FACULTATIFS_CATALOGUE:
             feuille = classeur[nom]
             attendues = set()
             for cellule in tuple(feuille._cells.values()):

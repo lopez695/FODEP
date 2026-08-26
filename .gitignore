@@ -42,6 +42,7 @@ venv/
 *.db-shm
 backend/data/logs/
 backend/data/backups/
+modeles_import/_bac_a_sable/
 *.log
 
 # ─── Système ────────────────────────────────────────────────────────────────

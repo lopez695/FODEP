@@ -134,7 +134,7 @@ class _RwaAppState extends State<RwaApp> {
           child: MaterialApp(
             navigatorKey: _navigatorKey,
             debugShowCheckedModeBanner: false,
-            title: 'Risk management',
+            title: 'FODEP',
             locale: appLanguage.locale,
             supportedLocales: AppLanguage.values
                 .map((language) => language.locale)

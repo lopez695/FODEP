@@ -86,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(width: 34, height: 3, color: _navy),
                   const SizedBox(height: 20),
                   const Text(
-                    'Risk management',
+                    'FODEP',
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w700,

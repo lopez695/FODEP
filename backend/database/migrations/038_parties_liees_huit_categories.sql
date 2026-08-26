@@ -5,6 +5,14 @@
 --
 -- La colonne vient d'être créée et n'est encore renseignée nulle part : la
 -- recréer ne perd donc aucune déclaration.
+--
+-- L'index de la migration 037 doit partir en premier : SQLite refuse de
+-- supprimer une colonne qu'un index retient, et cette instruction échouait
+-- donc systématiquement — « error in index idx_contreparties_partie_liee
+-- after drop column ». Les bases déjà installées sont rattrapées par la
+-- migration 041, celle-ci ne servant plus qu'aux installations neuves.
+DROP INDEX IF EXISTS idx_contreparties_partie_liee;
+
 ALTER TABLE contreparties DROP COLUMN categorie_partie_liee;
 
 ALTER TABLE contreparties ADD COLUMN categorie_partie_liee TEXT

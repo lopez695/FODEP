@@ -62,7 +62,7 @@ LIMITE_FORMULE = 240
 # Lignes de saisie couvertes par les listes deroulantes.
 DERNIERE_LIGNE = 2001
 
-OUI_NON = ("OUI", "NON")
+OUI_NON = ("Oui", "Non")
 
 # La feuille « (k) autres actifs » documente la ponderation de chaque nature.
 # Les deux naturees ajoutees au referentiel n'y figuraient pas. Les coefficients
@@ -84,7 +84,7 @@ def _colonnes_oui_non() -> set[str]:
     booleennes: set[str] = set()
     for spec in IMPORT_SHEET_SPECS:
         for colonne in spec.required_columns + spec.optional_columns:
-            if str(getattr(colonne, "value_type", "")).lower() in {"bool", "boolean"}:
+            if str(getattr(colonne, "value_type", "")).lower() in {"bool", "boolean", "oui/non"}:
                 booleennes.add(colonne.name)
     return booleennes
 
@@ -208,12 +208,19 @@ def completer(*, ecrire: bool) -> list[str]:
 
             index = feuille.max_column + 1
             cellule = feuille.cell(row=1, column=index, value=colonne)
-            cellule.font = Font(
-                bold=True, size=10, color="1D4ED8" if colonne in requises else "475569"
-            )
-            cellule.fill = PatternFill(
-                "solid", fgColor="DBEAFE" if colonne in requises else "F1F5F9"
-            )
+            is_oui_non = colonne in booleennes
+            if colonne in requises:
+                font_color = "1D4ED8"
+                fill_color = "DBEAFE"
+            elif is_oui_non:
+                font_color = "065F46"
+                fill_color = "D1FAE5"
+            else:
+                font_color = "475569"
+                fill_color = "F1F5F9"
+
+            cellule.font = Font(bold=True, size=10, color=font_color)
+            cellule.fill = PatternFill("solid", fgColor=fill_color)
             cellule.alignment = Alignment(
                 horizontal="center", vertical="center", wrap_text=True
             )
@@ -222,7 +229,7 @@ def completer(*, ecrire: bool) -> list[str]:
             )
 
             options = (
-                OUI_NON if colonne in booleennes
+                OUI_NON if is_oui_non
                 else FIXED_OPTIONS_BY_COLUMN.get(colonne, ())
             )
             validation = _validation(classeur, colonne, options)

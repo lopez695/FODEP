@@ -6,9 +6,9 @@ import 'package:flutter/foundation.dart';
 
 /// Énumération pour le statut d'un titre vis-à-vis du risque de change
 enum FxSecurityStatus {
-  favorable, // Gain de change positif 🟢
-  unfavorable, // Perte de change négative 🔴
-  stable, // Gain/Perte proche de 0 ⚪
+  favorable, // Gain de change positif ↑
+  unfavorable, // Perte de change négative ↓
+  stable, // Gain/Perte proche de 0 =
 }
 
 /// Énumération pour la position de change
@@ -103,9 +103,9 @@ class FxSecurityAnalysis {
 
   /// Emoji du statut
   String get statusEmoji => switch (status) {
-        FxSecurityStatus.favorable => '🟢',
-        FxSecurityStatus.unfavorable => '🔴',
-        FxSecurityStatus.stable => '⚪',
+        FxSecurityStatus.favorable => '↑',
+        FxSecurityStatus.unfavorable => '↓',
+        FxSecurityStatus.stable => '=',
       };
 
   /// Représentation textuelle de la position

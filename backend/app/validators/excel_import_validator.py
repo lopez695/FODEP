@@ -173,85 +173,21 @@ IMPORT_SHEET_SPECS: tuple[ExcelSheetSpec, ...] = (
             ),
             _column("Commentaire", "texte", "Commentaire de gestion"),
             _column(
+                "Regime_prudentiel_specifique",
+                "texte",
+                "Régime ou traitement prudentiel spécifique au sens des circulaires BCEAO",
+            ),
+            _column(
                 "Cas_particulier_souverain",
                 "texte",
                 "Type spécifique d'exposition souveraine (pondération préférentielle)",
             ),
-            _column(
-                "Souverain_ponderation_pref_nulle",
-                "oui/non",
-                "Souverain préférentiel à pondération nulle",
-            ),
-            _column("Souverain_OCE_etabli", "oui/non", "Souverain non noté établi par les OCE"),
             _column("Souverain_note_OCE", "texte", "Note OCE de 0 à 7"),
-            _column(
-                "Organisme_public_cas_UEMOA_FCFA",
-                "oui/non",
-                "Organisme public hors administration centrale, libellé et financé en FCFA",
-            ),
-            _column(
-                "Organisme_public_activite_non_publique",
-                "oui/non",
-                "L'organisme public finance une activité non publique",
-            ),
-            _column("BMD_cas_haute_qualite", "oui/non", "BMD notation élevée / soutien actionnarial fort"),
-            _column("BMD_cas_UEMOA_FCFA", "oui/non", "BMD relevant du cas UEMOA libellé et financé en FCFA"),
-            _column(
-                "BMD_criteres_UEMOA_respectes",
-                "oui/non",
-                "BMD UEMOA en FCFA respectant les critères c), d) et e)",
-            ),
-            _column(
-                "BMD_institution_listee_FCFA",
-                "oui/non",
-                "BMD de la liste BIRD/SFI/BAsD/BAD/BERD/BEI/FEI/BNI/BDC/BIsD/BDCE/AMGI/BOAD",
-            ),
-            _column("Cas_institution_bancaire", "texte", "Cas prudentiel des institutions bancaires"),
             _column("Type_autre_actif", "texte", "Type d'élément d'actif (catégorie autres actifs)"),
-            _column(
-                "Clientele_detail_criteres_respectes",
-                "oui/non",
-                "Critères de classement en clientèle de détail respectés",
-            ),
-            _column(
-                "Immobilier_residentiel_eligible",
-                "oui/non",
-                "Conditions d'éligibilité de l'immobilier résidentiel respectées",
-            ),
-            _column(
-                "Immobilier_commercial_eligible",
-                "oui/non",
-                "Conditions d'éligibilité de l'immobilier commercial respectées",
-            ),
             _column(
                 "Ponderation_initiale_avant_defaut",
                 "nombre",
                 "Pondération initiale de l'exposition avant défaut",
-            ),
-            _column(
-                "Defaut_pret_immo_residentiel",
-                "oui/non",
-                "Exposition en défaut = prêt immobilier résidentiel",
-            ),
-            _column(
-                "Defaut_provision_min_20pct",
-                "oui/non",
-                "Provisions ≥ 20 % de l'encours",
-            ),
-            _column(
-                "Entreprise_depasse_seuil_degradation_BCEAO",
-                "oui/non",
-                "Portefeuille entreprises dépassant le seuil BCEAO de dégradation",
-            ),
-            _column(
-                "Entreprise_procedure_prudentielle",
-                "oui/non",
-                "Entreprise faisant l'objet d'une procédure prudentielle",
-            ),
-            _column(
-                "Entreprise_investissement_hors_loi_bancaire",
-                "oui/non",
-                "Entreprise d'investissement non soumise à la loi bancaire",
             ),
         ),
         notes=(
@@ -458,3 +394,187 @@ def inspect_workbook_structure(workbook) -> dict[str, Any]:
         "sheets": sheet_reports,
         "errors": errors,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Exigences conditionnelles
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Une colonne « optionnelle » ne l'est que parce qu'elle ne concerne pas toutes
+# les categories. Laissee vide la ou elle s'applique, elle ne fait pas echouer
+# l'import : elle fausse le calcul, en silence.
+#
+# Mesure sur un portefeuille de 1 500 expositions, chaque colonne videe tour a
+# tour, ecart sur le RWA total :
+#
+#     PRET TOTAL                          -9,21 %
+#     Type_autre_actif                    +3,80 %
+#     Provisions                          +3,64 %
+#     Niveau de risque HB                 +3,41 %
+#     Montant d'exposition au HB          -1,25 %
+#     Ponderation_initiale_avant_defaut   -0,53 %
+#     Regime_prudentiel_specifique        -0,33 %
+#
+# Toutes videes ensemble, le RWA declare passait de 686,97 a 785,66 milliards
+# -- +14,4 % -- sans un rejet ni un avertissement.
+
+COLONNE_CATEGORIE = "Catégorie d'exposition"
+COLONNE_MONTANT_HB = "Montant d'exposition au HB"
+COLONNE_NIVEAU_HB = "Niveau de risque HB"
+
+# Colonnes exigees selon la categorie prudentielle de la ligne, avec ce que
+# leur absence coute au calcul.
+EXIGENCES_PAR_CATEGORIE: dict[str, tuple[tuple[str, str], ...]] = {
+    "Prêts garantis par l'immo R": (
+        ("PRÊT TOTAL", "la quotite de financement, qui decide de la ponderation"),
+    ),
+    "Prêts garantis par l'immo C": (
+        ("PRÊT TOTAL", "la quotite de financement, qui decide de la ponderation"),
+    ),
+    "Autres actifs": (
+        ("Type_autre_actif", "la nature de l'actif, qui porte sa ponderation"),
+    ),
+    "Créances en souffrance": (
+        ("Provisions", "le taux de provisionnement, qui decide de la ponderation"),
+        ("Jours_impayes", "l'anciennete de l'impaye"),
+        (
+            "Ponderation_initiale_avant_defaut",
+            "la ponderation d'origine, base du traitement du defaut",
+        ),
+    ),
+    "Créances à risque élevé": (
+        ("Provisions", "le taux de provisionnement, qui decide de la ponderation"),
+    ),
+}
+
+# Exigees sur toute ligne, quelle que soit la categorie.
+EXIGENCES_TOUTES_LIGNES: tuple[tuple[str, str], ...] = (
+    (
+        "Regime_prudentiel_specifique",
+        "le traitement prudentiel retenu ; « Standard (aucun traitement "
+        "particulier) » si la ligne n'en releve pas",
+    ),
+)
+
+# Identification de la contrepartie : exigee une fois par contrepartie, pas par
+# ligne -- elle la decrit, elle ne decrit pas l'exposition. Sans elle, l'EP29,
+# l'EP30, l'EP32, l'EP38 et l'EP39 partent vides.
+# Le troisieme terme dit si « Neant » vaut reponse. Une contrepartie hors groupe
+# n'a rien d'honnete a porter dans les trois colonnes de groupe, et la plupart
+# des contreparties ne sont pas des parties liees : exiger une valeur reelle
+# rendrait la regle insatisfiable. Le numero a la Centrale des risques et le
+# secteur, eux, existent toujours -- s'en dispenser serait ne pas identifier la
+# contrepartie du tout.
+EXIGENCES_PAR_CONTREPARTIE: tuple[tuple[str, str, bool], ...] = (
+    ("N_Centrale_risques", "l'identifiant de la contrepartie sur l'EP29 et l'EP32", False),
+    ("Secteur_activite", "le secteur declare sur l'EP29 et l'EP30", False),
+    ("Groupe_clients_lies", "le groupe de clients lies de l'EP30", True),
+    ("N_Centrale_risques_groupe", "l'identifiant du groupe sur l'EP30", True),
+    ("Categorie_lien", "la nature du lien au groupe, codee « a » ou « b » sur l'EP30", True),
+    ("Partie_liee", "la qualite au titre de l'EP38 et de l'EP39", True),
+)
+
+# Une contrepartie hors groupe n'a rien d'honnete a porter dans les trois
+# colonnes de groupe. « Repondre » a l'exigence, c'est alors le dire : ces
+# mentions valent reponse, au meme titre qu'un nom de groupe.
+MENTIONS_SANS_OBJET = frozenset(
+    {"neant", "néant", "sans objet", "non applicable", "n/a", "na", "-", "aucun", "aucune"}
+)
+
+
+def _renseignee(valeur: Any) -> bool:
+    return valeur is not None and str(valeur).strip() != ""
+
+
+def _repondue(valeur: Any, *, neant_accepte: bool) -> bool:
+    """Une case a laquelle le declarant a repondu.
+
+    « Neant » est une reponse la ou l'absence est un fait declarable -- pas de
+    groupe, pas de qualite de partie liee. Ailleurs, c'est une case vide
+    deguisee, et la regle la refuse comme telle.
+    """
+
+    if not _renseignee(valeur):
+        return False
+    if neant_accepte:
+        return True
+    return str(valeur).strip().casefold() not in MENTIONS_SANS_OBJET
+
+
+def controler_exigences_conditionnelles(
+    lignes: list[tuple[int, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Releve les cases exigees par le contexte de la ligne et restees vides.
+
+    `lignes` porte des couples (numero de ligne dans le classeur, valeurs) :
+    designer un manque par sa ligne Excel est la seule facon utile de le dire au
+    declarant.
+
+    Retourne une liste de manques, chacun portant la ligne du classeur, la
+    colonne, et ce que son absence coute. Vide, le classeur est complet.
+    """
+
+    manques: list[dict[str, Any]] = []
+    vues: set[str] = set()
+
+    for index, ligne in lignes:
+        categorie = str(ligne.get(COLONNE_CATEGORIE) or "").strip()
+        identifiant = str(ligne.get("ID_Exposition") or "").strip()
+
+        exigences = list(EXIGENCES_TOUTES_LIGNES)
+        exigences.extend(EXIGENCES_PAR_CATEGORIE.get(categorie, ()))
+
+        # Le hors bilan se declare par paire : un montant sans niveau de risque
+        # n'a pas de facteur de conversion, un niveau sans montant ne s'applique
+        # a rien.
+        if _renseignee(ligne.get(COLONNE_MONTANT_HB)) and not _renseignee(
+            ligne.get(COLONNE_NIVEAU_HB)
+        ):
+            exigences.append(
+                (COLONNE_NIVEAU_HB, "le facteur de conversion de l'engagement hors bilan")
+            )
+        if _renseignee(ligne.get(COLONNE_NIVEAU_HB)) and not _renseignee(
+            ligne.get(COLONNE_MONTANT_HB)
+        ):
+            exigences.append(
+                (COLONNE_MONTANT_HB, "le montant auquel appliquer le niveau de risque")
+            )
+
+        for colonne, consequence in exigences:
+            if not _renseignee(ligne.get(colonne)):
+                manques.append(
+                    {
+                        "ligne": index,
+                        "id_exposition": identifiant,
+                        "colonne": colonne,
+                        "portee": categorie or "toutes catégories",
+                        "consequence": consequence,
+                    }
+                )
+
+        # Identification : relevee une fois par contrepartie. Une contrepartie
+        # etalee sur plusieurs lignes peut n'en renseigner qu'une.
+        contrepartie = str(ligne.get("Contrepartie") or "").strip()
+        if contrepartie and contrepartie not in vues:
+            vues.add(contrepartie)
+            siennes = [
+                autre
+                for _, autre in lignes
+                if str(autre.get("Contrepartie") or "").strip() == contrepartie
+            ]
+            for colonne, consequence, neant_accepte in EXIGENCES_PAR_CONTREPARTIE:
+                if not any(
+                    _repondue(autre.get(colonne), neant_accepte=neant_accepte)
+                    for autre in siennes
+                ):
+                    manques.append(
+                        {
+                            "ligne": index,
+                            "id_exposition": identifiant,
+                            "colonne": colonne,
+                            "portee": f"contrepartie « {contrepartie} »",
+                            "consequence": consequence,
+                        }
+                    )
+
+    return manques

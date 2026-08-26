@@ -81,10 +81,52 @@ CAS_SOUVERAIN_BCEAO = "Expositions sur BCEAO libellées et financées en FCFA"
 CAS_SOUVERAIN_AUCUN = "Aucun de ces cas"
 CAS_SOUVERAIN_ORG = ("UEMOA", "CEDEAO", "UA", "UE", "ONU", "BRI", "FMI", "BCE", "FGD-UMOA")
 
+CAS_ORGANISME_PUBLIC = (
+    "Organisme public standard (selon notation)",
+    "Organisme public UEMOA libellé en FCFA (préférentiel 20%)",
+    "Activité commerciale / non publique (traité comme entreprise)",
+)
+
+CAS_BMD = (
+    "BMD standard (selon notation)",
+    "BMD haute qualité / soutien fort (pondération 0%)",
+    "BMD institution listée BCEAO en FCFA (BIRD, BAD, BOAD... 0%)",
+    "BMD UEMOA en FCFA conforme aux critères (20%)",
+)
+
 CAS_INSTITUTION_BANCAIRE = (
     "equivalent_umoa_rules",
     "weak_prudential_case",
     "eligible_categories_case",
+)
+
+CAS_CREANCE_SOUFFRANCE = (
+    "Prêt immobilier résidentiel en défaut (Provisions >= 20%) — 50%",
+    "Prêt immobilier résidentiel en défaut (Provisions < 20%) — 100%",
+    "Autre créance en défaut (Provisions >= 20%) — 100%",
+    "Autre créance en défaut (Provisions < 20%) — 150%",
+)
+
+REGIMES_PRUDENTIELS = (
+    "Standard (aucun traitement particulier)",
+    "Souverain UEMOA en FCFA (pondération 0 %)",
+    "Organisme public UEMOA en FCFA (pondération 20 %)",
+    "Organisme public - Activité commerciale (traité comme entreprise)",
+    "BMD liste officielle BCEAO (BIRD, BAD, BOAD... pondération 0 %)",
+    "BMD haute qualité / soutien fort (pondération 0 %)",
+    "BMD UEMOA en FCFA (pondération 20 %)",
+    "Banque - Établissement de crédit agréé UEMOA",
+    "Banque - Faible qualité prudentielle",
+    "Clientèle de détail - Critères d'éligibilité respectés (pondération 75 %)",
+    "Immobilier résidentiel - Prêt éligible avec hypothèque 1er rang (pondération 35 %)",
+    "Immobilier commercial - Prêt éligible (pondération 50 %)",
+    "Défaut - Prêt immobilier résidentiel (Provisions >= 20%) — pondération 50 %",
+    "Défaut - Prêt immobilier résidentiel (Provisions < 20%) — pondération 100 %",
+    "Défaut - Autre créance en souffrance (Provisions >= 20%) — pondération 100 %",
+    "Défaut - Autre créance en souffrance (Provisions < 20%) — pondération 150 %",
+    "Entreprise - Portefeuille dégradé (seuil BCEAO dépassé -> pondération 150 %)",
+    "Entreprise - Procédure prudentielle (pondération 150 %)",
+    "Entreprise d'investissement non soumise à la loi bancaire (pondération 100 %)",
 )
 
 PONDERATIONS_AVANT_DEFAUT = (0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.5)

@@ -147,9 +147,9 @@ const _artExplanations = <String, String>{
   'Art. 89':
       'Calcul des RWA opérationnels - méthode Indicateur de Base (BIA).\n\n'
       'Formule BIA :\n'
-      '  Capital minimal = α × PNBmoy₃\n'
+      '  Capital minimal = α × PNBmoy3\n'
       '  α = 15 %   (coefficient réglementaire BCEAO)\n'
-      '  PNBmoy₃ = Σ PNBᵢ (positifs) / n   sur 3 derniers exercices\n'
+      '  PNBmoy3 = Σ PNB_i (positifs) / n   sur 3 derniers exercices\n'
       '  RWA_opérationnel = Capital minimal × 12,5   (multiplicateur réglementaire)',
   'Art. 301/307':
       'Exigences minimales en fonds propres (dispositif prudentiel BCEAO).\n\n'
@@ -170,7 +170,7 @@ const _artExplanations = <String, String>{
       'Rapport annuel sur le dispositif de gestion des risques opérationnels,\n'
       'transmis à la Commission Bancaire de l\'UMOA.\n\n'
       'Indicateurs clés à reporter :\n'
-      '  • RWA opérationnel = K_BIA × 12,5   (avec K_BIA = 15 % × PNBmoy₃)\n'
+      '  • RWA opérationnel = K_BIA × 12,5   (avec K_BIA = 15 % × PNBmoy3)\n'
       '  • Pertes totales nettes = Σ (Perte brute − Récupérations)\n'
       '  • Taux couverture plans = Actions terminées / Total plans × 100\n'
       '  • Résultats stress tests : ΔFP sous S3 et S4',
@@ -3190,14 +3190,14 @@ class _KriCard extends StatelessWidget {
                 // Seuils compacts
                 Row(children: [
                   Text(
-                    '${sens ? '▲' : '▼'} ${d.seuilAlerte}',
+                    '${sens ? '↑' : '↓'} ${d.seuilAlerte}',
                     style: TextStyle(fontSize: 10, color: mutedColor, fontWeight: FontWeight.w600)),
                   Container(
                     width: 1, height: 9,
                     margin: const EdgeInsets.symmetric(horizontal: 7),
                     color: mutedColor.withValues(alpha: 0.2)),
                   Text(
-                    '${sens ? '▲' : '▼'} ${d.seuilCritique} ${d.unite}',
+                    '${sens ? '↑' : '↓'} ${d.seuilCritique} ${d.unite}',
                     style: TextStyle(fontSize: 10, color: mutedColor, fontWeight: FontWeight.w600)),
                 ]),
 

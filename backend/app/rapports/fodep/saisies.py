@@ -190,13 +190,12 @@ def catalogue_adpe() -> list[CaseASaisir]:
 # doivent etre declares en millions de franc CFA » (notice, § 2.3). Ce qui est
 # saisi ici est ecrit tel quel dans le classeur, sans conversion — contrairement
 # aux montants que l'application calcule, qu'elle ramene au million elle-meme.
-# Le rappeler sur l'ecran evite l'erreur d'un facteur un million.
 UNITE_DE_DECLARATION = (
     "Montants en millions de FCFA, comme tout le formulaire (notice, § 2.3). "
     "Ce qui est laissé vide part à zéro."
 )
 
-ETATS_A_SAISIR: tuple[tuple[str, str, str], ...] = (
+ETATS_FACULTATIFS_CATALOGUE: tuple[tuple[str, str, str], ...] = (
     (
         "EP04",
         "Dispositions transitoires : reclassement et retrait progressif des "
@@ -221,6 +220,10 @@ ETATS_A_SAISIR: tuple[tuple[str, str, str], ...] = (
         UNITE_DE_DECLARATION,
     ),
 )
+
+# Seul l'ADPE est exposé à la saisie manuelle sur l'écran de saisie du FODEP.
+# Tout le reste du formulaire est produit par l'application ou complété automatiquement à zéro.
+ETATS_A_SAISIR: tuple[tuple[str, str, str], ...] = ()
 
 
 # « A. », « B) » — la numerotation des blocs du formulaire.
@@ -361,7 +364,7 @@ def _catalogue_prudentiel() -> tuple[CaseASaisir, ...]:
     try:
         styles = styles_ouverts(classeur)
         cases: list[CaseASaisir] = []
-        for etat, _, _note in ETATS_A_SAISIR:
+        for etat, _, _note in ETATS_FACULTATIFS_CATALOGUE:
             if etat not in classeur.sheetnames:
                 continue
             feuille = classeur[etat]

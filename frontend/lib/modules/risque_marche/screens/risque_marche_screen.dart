@@ -30792,7 +30792,7 @@ extension on _VarMethod {
               r'\widehat{\mathrm{ES}}_{\alpha,T}=\mathbb{E}\left[L\mid L\geq \widehat{\mathrm{VaR}}_{\alpha,T}\right]',
             ],
             variables:
-                'PVᵢ : valeur actuelle du titre ; Dmodᵢ : duration modifiée ; Cᵢ : convexité ; Δyᵢ,ₜ : choc de courbe interpolé ; α : niveau de confiance ; T : horizon en jours.',
+                'PV_i : valeur actuelle du titre ; Dmod_i : duration modifiée ; C_i : convexité ; Δy_i,t : choc de courbe interpolé ; α : niveau de confiance ; T : horizon en jours.',
           ),
         _VarMethod.parametric => const _VarFormulaSpec(
             color: _marketDashboardDeepBlue,

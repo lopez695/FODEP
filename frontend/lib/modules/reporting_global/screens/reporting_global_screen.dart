@@ -68,9 +68,9 @@ const _artExplanations = <String, String>{
   'Art. 89':
       'Calcul des RWA opérationnels : méthode Indicateur de Base (BIA).\n\n'
           'Formule BIA :\n'
-          '  Capital minimal = α × PNBmoy₃\n'
+          '  Capital minimal = α × PNBmoy3\n'
           '  α = 15 %   (coefficient réglementaire BCEAO)\n'
-          '  PNBmoy₃ = Σ PNBᵢ (positifs) / n   sur 3 derniers exercices\n'
+          '  PNBmoy3 = Σ PNB_i (positifs) / n   sur 3 derniers exercices\n'
           '  RWA_opérationnel = Capital minimal × 12,5   (multiplicateur réglementaire)',
   'Art. 301/307':
       'Exigences minimales en fonds propres (dispositif prudentiel BCEAO).\n\n'

@@ -19,7 +19,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   std::wstring backend_error;
   if (!EnsureBackendServerRunning(&backend_error)) {
-    ::MessageBoxW(nullptr, backend_error.c_str(), L"Risk management",
+    ::MessageBoxW(nullptr, backend_error.c_str(), L"FODEP",
                   MB_OK | MB_ICONERROR);
     ::CoUninitialize();
     return EXIT_FAILURE;
@@ -38,7 +38,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"Risk management", origin, size)) {
+  if (!window.Create(L"FODEP", origin, size)) {
     StopManagedBackendServer();
     ::CoUninitialize();
     return EXIT_FAILURE;

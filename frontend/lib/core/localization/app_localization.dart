@@ -744,6 +744,7 @@ const Map<String, String> _englishTranslations = {
   'Marché interne': 'Internal market',
   'Flux marché': 'Market feed',
   'Bourse': 'Exchange',
+  'FODEP': 'FODEP',
   'Risk management': 'Risk management',
   'Risque Crédit': 'Credit Risk',
   'Risque du Marché': 'Market Risk',
@@ -850,12 +851,12 @@ const Map<String, String> _englishTranslations = {
   'Formules - VaR Monte-Carlo': 'Formulas - Monte Carlo VaR',
   'Formules de calcul': 'Calculation formulas',
   'Variables': 'Variables',
-  'Lᵢ : perte observée ; Rᵢ : rendement historique ; V : valeur du portefeuille ; α : niveau de confiance ; n : nombre d’observations ; Qα : quantile empirique.':
-      'Lᵢ: observed loss; Rᵢ: historical return; V: portfolio value; α: confidence level; n: number of observations; Qα: empirical quantile.',
+  'L_i : perte observée ; R_i : rendement historique ; V : valeur du portefeuille ; α : niveau de confiance ; n : nombre d’observations ; Qα : quantile empirique.':
+      'L_i: observed loss; R_i: historical return; V: portfolio value; α: confidence level; n: number of observations; Qα: empirical quantile.',
   'zα : quantile normal ; σ : volatilité ; D : duration/sensibilité ; ρ : corrélation ; μ : rendement attendu ; T : horizon en jours ouvrés ; φ : densité normale.':
       'zα: normal quantile; σ: volatility; D: duration/sensitivity; ρ: correlation; μ: expected return; T: horizon in business days; φ: normal density.',
-  'Mᵢ : facteur de marché ; Eᵢ : choc spécifique ; ρ : corrélation ; εᵢ : choc corrélé ; Rᵢ : rendement simulé ; Lᵢ : perte simulée ; V : valeur du portefeuille ; N : scénarios.':
-      'Mᵢ: market factor; Eᵢ: specific shock; ρ: correlation; εᵢ: correlated shock; Rᵢ: simulated return; Lᵢ: simulated loss; V: portfolio value; N: scenarios.',
+  'M_i : facteur de marché ; E_i : choc spécifique ; ρ : corrélation ; ε_i : choc corrélé ; R_i : rendement simulé ; L_i : perte simulée ; V : valeur du portefeuille ; N : scénarios.':
+      'M_i: market factor; E_i: specific shock; ρ: correlation; ε_i: correlated shock; R_i: simulated return; L_i: simulated loss; V: portfolio value; N: scenarios.',
   'Fréquence': 'Frequency',
   'gains ←': 'gains ←',
   'pertes sévères →': 'severe losses →',

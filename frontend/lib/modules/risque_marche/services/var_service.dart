@@ -152,7 +152,7 @@ VarEngineResult calculateHistoricalVar({
         'moyenne_extreme': esReturns.isEmpty
             ? 0
             : esReturns.reduce((a, b) => a + b) / esReturns.length,
-        'formule_es': 'ES($conf) = -moyenne(R ≤ -VaR) × P × √T',
+        'formule_es': 'ES($conf) = -moyenne(R ≤ -VaR) × P × sqrt(T)',
       });
 
       journal.add({
@@ -184,8 +184,8 @@ VarEngineResult calculateHistoricalVar({
               : esReturns.reduce((a, b) => a + b) / esReturns.length,
           'time_scale': timeScale,
           'z_score': z,
-          'formule_var': 'VaR_{hist}(α) = -percentile(R, 1-α) × P × √T',
-          'formule_es': 'ES(α) = -E[R | R ≤ q_{1-α}] × P × √T',
+          'formule_var': 'VaR_{hist}(α) = -percentile(R, 1-α) × P × sqrt(T)',
+          'formule_es': 'ES(α) = -E[R | R ≤ q_{1-α}] × P × sqrt(T)',
         },
         calculationJournal: journal,
       ));
@@ -211,8 +211,8 @@ VarEngineResult calculateParametricVar({
     'etape': 'Initialisation',
     'description': 'VaR Paramétrique (Variance-Covariance)',
     'timestamp': DateTime.now().toIso8601String(),
-    'formule': 'VaR_{param}(α) = Z_α × σ × P × √T',
-    'formule_es': 'ES(α) = φ(Z_α) / (1-α) × σ × P × √T',
+    'formule': 'VaR_{param}(α) = Z_α × σ × P × sqrt(T)',
+    'formule_es': 'ES(α) = φ(Z_α) / (1-α) × σ × P × sqrt(T)',
   });
 
   final hasData = input.portfolioValue > 0 && input.annualVolatility > 0;
@@ -269,8 +269,8 @@ VarEngineResult calculateParametricVar({
           'loss_std_dev': lossStdDev,
           'time_scale': timeScale,
           'sensitivity_multiplier': sensMultiple,
-          'formule_var': 'VaR(α) = Z_α × σ_j × S × P × √T',
-          'formule_es': 'ES(α) = φ(Z_α) / (1-α) × σ_j × P × √T',
+          'formule_var': 'VaR(α) = Z_α × σ_j × S × P × sqrt(T)',
+          'formule_es': 'ES(α) = φ(Z_α) / (1-α) × σ_j × P × sqrt(T)',
           'formule_z': 'Z_95 = 1.645, Z_99 = 2.326',
         },
         calculationJournal: journal,
@@ -298,7 +298,7 @@ VarEngineResult calculateMonteCarloVar({
     'description': 'VaR Monte-Carlo - ${input.numSimulations} simulations',
     'timestamp': DateTime.now().toIso8601String(),
     'formule':
-        'Simulation de GBM: S_t = S_0 × exp((μ - σ²/2) × Δt + σ × √Δt × ε)',
+        'Simulation de GBM: S_t = S_0 × exp((μ - σ²/2) × Δt + σ × sqrt(Δt) × ε)',
   });
 
   final hasData = input.portfolioValue > 0 &&
@@ -379,7 +379,7 @@ VarEngineResult calculateMonteCarloVar({
           'seed': 42,
           'var_index': boundedIndex,
           'es_count': esScenarios.length,
-          'formule': 'GBM: S_t = S_0 × exp((μ - σ²/2)Δt + σ√Δt × ε)',
+          'formule': 'GBM: S_t = S_0 × exp((μ - σ²/2)Δt + σsqrt(Δt) × ε)',
           'distribution': 'Normale (Box-Muller)',
         },
         calculationJournal: journal,

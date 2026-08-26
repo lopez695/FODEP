@@ -1017,7 +1017,7 @@ class _AgentContributionTableState extends State<_AgentContributionTable> {
     String? tooltip,
   }) {
     final active = _sortKey == key;
-    final suffix = active ? (_ascending ? ' ▴' : ' ▾') : '';
+    final suffix = active ? (_ascending ? ' ↑' : ' ↓') : '';
     final text = _TableHeaderText('$label$suffix', alignRight: alignRight);
     return Expanded(
       flex: flex,

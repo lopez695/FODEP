@@ -95,7 +95,7 @@ class DashboardTop10RisquesChart extends StatelessWidget {
                         ),
                         children: [
                           TextSpan(
-                            text: '────────────────\n',
+                            text: '————————————————\n',
                             style: TextStyle(
                               color: c.muted.withValues(alpha: 0.3),
                               fontSize: 8,

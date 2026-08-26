@@ -766,11 +766,14 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     'country_rating',
     'country_rw',
     'category',
+    'regime_prudentiel',
     'rw',
     'loan_total',
     'encours_restant',
     'on_balance_amount',
     'off_balance_amount',
+    'provisions',
+    'jours_impayes',
     'source_currency',
     'crm_exists',
     'crm_type',
@@ -782,6 +785,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     'rwa_hb',
     'rwa',
     'capital',
+    'commentaire',
     'statut',
     'actions',
   ];
@@ -789,12 +793,12 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
   static const List<String> _importedColumnKeys = [
     'id', 'grant_date', 'maturity_date', 'exposure_maturity', 'residual_maturity',
     'counterparty', 'counterparty_rating', 'country', 'country_rating', 'country_rw',
-    'category', 'rw', 'loan_total', 'encours_restant', 'on_balance_amount', 'off_balance_amount',
-    'source_currency', 'crm_exists', 'crm_type', 'actions',
+    'category', 'regime_prudentiel', 'rw', 'loan_total', 'encours_restant', 'on_balance_amount', 'off_balance_amount',
+    'provisions', 'jours_impayes', 'source_currency', 'crm_exists', 'crm_type', 'commentaire', 'actions',
   ];
 
   static const List<String> _calculatedColumnKeys = [
-    'id', 'counterparty', 'encours_restant', 'ead_bilan', 'ead_hb', 'ead_hb_ccf', 'ead_total',
+    'id', 'counterparty', 'regime_prudentiel', 'encours_restant', 'ead_bilan', 'ead_hb', 'ead_hb_ccf', 'ead_total',
     'rwa_eb', 'rwa_hb', 'rwa', 'capital', 'statut', 'actions',
   ];
 
@@ -803,6 +807,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     'counterparty',
     'geo',
     'category',
+    'regime_prudentiel',
     'rating',
     'gross',
     'ead',
@@ -816,6 +821,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     'counterparty',
     'geo',
     'category',
+    'regime_prudentiel',
     'gross',
     'rw',
     'rwa',
@@ -826,6 +832,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     'id',
     'counterparty',
     'category',
+    'regime_prudentiel',
     'gross',
     'rwa',
     'crm',
@@ -843,24 +850,28 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     0.20, // 8  country_rating
     0.20, // 9  country_rw
     0.45, // 10 category
-    0.20, // 11 rw
-    0.20, // 12 loan_total
-    0.20, // 13 encours_restant
-    0.20, // 14 on_balance_amount
-    0.20, // 14 off_balance_amount
-    0.20, // 15 source_currency
-    0.20, // 16 crm_exists
-    0.20, // 17 crm_type
-    0.20, // 18 ead_bilan
-    0.20, // 19 ead_hb
-    0.20, // 20 ead_hb_ccf
-    0.20, // 21 ead_total
-    0.20, // 22 rwa_eb
-    0.20, // 23 rwa_hb
-    0.20, // 24 rwa
-    0.20, // 25 capital
-    0.20, // 26 statut
-    0.20, // 27 actions
+    0.45, // 11 regime_prudentiel
+    0.20, // 12 rw
+    0.20, // 13 loan_total
+    0.20, // 14 encours_restant
+    0.20, // 15 on_balance_amount
+    0.20, // 16 off_balance_amount
+    0.20, // 17 provisions
+    0.20, // 18 jours_impayes
+    0.20, // 19 source_currency
+    0.20, // 20 crm_exists
+    0.20, // 21 crm_type
+    0.20, // 22 ead_bilan
+    0.20, // 23 ead_hb
+    0.20, // 24 ead_hb_ccf
+    0.20, // 25 ead_total
+    0.20, // 26 rwa_eb
+    0.20, // 27 rwa_hb
+    0.20, // 28 rwa
+    0.20, // 29 capital
+    0.35, // 30 commentaire
+    0.20, // 31 statut
+    0.20, // 32 actions
   ];
 
   static const List<double> _denseTableWidthWeights = [
@@ -868,6 +879,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     1.75,
     1,
     1.15,
+    1.40,
     0.75,
     1,
     1,
@@ -881,6 +893,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     2.35,
     1.55,
     1.75,
+    1.60,
     1.55,
     1.10,
     1.40,
@@ -891,6 +904,7 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
     1.25,
     3.00,
     2.30,
+    1.80,
     2.00,
     1.80,
     1.80,
@@ -1542,6 +1556,8 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
         return 'Devise';
       case 'category':
         return "Catégorie d'exposition";
+      case 'regime_prudentiel':
+        return 'Régime prudentiel';
       case 'rating':
         return 'Notation';
       case 'gross':
@@ -1554,6 +1570,12 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
         return 'Exposition au bilan$currencySuffix';
       case 'off_balance_amount':
         return 'Exposition au hors bilan$currencySuffix';
+      case 'provisions':
+        return 'Provisions$currencySuffix';
+      case 'jours_impayes':
+        return 'Jours impayés';
+      case 'commentaire':
+        return 'Commentaire';
       case 'crm_exists':
         return 'CRM existe';
       case 'crm_type':
@@ -1620,12 +1642,16 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
       case 'country_rw':
       case 'source_currency':
       case 'category':
+      case 'regime_prudentiel':
       case 'rating':
       case 'gross':
       case 'loan_total':
       case 'encours_restant':
       case 'on_balance_amount':
       case 'off_balance_amount':
+      case 'provisions':
+      case 'jours_impayes':
+      case 'commentaire':
       case 'crm_exists':
       case 'crm_type':
       case 'ead_bilan':
@@ -1899,6 +1925,8 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
         return _tableText(row.currency, width);
       case 'category':
         return _tableText(_displayExposureCategory(row.categoryLabel), width);
+      case 'regime_prudentiel':
+        return _tableText(row.regimePrudentielLabel, width, tooltip: row.regimePrudentielLabel);
       case 'rating':
         return _tableText(row.ratingLabel.tr(context), width);
       case 'gross':
@@ -1931,6 +1959,16 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
           currencyCode: _displayCurrency == 'Origine' ? row.currency : _displayCurrency,
           width: width,
         );
+      case 'provisions':
+        return _tableAmountText(
+          _convertRowAmount(row.provisionsAmount ?? 0.0, row.currency),
+          currencyCode: _displayCurrency == 'Origine' ? row.currency : _displayCurrency,
+          width: width,
+        );
+      case 'jours_impayes':
+        return _tableText(row.joursImpayes > 0 ? '${row.joursImpayes} j' : '-', width);
+      case 'commentaire':
+        return _tableText(row.comment, width, tooltip: row.comment);
       case 'crm_exists':
         return _tableText(_crmExistsLabel(row), width);
       case 'crm_type':
@@ -3311,6 +3349,8 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
           'source_currency' => left.currency.compareTo(right.currency),
           'category' => _displayExposureCategory(left.categoryLabel)
               .compareTo(_displayExposureCategory(right.categoryLabel)),
+          'regime_prudentiel' => left.regimePrudentielLabel
+              .compareTo(right.regimePrudentielLabel),
           'rating' => _compareRatings(left.ratingLabel, right.ratingLabel),
           'loan_total' =>
             _convertRowAmount(_loanTotalAmountValue(left), left.currency)
@@ -3328,6 +3368,10 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
             _convertRowAmount(_offBalanceAmountValue(left), left.currency)
                 .compareTo(_convertRowAmount(
                     _offBalanceAmountValue(right), right.currency)),
+          'provisions' => (_convertRowAmount(left.provisionsAmount ?? 0.0, left.currency))
+              .compareTo(_convertRowAmount(right.provisionsAmount ?? 0.0, right.currency)),
+          'jours_impayes' => left.joursImpayes.compareTo(right.joursImpayes),
+          'commentaire' => left.comment.compareTo(right.comment),
           'crm_exists' =>
             _crmExistsLabel(left).compareTo(_crmExistsLabel(right)),
           'crm_type' =>
@@ -4133,6 +4177,8 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
         return _pdfTableCell(_formatRiskWeight(_countryRiskWeightValue(row)));
       case 'category':
         return _pdfTableCell(_displayExposureCategory(row.categoryLabel));
+      case 'regime_prudentiel':
+        return _pdfTableCell(row.regimePrudentielLabel);
       case 'rw':
         return _pdfTableCell(
           _formatRiskWeight(row.finalRw),
@@ -4164,6 +4210,15 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
           _formatDisplayAmount(
               _convertRowAmount(_offBalanceAmountValue(row), row.currency)),
         );
+      case 'provisions':
+        return _pdfTableCell(
+          _formatDisplayAmount(
+              _convertRowAmount(row.provisionsAmount ?? 0.0, row.currency)),
+        );
+      case 'jours_impayes':
+        return _pdfTableCell(row.joursImpayes > 0 ? '${row.joursImpayes} j' : '-');
+      case 'commentaire':
+        return _pdfTableCell(row.comment);
       case 'source_currency':
         return _pdfTableCell(row.currency);
       case 'crm_exists':

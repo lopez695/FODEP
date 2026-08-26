@@ -872,17 +872,17 @@ class _CrmDetailsDialogState extends State<_CrmDetailsDialog> {
   String _noteDeLecture() {
     switch (_selectedType) {
       case 'FINANCÉE':
-        return '❶ Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
-            '❷ EAD : Exposition réduite de la valeur de la sûreté retenue après décote.\n'
-            '❸ Tous les montants sont exprimés en XOF.';
+        return '(1) Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
+            '(2) EAD : Exposition réduite de la valeur de la sûreté retenue après décote.\n'
+            '(3) Tous les montants sont exprimés en XOF.';
       case 'NON FINANCÉE':
-        return '❶ Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
-            '❷ EAD : Exposition ajustée selon le principe de substitution du garant.\n'
-            '❸ Tous les montants sont exprimés en XOF.';
+        return '(1) Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
+            '(2) EAD : Exposition ajustée selon le principe de substitution du garant.\n'
+            '(3) Tous les montants sont exprimés en XOF.';
       default:
-        return '❶ Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
-            '❷ EAD : Exposition après application du facteur de conversion (CCF).\n'
-            '❸ Tous les montants sont exprimés en XOF.';
+        return '(1) Encours brut : Bilan + Hors bilan (avant facteur de conversion CCF).\n'
+            '(2) EAD : Exposition après application du facteur de conversion (CCF).\n'
+            '(3) Tous les montants sont exprimés en XOF.';
     }
   }
 

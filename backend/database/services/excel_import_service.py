@@ -25,6 +25,7 @@ from app.validators.excel_import_validator import (
     IMPORT_SHEET_SPECS,
     ExcelImportValidationError,
     build_excel_import_spec,
+    controler_exigences_conditionnelles,
     inspect_workbook_structure,
     read_sheet_headers,
 )
@@ -150,6 +151,33 @@ BANK_INSTITUTION_CASE_OPTIONS: tuple[str, ...] = (
     BANK_INSTITUTION_ELIGIBLE_CATEGORIES_CASE,
 )
 
+PUBLIC_BODY_CASE_OPTIONS: tuple[str, ...] = (
+    "Organisme public standard (selon notation)",
+    "Organisme public UEMOA libellé en FCFA (préférentiel 20%)",
+    "Activité commerciale / non publique (traité comme entreprise)",
+)
+
+BMD_CASE_OPTIONS: tuple[str, ...] = (
+    "BMD standard (selon notation)",
+    "BMD haute qualité / soutien fort (pondération 0%)",
+    "BMD institution listée BCEAO en FCFA (BIRD, BAD, BOAD... 0%)",
+    "BMD UEMOA en FCFA conforme aux critères (20%)",
+)
+
+DEFAULTED_EXPOSURE_CASE_OPTIONS: tuple[str, ...] = (
+    "Prêt immobilier résidentiel en défaut (Provisions >= 20%) — 50%",
+    "Prêt immobilier résidentiel en défaut (Provisions < 20%) — 100%",
+    "Autre créance en défaut (Provisions >= 20%) — 100%",
+    "Autre créance en défaut (Provisions < 20%) — 150%",
+)
+
+ENTERPRISE_CASE_OPTIONS: tuple[str, ...] = (
+    "Entreprise standard (selon notation ou 100%)",
+    "Portefeuille dégradé (seuil BCEAO dépassé -> 150%)",
+    "Entreprise faisant l'objet d'une procédure prudentielle",
+    "Entreprise d'investissement non soumise à la loi bancaire (100%)",
+)
+
 DEFAULTED_EXPOSURE_INITIAL_RISK_WEIGHT_OPTIONS: tuple[float, ...] = (
     0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.5,
 )
@@ -224,6 +252,33 @@ STATUS_OPTIONS: tuple[str, ...] = (
     "Clôturée",
 )
 
+PRUDENTIAL_REGIME_OPTIONS: tuple[str, ...] = (
+    "Standard (aucun traitement particulier)",
+    # Souverains & Organismes publics
+    "Souverain UEMOA en FCFA (pondération 0 %)",
+    "Organisme public UEMOA en FCFA (pondération 20 %)",
+    "Organisme public - Activité commerciale (traité comme entreprise)",
+    # Banques & BMD
+    "BMD liste officielle BCEAO (BIRD, BAD, BOAD... pondération 0 %)",
+    "BMD haute qualité / soutien fort (pondération 0 %)",
+    "BMD UEMOA en FCFA (pondération 20 %)",
+    "Banque - Établissement de crédit agréé UEMOA",
+    "Banque - Faible qualité prudentielle",
+    # Clientèle de détail & Immobilier
+    "Clientèle de détail - Critères d'éligibilité respectés (pondération 75 %)",
+    "Immobilier résidentiel - Prêt éligible avec hypothèque 1er rang (pondération 35 %)",
+    "Immobilier commercial - Prêt éligible (pondération 50 %)",
+    # Créances en souffrance (Défauts)
+    "Défaut - Prêt immobilier résidentiel (Provisions >= 20%) — pondération 50 %",
+    "Défaut - Prêt immobilier résidentiel (Provisions < 20%) — pondération 100 %",
+    "Défaut - Autre créance en souffrance (Provisions >= 20%) — pondération 100 %",
+    "Défaut - Autre créance en souffrance (Provisions < 20%) — pondération 150 %",
+    # Entreprises
+    "Entreprise - Portefeuille dégradé (seuil BCEAO dépassé -> pondération 150 %)",
+    "Entreprise - Procédure prudentielle (pondération 150 %)",
+    "Entreprise d'investissement non soumise à la loi bancaire (pondération 100 %)",
+)
+
 # Colonnes à choix fixes -> liste d'options associée. Les colonnes de type
 # "oui/non" (cf. IMPORT_SHEET_SPECS) sont traitées séparément et n'ont pas
 # besoin d'être répétées ici.
@@ -237,9 +292,14 @@ FIXED_OPTIONS_BY_COLUMN: dict[str, tuple] = {
     "Pays_contrepartie": WORLD_COUNTRY_OPTIONS,
     "Niveau de risque HB": OFF_BALANCE_RISK_LEVEL_OPTIONS,
     "Statut": STATUS_OPTIONS,
+    "Regime_prudentiel_specifique": PRUDENTIAL_REGIME_OPTIONS,
     "Cas_particulier_souverain": SOVEREIGN_SPECIAL_CASE_OPTIONS,
     "Souverain_note_OCE": SOVEREIGN_OCE_NOTE_OPTIONS,
+    "Cas_organisme_public": PUBLIC_BODY_CASE_OPTIONS,
+    "Cas_particulier_bmd": BMD_CASE_OPTIONS,
     "Cas_institution_bancaire": BANK_INSTITUTION_CASE_OPTIONS,
+    "Cas_creance_souffrance": DEFAULTED_EXPOSURE_CASE_OPTIONS,
+    "Cas_particulier_entreprise": ENTERPRISE_CASE_OPTIONS,
     "Type_autre_actif": OTHER_ASSET_TYPE_OPTIONS,
     # Identification des contreparties : les libelles proposes sont ceux
     # que l'import sait traduire en identifiants, une saisie libre serait
@@ -262,47 +322,9 @@ FIXED_OPTIONS_BY_COLUMN: dict[str, tuple] = {
     "Decote_OPCVM_max": FINANCED_CRM_OPCVM_HAIRCUT_OPTIONS,
 }
 
-# Colonnes de "Template données" dont les options valides dépendent de la
-# catégorie choisie sur la même ligne (colonne "Catégorie d'exposition") :
-# pour chaque colonne, les codes de catégorie qui l'activent et la liste
-# d'options à proposer dans ce cas. Sur les autres catégories, la colonne ne
-# propose que "(Sans objet pour cette catégorie)" — comme le formulaire
-# "Ajouter une exposition" masque ces mêmes champs selon la catégorie.
-# Remplace, pour ces colonnes, l'entrée correspondante de
-# FIXED_OPTIONS_BY_COLUMN (conservée telle quelle pour l'onglet "Listes de
-# référence", qui reste un simple rappel indépendant de la catégorie).
-CATEGORY_DEPENDENT_COLUMNS: dict[str, tuple[tuple[str, ...], tuple]] = {
-    "Cas_particulier_souverain": (("a",), SOVEREIGN_SPECIAL_CASE_OPTIONS),
-    "Souverain_ponderation_pref_nulle": (("a",), OUI_NON_OPTIONS),
-    "Souverain_OCE_etabli": (("a",), OUI_NON_OPTIONS),
-    "Souverain_note_OCE": (("a",), SOVEREIGN_OCE_NOTE_OPTIONS),
-    "Organisme_public_cas_UEMOA_FCFA": (("b",), OUI_NON_OPTIONS),
-    "Organisme_public_activite_non_publique": (("b",), OUI_NON_OPTIONS),
-    "BMD_cas_haute_qualite": (("c",), OUI_NON_OPTIONS),
-    "BMD_cas_UEMOA_FCFA": (("c",), OUI_NON_OPTIONS),
-    "BMD_criteres_UEMOA_respectes": (("c",), OUI_NON_OPTIONS),
-    "BMD_institution_listee_FCFA": (("c",), OUI_NON_OPTIONS),
-    "Cas_institution_bancaire": (("d",), BANK_INSTITUTION_CASE_OPTIONS),
-    "Type_autre_actif": (("k",), OTHER_ASSET_TYPE_OPTIONS),
-    "Clientele_detail_criteres_respectes": (("f",), OUI_NON_OPTIONS),
-    "Immobilier_residentiel_eligible": (("g",), OUI_NON_OPTIONS),
-    "Immobilier_commercial_eligible": (("h",), OUI_NON_OPTIONS),
-    "Ponderation_initiale_avant_defaut": (
-        ("i",),
-        DEFAULTED_EXPOSURE_INITIAL_RISK_WEIGHT_OPTIONS,
-    ),
-    "Defaut_pret_immo_residentiel": (("i",), OUI_NON_OPTIONS),
-    "Defaut_provision_min_20pct": (("i",), OUI_NON_OPTIONS),
-    "Entreprise_depasse_seuil_degradation_BCEAO": (
-        ("e", "f", "h"),
-        OUI_NON_OPTIONS,
-    ),
-    "Entreprise_procedure_prudentielle": (("e", "f", "h"), OUI_NON_OPTIONS),
-    "Entreprise_investissement_hors_loi_bancaire": (
-        ("e", "f", "h"),
-        OUI_NON_OPTIONS,
-    ),
-}
+# Pour une ergonomie directe et sans blocage dans Excel, toutes les options
+# sont désormais proposées directement dans leurs listes déroulantes respectives.
+CATEGORY_DEPENDENT_COLUMNS: dict[str, tuple[tuple[str, ...], tuple]] = {}
 
 # Nombre de lignes de saisie couvertes par les listes déroulantes (au-delà de
 # ce nombre de lignes, l'utilisateur peut toujours copier la validation avec
@@ -386,6 +408,12 @@ class ParsedImportBundle:
     # Identification des contreparties (EP30, EP38, EP39), traitee a part
     # du modele d'exposition : elle decrit la contrepartie, pas la ligne.
     identifications: dict[str, dict[str, str]] = field(default_factory=dict)
+    # Lignes brutes de « Template donnees », sous la forme (numero de ligne
+    # Excel, valeurs). Conservees pour le controle des exigences
+    # conditionnelles : celui-ci raisonne sur ce que le declarant a ecrit, pas
+    # sur l'enregistrement d'exposition deja calcule, et designe les manques
+    # par leur ligne dans le classeur.
+    template_rows: list[tuple[int, dict[str, Any]]] = field(default_factory=list)
 
 
 class ImportProfiler:
@@ -576,23 +604,20 @@ class ExcelImportService:
             (
                 "Listes déroulantes",
                 "Chaque colonne à choix (catégorie, notation, devise, pays, "
-                "type de CRM, cas particuliers, champs Oui/Non...) propose une "
+                "type de CRM, régime prudentiel spécifique...) propose une "
                 "liste déroulante : cliquez sur la cellule puis sur la flèche "
                 "qui apparaît pour choisir une valeur reconnue par le calcul. "
                 "Le détail des valeurs figure aussi dans l'onglet « Listes de "
                 "référence ».",
             ),
             (
-                "Listes en cascade",
-                "Comme dans le formulaire « Ajouter une exposition », certaines "
-                "listes dépendent de la « Catégorie d'exposition » choisie sur la "
-                "même ligne (ex. Cas_institution_bancaire ne propose des options "
-                "que si la catégorie est Institutions financières, Type_autre_actif "
-                "seulement pour Autres actifs, Cas_particulier_souverain et les "
-                "champs Souverain_* seulement pour Souverains, etc.). Choisissez "
-                "d'abord la catégorie : les colonnes qui ne la concernent pas "
-                "n'affichent alors que « (Sans objet pour cette catégorie) », "
-                "et se réactivent automatiquement si vous changez la catégorie.",
+                "Régime prudentiel spécifique",
+                "La colonne « Regime_prudentiel_specifique » rassemble en une seule liste "
+                "déroulante tous les cas et traitements particuliers de la réglementation BCEAO : "
+                "taux préférentiels (Souverain UEMOA 0%, Prêt immobilier résidentiel 35%, Clientèle "
+                "de détail 75%, BMD 0%), surpondérations (Défauts 50%/100%/150%, Entreprise dégradée "
+                "150%, Procédure prudentielle 150%). Laissez « Standard » ou vide si aucun "
+                "traitement particulier ne s'applique.",
             ),
             (
                 "Champs Oui/Non",
@@ -631,7 +656,13 @@ class ExcelImportService:
                 {
                     "Date d'analyse": "2026-06-30",
                     "ID_Exposition": "EXP-EX-001",
-                    "Contrepartie": "État XYZ",
+                    "N_Centrale_risques": "CR-CI-0001",
+                    "Secteur_activite": "Administration publique",
+                    "Groupe_clients_lies": "Néant",
+                    "N_Centrale_risques_groupe": "Néant",
+                    "Categorie_lien": "Néant",
+                    "Partie_liee": "Néant",
+                    "Contrepartie": "Trésor Public de Côte d'Ivoire",
                     "Notation_externe_contrepartie": "AAA",
                     "Pays_contrepartie": "Côte d'Ivoire",
                     "Notation_externe_pays": "AAA",
@@ -639,48 +670,180 @@ class ExcelImportService:
                     "Montant_exposition_but_au_bilan": 500000000,
                     "Devise": "XOF",
                     "Type_CRM": "Aucune",
+                    "Date d'octroi": "2024-01-15",
+                    "Date d'échéance": "2029-01-15",
+                    "PRÊT TOTAL": 500000000,
+                    "Montant d'exposition au HB": 0,
+                    "Niveau de risque HB": "Risque faible",
+                    "Statut": "Active",
+                    "Provisions": 0,
+                    "Jours_impayes": 0,
+                    "Commentaire": "Bons du Trésor UEMOA — éligible refinancement BCEAO",
+                    "Regime_prudentiel_specifique": "Souverain UEMOA en FCFA (pondération 0 %)",
+                    "Cas_particulier_souverain": "Traitement préférentiel UEMOA (0%)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "(Sans objet pour cette catégorie)",
+                    "Ponderation_initiale_avant_defaut": 0.0,
                 },
                 {
                     "Date d'analyse": "2026-06-30",
                     "ID_Exposition": "EXP-EX-002",
-                    "Date d'octroi": "2024-01-10",
-                    "Date d'échéance": "2027-01-10",
-                    "Contrepartie": "Société ABC SA",
-                    "Notation_externe_contrepartie": "BB",
-                    "Pays_contrepartie": "Sénégal",
-                    "Notation_externe_pays": "A",
+                    "N_Centrale_risques": "CR-CI-0114",
+                    "Secteur_activite": "Industrie manufacturiere",
+                    "Groupe_clients_lies": "Groupe Industriel Ivoirien",
+                    "N_Centrale_risques_groupe": "CR-CI-0100",
+                    "Categorie_lien": "Controle de droit",
+                    "Partie_liee": "Néant",
+                    "Contrepartie": "Société Industrielle Ivoirienne SA",
+                    "Notation_externe_contrepartie": "BBB",
+                    "Pays_contrepartie": "Côte d'Ivoire",
+                    "Notation_externe_pays": "AAA",
                     "Catégorie d'exposition": "Entreprises",
-                    "PRÊT TOTAL": 160000000,
                     "Montant_exposition_but_au_bilan": 150000000,
                     "Devise": "XOF",
                     "Type_CRM": "CRM financee",
+                    "Date d'octroi": "2023-05-10",
+                    "Date d'échéance": "2027-05-10",
+                    "PRÊT TOTAL": 180000000,
+                    "Montant d'exposition au HB": 30000000,
+                    "Niveau de risque HB": "Risque moyen",
+                    "Statut": "Active",
+                    "Provisions": 0,
+                    "Jours_impayes": 0,
+                    "Commentaire": "Ligne de crédit adossée à garantie espèces nantie",
+                    "Regime_prudentiel_specifique": "Standard (aucun traitement particulier)",
+                    "Cas_particulier_souverain": "(Sans objet pour cette catégorie)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "(Sans objet pour cette catégorie)",
+                    "Ponderation_initiale_avant_defaut": 1.0,
                 },
                 {
                     "Date d'analyse": "2026-06-30",
                     "ID_Exposition": "EXP-EX-003",
-                    "Contrepartie": "Particulier — M. Koffi",
+                    "N_Centrale_risques": "CR-SN-0207",
+                    "Secteur_activite": "Menages",
+                    "Groupe_clients_lies": "Néant",
+                    "N_Centrale_risques_groupe": "Néant",
+                    "Categorie_lien": "Néant",
+                    "Partie_liee": "Néant",
+                    "Contrepartie": "Particulier — M. Amadou Diallo",
                     "Notation_externe_contrepartie": "Non noté",
-                    "Pays_contrepartie": "Côte d'Ivoire",
-                    "Notation_externe_pays": "AAA",
+                    "Pays_contrepartie": "Sénégal",
+                    "Notation_externe_pays": "A",
                     "Catégorie d'exposition": "Clientèle de détail",
-                    "Montant_exposition_but_au_bilan": 8000000,
-                    "Montant d'exposition au HB": 2000000,
-                    "Niveau de risque HB": "Risque moyen",
+                    "Montant_exposition_but_au_bilan": 12000000,
                     "Devise": "XOF",
                     "Type_CRM": "CRM non financee",
-                    "Clientele_detail_criteres_respectes": "Oui",
+                    "Date d'octroi": "2024-03-01",
+                    "Date d'échéance": "2028-03-01",
+                    "PRÊT TOTAL": 15000000,
+                    "Montant d'exposition au HB": 3000000,
+                    "Niveau de risque HB": "Risque moyen",
+                    "Statut": "Active",
+                    "Provisions": 0,
+                    "Jours_impayes": 0,
+                    "Commentaire": "Crédit équipement couvert par caution souveraine",
+                    "Regime_prudentiel_specifique": "Clientèle de détail - Critères d'éligibilité respectés (pondération 75 %)",
+                    "Cas_particulier_souverain": "(Sans objet pour cette catégorie)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "(Sans objet pour cette catégorie)",
+                    "Ponderation_initiale_avant_defaut": 0.75,
                 },
                 {
                     "Date d'analyse": "2026-06-30",
                     "ID_Exposition": "EXP-EX-004",
-                    "Contrepartie": "Banque Régionale XYZ",
-                    "Notation_externe_contrepartie": "A",
-                    "Pays_contrepartie": "Bénin",
-                    "Notation_externe_pays": "A",
-                    "Catégorie d'exposition": "Institutions financières",
-                    "Montant_exposition_but_au_bilan": 75000000,
+                    "N_Centrale_risques": "CR-ML-0318",
+                    "Secteur_activite": "Menages",
+                    "Groupe_clients_lies": "Néant",
+                    "N_Centrale_risques_groupe": "Néant",
+                    "Categorie_lien": "Néant",
+                    "Partie_liee": "Néant",
+                    "Contrepartie": "Particulier — Mme Fatou Traoré",
+                    "Notation_externe_contrepartie": "Non noté",
+                    "Pays_contrepartie": "Mali",
+                    "Notation_externe_pays": "BBB",
+                    "Catégorie d'exposition": "Immobilier résidentiel",
+                    "Montant_exposition_but_au_bilan": 35000000,
                     "Devise": "XOF",
                     "Type_CRM": "Aucune",
+                    "Date d'octroi": "2022-09-15",
+                    "Date d'échéance": "2037-09-15",
+                    "PRÊT TOTAL": 40000000,
+                    "Montant d'exposition au HB": 0,
+                    "Niveau de risque HB": "Risque faible",
+                    "Statut": "Active",
+                    "Provisions": 0,
+                    "Jours_impayes": 0,
+                    "Commentaire": "Crédit acquisition logement avec hypothèque 1er rang",
+                    "Regime_prudentiel_specifique": "Immobilier résidentiel - Prêt éligible avec hypothèque 1er rang (pondération 35 %)",
+                    "Cas_particulier_souverain": "(Sans objet pour cette catégorie)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "(Sans objet pour cette catégorie)",
+                    "Ponderation_initiale_avant_defaut": 0.35,
+                },
+                {
+                    "Date d'analyse": "2026-06-30",
+                    "ID_Exposition": "EXP-EX-005",
+                    "N_Centrale_risques": "CR-BF-0422",
+                    "Secteur_activite": "Commerce de gros et de detail",
+                    "Groupe_clients_lies": "Groupe Industriel Ivoirien",
+                    "N_Centrale_risques_groupe": "CR-CI-0100",
+                    "Categorie_lien": "Dependance economique",
+                    "Partie_liee": "Néant",
+                    "Contrepartie": "Entreprise Sahel Négoce SARL",
+                    "Notation_externe_contrepartie": "< B-",
+                    "Pays_contrepartie": "Burkina Faso",
+                    "Notation_externe_pays": "BB",
+                    "Catégorie d'exposition": "Créances en souffrance",
+                    "Montant_exposition_but_au_bilan": 25000000,
+                    "Devise": "XOF",
+                    "Type_CRM": "Aucune",
+                    "Date d'octroi": "2023-02-01",
+                    "Date d'échéance": "2025-02-01",
+                    "PRÊT TOTAL": 25000000,
+                    "Montant d'exposition au HB": 0,
+                    "Niveau de risque HB": "Risque très élevé",
+                    "Statut": "Contentieux",
+                    "Provisions": 8000000,
+                    "Jours_impayes": 125,
+                    "Commentaire": "Dossier contentieux avec provisionnement à 32%",
+                    "Regime_prudentiel_specifique": "Défaut - Autre créance en souffrance (Provisions >= 20%) — pondération 100 %",
+                    "Cas_particulier_souverain": "(Sans objet pour cette catégorie)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "(Sans objet pour cette catégorie)",
+                    "Ponderation_initiale_avant_defaut": 1.0,
+                },
+                {
+                    "Date d'analyse": "2026-06-30",
+                    "ID_Exposition": "EXP-EX-006",
+                    "Contrepartie": "Valeurs en caisse et avoirs BCEAO",
+                    "N_Centrale_risques": "CR-CI-0500",
+                    "Secteur_activite": "Activites financieres et d'assurance",
+                    "Groupe_clients_lies": "Néant",
+                    "N_Centrale_risques_groupe": "Néant",
+                    "Categorie_lien": "Néant",
+                    "Partie_liee": "Néant",
+                    "Notation_externe_contrepartie": "Non noté",
+                    "Pays_contrepartie": "Côte d'Ivoire",
+                    "Notation_externe_pays": "AAA",
+                    "Catégorie d'exposition": "Autres actifs",
+                    "Montant_exposition_but_au_bilan": 50000000,
+                    "Devise": "XOF",
+                    "Type_CRM": "Aucune",
+                    "Date d'octroi": "2026-06-30",
+                    "Date d'échéance": "2026-07-01",
+                    "PRÊT TOTAL": 50000000,
+                    "Montant d'exposition au HB": 0,
+                    "Niveau de risque HB": "Risque faible",
+                    "Statut": "Active",
+                    "Provisions": 0,
+                    "Jours_impayes": 0,
+                    "Commentaire": "Billets et monnaies en caisse",
+                    "Regime_prudentiel_specifique": "Standard (aucun traitement particulier)",
+                    "Cas_particulier_souverain": "(Sans objet pour cette catégorie)",
+                    "Souverain_note_OCE": None,
+                    "Type_autre_actif": "Billets et monnaies en caisse (0 %)",
+                    "Ponderation_initiale_avant_defaut": 0.0,
                 },
             ],
             "CRM_financée": [
@@ -859,6 +1022,7 @@ class ExcelImportService:
         # seule source de vérité pour ces valeurs dans ce fichier.
         reference_blocks = [
             ("Catégorie d'exposition", CATEGORY_PRUDENTIAL_LABELS),
+            ("Régime prudentiel spécifique (BCEAO)", PRUDENTIAL_REGIME_OPTIONS),
             ("Type_CRM", CRM_TYPE_OPTIONS),
             ("Niveau de risque HB", OFF_BALANCE_RISK_LEVEL_OPTIONS),
             ("Statut (gestion)", STATUS_OPTIONS),
@@ -868,33 +1032,22 @@ class ExcelImportService:
             ("Type_emetteur (CRM financée)", FINANCED_CRM_ISSUER_ROLE_OPTIONS),
             ("Maturite (CRM financée)", FINANCED_CRM_MATURITY_BUCKET_OPTIONS),
             ("Type_Collatéral (CRM financée)", FINANCED_CRM_COLLATERAL_TYPE_OPTIONS),
+            ("Cas_particulier_souverain", SOVEREIGN_SPECIAL_CASE_OPTIONS),
+            ("Souverain_note_OCE", SOVEREIGN_OCE_NOTE_OPTIONS),
+            ("Cas_organisme_public", PUBLIC_BODY_CASE_OPTIONS),
+            ("Cas_particulier_bmd", BMD_CASE_OPTIONS),
+            ("Cas_institution_bancaire", BANK_INSTITUTION_CASE_OPTIONS),
+            ("Type_autre_actif", OTHER_ASSET_TYPE_OPTIONS),
+            ("Cas_creance_souffrance", DEFAULTED_EXPOSURE_CASE_OPTIONS),
+            ("Cas_particulier_entreprise", ENTERPRISE_CASE_OPTIONS),
             (
-                "Cas_particulier_souverain (cascade : catégorie = Souverains)",
-                SOVEREIGN_SPECIAL_CASE_OPTIONS,
-            ),
-            (
-                "Souverain_note_OCE (cascade : catégorie = Souverains)",
-                SOVEREIGN_OCE_NOTE_OPTIONS,
-            ),
-            (
-                "Cas_institution_bancaire (cascade : catégorie = Institutions financières)",
-                BANK_INSTITUTION_CASE_OPTIONS,
-            ),
-            (
-                "Type_autre_actif (cascade : catégorie = Autres actifs)",
-                OTHER_ASSET_TYPE_OPTIONS,
-            ),
-            (
-                "Ponderation_initiale_avant_defaut (cascade : catégorie = Créances en souffrance)",
+                "Ponderation_initiale_avant_defaut",
                 DEFAULTED_EXPOSURE_INITIAL_RISK_WEIGHT_OPTIONS,
             ),
             ("Devise / Devise_Collatéral", CURRENCY_OPTIONS),
             (
-                "Champs Oui/Non (tous les Souverain_*, BMD_*, Organisme_public_*, "
-                "Clientele_detail_*, Immobilier_*, Defaut_*, Entreprise_*, "
-                "Obligation_convertible_indice_principal) — la plupart sont en "
-                "cascade selon Catégorie d'exposition, voir l'onglet "
-                "Instructions",
+                "Champs Oui/Non (Souverain_*, Clientele_detail_*, Immobilier_*, "
+                "Obligation_convertible_indice_principal)",
                 OUI_NON_OPTIONS,
             ),
         ]
@@ -975,6 +1128,8 @@ class ExcelImportService:
             parsed = self._parse_workbook(workbook, profiler=profiler)
         finally:
             workbook.close()
+
+        self._ensure_exigences_conditionnelles(parsed)
 
         backup_path = None
         if normalized_mode == "replace":
@@ -1082,6 +1237,47 @@ class ExcelImportService:
             {
                 "message": "Le fichier Excel ne respecte pas le format d'import attendu.",
                 **inspection,
+            }
+        )
+
+    def _ensure_exigences_conditionnelles(self, parsed: ParsedImportBundle) -> None:
+        """Refuse le classeur si une case exigee par son contexte est vide.
+
+        Une colonne « optionnelle » ne l'est que parce qu'elle ne concerne pas
+        toutes les categories. Vide la ou elle s'applique, elle ne faisait pas
+        echouer l'import : elle faussait le calcul sans un mot. Sur un
+        portefeuille de 1 500 expositions, le RWA declare passait ainsi de
+        686,97 a 785,66 milliards -- +14,4 % -- avec zero rejet.
+
+        Le fichier est refuse en entier : declarer sur des donnees partielles
+        n'a pas de sens a l'echelle d'un formulaire prudentiel, ou les etats se
+        bouclent les uns sur les autres.
+        """
+
+        manques = controler_exigences_conditionnelles(parsed.template_rows)
+        if not manques:
+            return
+
+        par_colonne: dict[str, int] = {}
+        for manque in manques:
+            par_colonne[manque["colonne"]] = par_colonne.get(manque["colonne"], 0) + 1
+        resume = ", ".join(
+            f"{colonne} ({nombre})"
+            for colonne, nombre in sorted(par_colonne.items(), key=lambda kv: -kv[1])
+        )
+        raise ExcelImportValidationError(
+            {
+                "code": "EXIGENCES_CONDITIONNELLES",
+                "message": (
+                    f"{len(manques)} case(s) exigée(s) par leur contexte sont "
+                    f"restées vides : {resume}. Le fichier n'a pas été importé — "
+                    "ces colonnes décident de la pondération ou remplissent un "
+                    "état du FODEP."
+                ),
+                "valid": False,
+                "manques": manques[:200],
+                "manques_total": len(manques),
+                "manques_par_colonne": par_colonne,
             }
         )
 
@@ -1233,6 +1429,7 @@ class ExcelImportService:
             identifications=collecter_identifications(
                 [valeurs for _, valeurs in template_rows]
             ),
+            template_rows=list(template_rows),
         )
 
 

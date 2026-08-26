@@ -79,58 +79,28 @@ class ExportService:
             [
                 "Date d'analyse",
                 "ID_Exposition",
-                "Date d'octroi",
-                "Date d'échéance",
-                "Maturité de l'exposition",
-                "Maturité résiduelle",
                 "Contrepartie",
                 "Notation_externe_contrepartie",
                 "Pays_contrepartie",
                 "Notation_externe_pays",
-                "Pondération_pays",
                 "Catégorie d'exposition",
-                "Pondération (RW)",
-                "PRÊT TOTAL",
                 "Montant_exposition_but_au_bilan",
-                "Montant d'exposition au HB",
                 "Devise",
-                "CRM_existe",
                 "Type_CRM",
-                "EAD_bilan",
-                "EAD_HB",
-                "EAD_HB_ccf",
-                "EAD_Total",
-                "RWA_EB",
-                "RWA_HB",
-                "RWA_crédit",
-                "Capital_min_reg",
-                # Colonnes brutes supplémentaires (mêmes noms que le modèle
-                # d'import) : permettent de réimporter directement un export
-                # sans perdre le statut, le niveau de risque hors bilan, ni
-                # les cas particuliers par catégorie.
-                "Statut",
+                "Date d'octroi",
+                "Date d'échéance",
+                "PRÊT TOTAL",
+                "Montant d'exposition au HB",
                 "Niveau de risque HB",
+                "Statut",
+                "Provisions",
+                "Jours_impayes",
+                "Commentaire",
+                "Regime_prudentiel_specifique",
                 "Cas_particulier_souverain",
-                "Souverain_ponderation_pref_nulle",
-                "Souverain_OCE_etabli",
                 "Souverain_note_OCE",
-                "Organisme_public_cas_UEMOA_FCFA",
-                "Organisme_public_activite_non_publique",
-                "BMD_cas_haute_qualite",
-                "BMD_cas_UEMOA_FCFA",
-                "BMD_criteres_UEMOA_respectes",
-                "BMD_institution_listee_FCFA",
-                "Cas_institution_bancaire",
                 "Type_autre_actif",
-                "Clientele_detail_criteres_respectes",
-                "Immobilier_residentiel_eligible",
-                "Immobilier_commercial_eligible",
                 "Ponderation_initiale_avant_defaut",
-                "Defaut_pret_immo_residentiel",
-                "Defaut_provision_min_20pct",
-                "Entreprise_depasse_seuil_degradation_BCEAO",
-                "Entreprise_procedure_prudentielle",
-                "Entreprise_investissement_hors_loi_bancaire",
             ]
         )
         workbook.create_sheet(self._CRM_FINANCED_SHEET).append(
@@ -271,6 +241,53 @@ class ExportService:
             return None
         return "Oui" if bool(value) else "Non"
 
+    def _compute_regime_prudentiel_specifique(self, exposure: dict[str, Any]) -> str:
+        category = (exposure.get("category_raw") or "").lower()
+        if exposure.get("sovereign_preferential_zero_weight"):
+            return "Souverain UEMOA en monnaie nationale (0 %)"
+        if exposure.get("public_body_non_public_activity"):
+            return "Organisme public activité commerciale (Entreprise)"
+        if exposure.get("public_body_uemoa_fcfa_case"):
+            return "Organisme public UEMOA en FCFA (20 %)"
+        if exposure.get("bmd_listed_institution_fcfa_case"):
+            return "BMD liste officielle BCEAO en FCFA (0 %)"
+        if exposure.get("bmd_high_quality_case"):
+            return "BMD haute qualité (0 %)"
+        if exposure.get("bmd_uemoa_fcfa_case"):
+            return "BMD UEMOA en FCFA (20 %)"
+        bank_case = exposure.get("bank_institution_case")
+        if bank_case == "equivalent_umoa_rules":
+            return "Établissement de crédit agréé UEMOA"
+        if bank_case == "weak_prudential_case":
+            return "Établissement sous surveillance / faible qualité"
+        if exposure.get("enterprise_exceeds_bceao_degradation_threshold"):
+            return "Entreprise portefeuille dégradé (150 %)"
+        if exposure.get("enterprise_prudential_procedure"):
+            return "Entreprise procédure collective / sauvegarde (150 %)"
+        if exposure.get("enterprise_investment_firm_without_banking_law"):
+            return "Entreprise d'investissement hors loi bancaire (100 %)"
+        if exposure.get("retail_eligibility_criteria_satisfied") is True:
+            return "Clientèle de détail éligible (75 %)"
+        elif exposure.get("retail_eligibility_criteria_satisfied") is False:
+            return "Clientèle de détail non éligible (100 %)"
+        if exposure.get("residential_mortgage_eligible") is True:
+            return "Immobilier résidentiel éligible (35 %)"
+        elif exposure.get("residential_mortgage_eligible") is False:
+            return "Immobilier résidentiel non éligible (100 %)"
+        if exposure.get("commercial_real_estate_eligible") is True:
+            return "Immobilier commercial éligible (50 %)"
+        elif exposure.get("commercial_real_estate_eligible") is False:
+            return "Immobilier commercial non éligible (100 %)"
+        if exposure.get("defaulted_exposure_residential_mortgage_in_default"):
+            if exposure.get("defaulted_exposure_provision_at_least_twenty_percent"):
+                return "Créance en défaut immo résidentiel provision >= 20% (50 %)"
+            return "Créance en défaut immo résidentiel provision < 20% (100 %)"
+        elif "souffrance" in category or "défaut" in category or "defaut" in category:
+            if exposure.get("defaulted_exposure_provision_at_least_twenty_percent"):
+                return "Créance en défaut autre provision >= 20% (100 %)"
+            return "Créance en défaut autre provision < 20% (150 %)"
+        return "(Sans objet pour cette catégorie)"
+
     def _fill_template_sheet(
         self,
         sheet,
@@ -283,87 +300,46 @@ class ExportService:
             grant_date = self._coerce_excel_date(exposure.get("grant_date"))
             maturity_date = self._coerce_excel_date(exposure.get("maturity_date"))
             identifier = str(exposure["id"])
-            crm_exists = bool(exposure.get("crm_exists"))
-            exposure_maturity = exposure.get("exposure_maturity_months")
-            residual_maturity = exposure.get("residual_maturity_months")
             loan_total_amount = exposure.get("loan_total_amount", exposure.get("gross_amount"))
             on_balance_amount = exposure.get("on_balance_exposure_amount", exposure.get("gross_amount"))
             off_balance_amount = exposure.get("off_balance_exposure_amount")
-            country_risk_weight = self._coerce_optional_float(
-                exposure.get("country_risk_weight")
-            )
+            provisions_amount = exposure.get("provisions_amount")
+            jours_impayes = exposure.get("jours_impayes", 0)
+            commentaire = exposure.get("comment", "")
+            regime = self._compute_regime_prudentiel_specifique(exposure)
+            sovereign_case = exposure.get("sovereign_special_case") or None
+            sovereign_oce_note = exposure.get("sovereign_oce_note") or None
+            other_asset = exposure.get("other_asset_type") or None
+            default_rw = exposure.get("defaulted_exposure_initial_risk_weight")
+
             self._write_row(
                 sheet,
                 row_index,
                 [
                     analysis_date,
                     identifier,
-                    grant_date,
-                    maturity_date,
-                    exposure_maturity
-                    if exposure_maturity is not None
-                    else self._months_between(grant_date, maturity_date),
-                    residual_maturity
-                    if residual_maturity is not None
-                    else self._months_between(analysis_date, maturity_date),
                     str(exposure.get("counterparty_name") or ""),
                     str(exposure.get("rating") or ""),
                     str(exposure.get("country") or ""),
                     str(exposure.get("country_rating") or "Non noté"),
-                    country_risk_weight,
                     str(exposure.get("category_raw") or ""),
-                    self._coerce_float(exposure.get("final_rw")),
-                    self._coerce_optional_float(loan_total_amount),
                     self._coerce_optional_float(on_balance_amount),
-                    self._coerce_optional_float(off_balance_amount),
                     str(exposure.get("currency") or "XOF"),
-                    "OUI" if crm_exists else "NON",
                     self._crm_type_label(exposure),
-                    self._coerce_optional_float(
-                        exposure.get("ead_bilan_amount", exposure.get("ead"))
-                    ),
-                    self._coerce_optional_float(exposure.get("ead_hb_amount")),
-                    self._coerce_optional_float(exposure.get("ead_hb_ccf_amount")),
-                    self._coerce_optional_float(
-                        exposure.get("ead_total_amount", exposure.get("ead"))
-                    ),
-                    self._coerce_optional_float(exposure.get("rwa_eb_amount")),
-                    self._coerce_optional_float(exposure.get("rwa_hb_amount")),
-                    self._coerce_float(exposure.get("rwa")),
-                    self._coerce_float(exposure.get("capital")),
-                    str(exposure.get("status") or "Active"),
+                    grant_date,
+                    maturity_date,
+                    self._coerce_optional_float(loan_total_amount),
+                    self._coerce_optional_float(off_balance_amount),
                     exposure.get("off_balance_risk_level"),
-                    exposure.get("sovereign_special_case") or None,
-                    self._bool_export(exposure.get("sovereign_preferential_zero_weight")),
-                    self._bool_export(exposure.get("sovereign_oce_established")),
-                    exposure.get("sovereign_oce_note") or None,
-                    self._bool_export(exposure.get("public_body_uemoa_fcfa_case")),
-                    self._bool_export(exposure.get("public_body_non_public_activity")),
-                    self._bool_export(exposure.get("bmd_high_quality_case")),
-                    self._bool_export(exposure.get("bmd_uemoa_fcfa_case")),
-                    self._bool_export(exposure.get("bmd_uemoa_criteria_satisfied")),
-                    self._bool_export(exposure.get("bmd_listed_institution_fcfa_case")),
-                    exposure.get("bank_institution_case"),
-                    exposure.get("other_asset_type"),
-                    self._bool_export(exposure.get("retail_eligibility_criteria_satisfied")),
-                    self._bool_export(exposure.get("residential_mortgage_eligible")),
-                    self._bool_export(exposure.get("commercial_real_estate_eligible")),
-                    self._coerce_optional_float(
-                        exposure.get("defaulted_exposure_initial_risk_weight")
-                    ),
-                    self._bool_export(
-                        exposure.get("defaulted_exposure_residential_mortgage_in_default")
-                    ),
-                    self._bool_export(
-                        exposure.get("defaulted_exposure_provision_at_least_twenty_percent")
-                    ),
-                    self._bool_export(
-                        exposure.get("enterprise_exceeds_bceao_degradation_threshold")
-                    ),
-                    self._bool_export(exposure.get("enterprise_prudential_procedure")),
-                    self._bool_export(
-                        exposure.get("enterprise_investment_firm_without_banking_law")
-                    ),
+                    str(exposure.get("status") or "Active"),
+                    self._coerce_optional_float(provisions_amount),
+                    jours_impayes if jours_impayes else None,
+                    commentaire or None,
+                    regime,
+                    sovereign_case,
+                    sovereign_oce_note,
+                    other_asset,
+                    self._coerce_optional_float(default_rw),
                 ],
             )
 

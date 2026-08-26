@@ -1998,6 +1998,100 @@ class ExposureRecord {
   String get ratingLabel => bucketizeRating(counterparty.rating);
   String get crmModeLabel => crmDetails.mode;
   String get zone => computeZone(counterparty.country);
+
+  String get regimePrudentielLabel {
+    switch (categoryCode) {
+      case 'a':
+        if (sovereignSpecialCase.isNotEmpty && sovereignSpecialCase != 'aucun_cas' && sovereignSpecialCase != 'Aucun de ces cas') {
+          return sovereignSpecialCase;
+        }
+        if (sovereignPreferentialZeroWeight) {
+          return 'Souverain UEMOA (0%)';
+        }
+        if (sovereignOceEstablished && sovereignOceNote.isNotEmpty) {
+          return 'Note OCE: $sovereignOceNote';
+        }
+        return 'Standard';
+      case 'b':
+        if (publicBodyFinancesNonPublicActivity == true) {
+          return 'Activité commerciale (Entreprise)';
+        }
+        if (publicBodyUemoaFcfaCase == true) {
+          return 'Organisme public UEMOA (20%)';
+        }
+        return 'Standard';
+      case 'c':
+        if (bmdListedInstitutionFcfaCase == true) {
+          return 'BMD liste officielle (0%)';
+        }
+        if (bmdHighQualityCase == true) {
+          return 'BMD haute qualité (0%)';
+        }
+        if (bmdUemoaFcfaCase == true) {
+          return 'BMD UEMOA (20%)';
+        }
+        return 'Standard';
+      case 'd':
+        if (bankInstitutionCase == 'equivalent_umoa_rules') {
+          return 'Banque agréée UEMOA';
+        }
+        if (bankInstitutionCase == 'weak_prudential_case') {
+          return 'Faible qualité';
+        }
+        return 'Standard';
+      case 'e':
+        if (enterpriseExceedsBceaoDegradationThreshold == true) {
+          return 'Portefeuille dégradé (150%)';
+        }
+        if (enterprisePrudentialProcedure == true) {
+          return 'Procédure prudentielle (150%)';
+        }
+        if (enterpriseInvestmentFirmWithoutBankingLaw == true) {
+          return 'Inv. hors loi bancaire (100%)';
+        }
+        return 'Standard';
+      case 'f':
+        if (retailEligibilityCriteriaSatisfied == true) {
+          return 'Détail éligible (75%)';
+        } else if (retailEligibilityCriteriaSatisfied == false) {
+          return 'Non éligible (100%)';
+        }
+        return 'Standard';
+      case 'g':
+        if (residentialMortgageEligible == true) {
+          return 'Immo résidentiel (35%)';
+        } else if (residentialMortgageEligible == false) {
+          return 'Non éligible (100%)';
+        }
+        return 'Standard';
+      case 'h':
+        if (commercialRealEstateEligible == true) {
+          return 'Immo commercial (50%)';
+        } else if (commercialRealEstateEligible == false) {
+          return 'Non éligible (100%)';
+        }
+        return 'Standard';
+      case 'i':
+        if (defaultedExposureResidentialMortgageInDefault == true) {
+          if (defaultedExposureProvisionAtLeastTwentyPercent == true) {
+            return 'Défaut immo Prov >= 20% (50%)';
+          }
+          return 'Défaut immo Prov < 20% (100%)';
+        } else {
+          if (defaultedExposureProvisionAtLeastTwentyPercent == true) {
+            return 'Défaut autre Prov >= 20% (100%)';
+          }
+          return 'Défaut autre Prov < 20% (150%)';
+        }
+      case 'k':
+        if (otherAssetType != null && otherAssetType!.isNotEmpty) {
+          return otherAssetType!;
+        }
+        return 'Standard';
+      default:
+        return 'Standard';
+    }
+  }
   bool get isDefaultLike => status == 'En defaut' || categoryCode == 'i' || (joursImpayes > 90) || (provisionsAmount != null && provisionsAmount! > 0);
 
   bool get isDouteuse => statutPrudentiel == 'douteuse';

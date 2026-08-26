@@ -113,12 +113,12 @@ OPTIONAL_COLUMNS_BY_SHEET: dict[str, tuple[str, ...]] = {
         # répètent sur chacune de ses lignes, et la dernière valeur non vide
         # fait foi (voir app/groupes_clients/identification_import.py).
         #
-        # Le validateur les déclarait déjà, l'import les lisait déjà — mais
-        # elles manquaient ici, donc au modèle livré : aucun classeur ne
-        # pouvait les porter. L'EP29 et l'EP32 partaient sans numéro Centrale
-        # des risques, l'EP30 sans catégorie de lien, l'EP38 et l'EP39 sans
-        # bénéficiaire, et il ne restait qu'à les saisir contrepartie par
-        # contrepartie.
+        # Le validateur les déclare et l'import les lit déjà. Absentes d'ici,
+        # elles manquent au modèle livré : aucun classeur ne peut alors les
+        # porter, l'EP29 et l'EP32 partent sans numéro Centrale des risques,
+        # l'EP30 sans catégorie de lien, l'EP38 et l'EP39 sans bénéficiaire.
+        # `test_les_deux_declarations_de_colonnes_ne_divergent_pas` garde
+        # l'accord entre les deux listes.
         "N_Centrale_risques",
         "Secteur_activite",
         "Groupe_clients_lies",
@@ -134,27 +134,11 @@ OPTIONAL_COLUMNS_BY_SHEET: dict[str, tuple[str, ...]] = {
         "Provisions",
         "Jours_impayes",
         "Commentaire",
+        "Regime_prudentiel_specifique",
         "Cas_particulier_souverain",
-        "Souverain_ponderation_pref_nulle",
-        "Souverain_OCE_etabli",
         "Souverain_note_OCE",
-        "Organisme_public_cas_UEMOA_FCFA",
-        "Organisme_public_activite_non_publique",
-        "BMD_cas_haute_qualite",
-        "BMD_cas_UEMOA_FCFA",
-        "BMD_criteres_UEMOA_respectes",
-        "BMD_institution_listee_FCFA",
-        "Cas_institution_bancaire",
         "Type_autre_actif",
-        "Clientele_detail_criteres_respectes",
-        "Immobilier_residentiel_eligible",
-        "Immobilier_commercial_eligible",
         "Ponderation_initiale_avant_defaut",
-        "Defaut_pret_immo_residentiel",
-        "Defaut_provision_min_20pct",
-        "Entreprise_depasse_seuil_degradation_BCEAO",
-        "Entreprise_procedure_prudentielle",
-        "Entreprise_investissement_hors_loi_bancaire",
     ),
     "CRM_financée": (
         "Devise_Collatéral",
@@ -923,6 +907,25 @@ class ExcelRepository:
                 }
             )
 
+        regime_text = (
+            _as_clean_text(row.get("Regime_prudentiel_specifique"))
+            or _as_clean_text(row.get("Traitement_prudentiel_particulier"))
+            or _as_clean_text(row.get("Cas_particulier_regime"))
+            or ""
+        ).lower()
+
+        sovereign_pref_zero = (
+            _as_optional_bool(row.get("Souverain_ponderation_pref_nulle"))
+            if _as_optional_bool(row.get("Souverain_ponderation_pref_nulle")) is not None
+            else (True if "souverain uemoa" in regime_text or ("souverain" in regime_text and "0 %" in regime_text) else None)
+        )
+
+        cas_org_pub = (_as_clean_text(row.get("Cas_organisme_public")) or "").lower()
+        cas_bmd = (_as_clean_text(row.get("Cas_particulier_bmd")) or "").lower()
+        cas_souf = (_as_clean_text(row.get("Cas_creance_souffrance")) or "").lower()
+        cas_ent = (_as_clean_text(row.get("Cas_particulier_entreprise")) or "").lower()
+        cas_banque = _as_clean_text(row.get("Cas_institution_bancaire")) or ""
+
         payload = ExposureCreate(
             id=exposure_id or None,
             analysis_date=_as_date(row.get("Date d'analyse")),
@@ -942,43 +945,149 @@ class ExcelRepository:
             currency=currency,
             status=_as_clean_text(row.get("Statut")) or "Active",
             sovereign_special_case=_as_clean_text(row.get("Cas_particulier_souverain")) or "",
-            sovereign_preferential_zero_weight=_as_optional_bool(
-                row.get("Souverain_ponderation_pref_nulle")
-            )
-            or False,
+            sovereign_preferential_zero_weight=bool(sovereign_pref_zero),
             sovereign_oce_established=_as_optional_bool(row.get("Souverain_OCE_etabli")) or False,
             sovereign_oce_note=_as_clean_text(row.get("Souverain_note_OCE")) or "",
-            public_body_uemoa_fcfa_case=_as_optional_bool(row.get("Organisme_public_cas_UEMOA_FCFA")),
-            public_body_non_public_activity=_as_optional_bool(
-                row.get("Organisme_public_activite_non_publique")
+            public_body_uemoa_fcfa_case=(
+                _as_optional_bool(row.get("Organisme_public_cas_UEMOA_FCFA"))
+                if _as_optional_bool(row.get("Organisme_public_cas_UEMOA_FCFA")) is not None
+                else ("uemoa" in cas_org_pub
+                      or "fcfa" in cas_org_pub
+                      or "20%" in cas_org_pub
+                      or "organisme public uemoa" in regime_text
+                      or ("20 %" in regime_text and "organisme public" in regime_text))
+                if (cas_org_pub or "organisme public" in regime_text)
+                else None
             ),
-            bmd_high_quality_case=_as_optional_bool(row.get("BMD_cas_haute_qualite")),
-            bmd_uemoa_fcfa_case=_as_optional_bool(row.get("BMD_cas_UEMOA_FCFA")),
-            bmd_uemoa_criteria_satisfied=_as_optional_bool(row.get("BMD_criteres_UEMOA_respectes")),
-            bmd_listed_institution_fcfa_case=_as_optional_bool(row.get("BMD_institution_listee_FCFA")),
-            bank_institution_case=_as_clean_text(row.get("Cas_institution_bancaire")),
+            public_body_non_public_activity=(
+                _as_optional_bool(row.get("Organisme_public_activite_non_publique"))
+                if _as_optional_bool(row.get("Organisme_public_activite_non_publique")) is not None
+                else ("commercial" in cas_org_pub
+                      or "non publique" in cas_org_pub
+                      or "activité commerciale" in regime_text
+                      or "activite commerciale" in regime_text)
+                if (cas_org_pub or "commercial" in regime_text)
+                else None
+            ),
+            bmd_high_quality_case=(
+                _as_optional_bool(row.get("BMD_cas_haute_qualite"))
+                if _as_optional_bool(row.get("BMD_cas_haute_qualite")) is not None
+                else ("haute" in cas_bmd
+                      or "soutien" in cas_bmd
+                      or "bmd haute" in regime_text
+                      or "soutien fort" in regime_text)
+                if (cas_bmd or "bmd haute" in regime_text or "soutien fort" in regime_text)
+                else None
+            ),
+            bmd_uemoa_fcfa_case=(
+                _as_optional_bool(row.get("BMD_cas_UEMOA_FCFA"))
+                if _as_optional_bool(row.get("BMD_cas_UEMOA_FCFA")) is not None
+                else ("uemoa" in cas_bmd or "bmd uemoa" in regime_text)
+                if (cas_bmd or "bmd uemoa" in regime_text)
+                else None
+            ),
+            bmd_uemoa_criteria_satisfied=(
+                _as_optional_bool(row.get("BMD_criteres_UEMOA_respectes"))
+                if _as_optional_bool(row.get("BMD_criteres_UEMOA_respectes")) is not None
+                else ("critères" in cas_bmd
+                      or "criteres" in cas_bmd
+                      or "20%" in cas_bmd
+                      or "bmd uemoa" in regime_text)
+                if (cas_bmd or "bmd uemoa" in regime_text)
+                else None
+            ),
+            bmd_listed_institution_fcfa_case=(
+                _as_optional_bool(row.get("BMD_institution_listee_FCFA"))
+                if _as_optional_bool(row.get("BMD_institution_listee_FCFA")) is not None
+                else ("listée" in cas_bmd
+                      or "listee" in cas_bmd
+                      or "bird" in cas_bmd
+                      or "boad" in cas_bmd
+                      or "bmd liste officielle" in regime_text
+                      or "boad" in regime_text
+                      or "bird" in regime_text
+                      or "bad" in regime_text)
+                if (cas_bmd or "bmd liste" in regime_text or "boad" in regime_text)
+                else None
+            ),
+            bank_institution_case=(
+                cas_banque
+                or ("equivalent_umoa_rules" if "agréé uemoa" in regime_text or "agree uemoa" in regime_text else "")
+                or ("weak_prudential_case" if "faible qualité" in regime_text or "faible qualite" in regime_text else "")
+            ),
             other_asset_type=_as_clean_text(row.get("Type_autre_actif")),
             off_balance_risk_level=_as_clean_text(row.get("Niveau de risque HB")),
-            retail_eligibility_criteria_satisfied=_as_optional_bool(
-                row.get("Clientele_detail_criteres_respectes")
+            retail_eligibility_criteria_satisfied=(
+                _as_optional_bool(row.get("Clientele_detail_criteres_respectes"))
+                if _as_optional_bool(row.get("Clientele_detail_criteres_respectes")) is not None
+                else (True if "clientèle de détail" in regime_text or "clientele de detail" in regime_text or "75 %" in regime_text else None)
             ),
-            residential_mortgage_eligible=_as_optional_bool(row.get("Immobilier_residentiel_eligible")),
-            commercial_real_estate_eligible=_as_optional_bool(row.get("Immobilier_commercial_eligible")),
+            residential_mortgage_eligible=(
+                _as_optional_bool(row.get("Immobilier_residentiel_eligible"))
+                if _as_optional_bool(row.get("Immobilier_residentiel_eligible")) is not None
+                else (True if "immobilier résidentiel" in regime_text or "immobilier residentiel" in regime_text or "35 %" in regime_text else None)
+            ),
+            commercial_real_estate_eligible=(
+                _as_optional_bool(row.get("Immobilier_commercial_eligible"))
+                if _as_optional_bool(row.get("Immobilier_commercial_eligible")) is not None
+                else (True if "immobilier commercial" in regime_text or ("50 %" in regime_text and "commercial" in regime_text) else None)
+            ),
             defaulted_exposure_initial_risk_weight=_as_optional_float(
                 row.get("Ponderation_initiale_avant_defaut")
             ),
-            defaulted_exposure_residential_mortgage_in_default=_as_optional_bool(
-                row.get("Defaut_pret_immo_residentiel")
+            defaulted_exposure_residential_mortgage_in_default=(
+                _as_optional_bool(row.get("Defaut_pret_immo_residentiel"))
+                if _as_optional_bool(row.get("Defaut_pret_immo_residentiel")) is not None
+                else ("immo" in cas_souf
+                      or "immobilier" in cas_souf
+                      or "défaut - prêt immobilier" in regime_text
+                      or "defaut - pret immobilier" in regime_text)
+                if (cas_souf or "défaut - prêt immobilier" in regime_text or "defaut - pret immobilier" in regime_text)
+                else None
             ),
-            defaulted_exposure_provision_at_least_twenty_percent=_as_optional_bool(
-                row.get("Defaut_provision_min_20pct")
+            defaulted_exposure_provision_at_least_twenty_percent=(
+                _as_optional_bool(row.get("Defaut_provision_min_20pct"))
+                if _as_optional_bool(row.get("Defaut_provision_min_20pct")) is not None
+                else (">= 20%" in cas_souf
+                      or ">=20%" in cas_souf
+                      or "≥ 20%" in cas_souf
+                      or "≥20%" in cas_souf
+                      or "≥ 20%" in regime_text
+                      or ">= 20%" in regime_text)
+                if (cas_souf or "défaut" in regime_text or "defaut" in regime_text)
+                else None
             ),
-            enterprise_exceeds_bceao_degradation_threshold=_as_optional_bool(
-                row.get("Entreprise_depasse_seuil_degradation_BCEAO")
+            enterprise_exceeds_bceao_degradation_threshold=(
+                _as_optional_bool(row.get("Entreprise_depasse_seuil_degradation_BCEAO"))
+                if _as_optional_bool(row.get("Entreprise_depasse_seuil_degradation_BCEAO")) is not None
+                else ("seuil" in cas_ent
+                      or "dégradé" in cas_ent
+                      or "degrade" in cas_ent
+                      or "150%" in cas_ent
+                      or "portefeuille dégradé" in regime_text
+                      or "portefeuille degrade" in regime_text
+                      or "seuil bceao" in regime_text)
+                if (cas_ent or "dégradé" in regime_text or "degrade" in regime_text or "seuil" in regime_text)
+                else None
             ),
-            enterprise_prudential_procedure=_as_optional_bool(row.get("Entreprise_procedure_prudentielle")),
-            enterprise_investment_firm_without_banking_law=_as_optional_bool(
-                row.get("Entreprise_investissement_hors_loi_bancaire")
+            enterprise_prudential_procedure=(
+                _as_optional_bool(row.get("Entreprise_procedure_prudentielle"))
+                if _as_optional_bool(row.get("Entreprise_procedure_prudentielle")) is not None
+                else ("procédure" in cas_ent
+                      or "procedure" in cas_ent
+                      or "procédure prudentielle" in regime_text
+                      or "procedure prudentielle" in regime_text)
+                if (cas_ent or "procédure" in regime_text or "procedure" in regime_text)
+                else None
+            ),
+            enterprise_investment_firm_without_banking_law=(
+                _as_optional_bool(row.get("Entreprise_investissement_hors_loi_bancaire"))
+                if _as_optional_bool(row.get("Entreprise_investissement_hors_loi_bancaire")) is not None
+                else ("investissement" in cas_ent
+                      or "hors loi" in cas_ent
+                      or ("investissement" in regime_text and "loi bancaire" in regime_text))
+                if (cas_ent or "investissement" in regime_text)
+                else None
             ),
             crm_type=crm_type,
             crm_coverage_percent=coverage_percent,

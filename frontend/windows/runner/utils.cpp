@@ -54,7 +54,7 @@ std::filesystem::path GetBackendLogPath() {
   }
 
   std::filesystem::path log_path =
-      std::filesystem::path(local_app_data) / L"Risk management" / L"logs" /
+      std::filesystem::path(local_app_data) / L"FODEP" / L"logs" /
       L"backend.log";
   free(local_app_data);
   return log_path;

@@ -2109,13 +2109,10 @@ class _ShellBrand extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 46,
-          height: 48,
+          width: 42,
+          height: 42,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF14233D)
-                : Colors.white.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(AppTheme.radius),
             boxShadow: [
               BoxShadow(
@@ -2127,20 +2124,25 @@ class _ShellBrand extends StatelessWidget {
               ),
             ],
           ),
-          child: const DesktopAssetImage(
-            'assets/images/logo.png',
-            fit: BoxFit.contain,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.high,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radius),
+            child: const DesktopAssetImage(
+              'assets/images/logo.png',
+              fit: BoxFit.cover,
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+            ),
           ),
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 8),
         Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              context.tr('Risk management'),
+              context.tr('FODEP'),
               style: TextStyle(
                 color:
                     isDark ? const Color(0xFFC9D6FF) : const Color(0xFF123A73),

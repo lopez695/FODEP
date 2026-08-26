@@ -1100,7 +1100,7 @@ class _BrandHeader extends StatelessWidget {
         const SizedBox(width: AppTheme.spacing),
         Expanded(
           child: Text(
-            context.tr('Risk management'),
+            context.tr('FODEP'),
             style: TextStyle(
               color: isDark
                   ? const Color(0xFFD7E3FA)

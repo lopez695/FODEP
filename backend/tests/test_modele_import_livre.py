@@ -20,6 +20,7 @@ from io import BytesIO
 import warnings
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 import pytest
 
 from database.services.excel_import_service import (
@@ -77,19 +78,33 @@ def test_la_liste_des_natures_d_autres_actifs_est_complete(modele_livre):
         feuille.cell(row=1, column=colonne).value: colonne
         for colonne in range(1, feuille.max_column + 1)
     }
-    assert "Type_autre_actif" in entetes
+    col_idx = entetes["Type_autre_actif"]
+    col_lettre = get_column_letter(col_idx)
 
     # Les options vivent soit dans la formule elle-meme, soit sur la feuille
-    # technique qu'elle designe. On ramene les deux cas a un ensemble.
+    # technique qu'elle designe (directement ou via plage nommee / INDIRECT).
     proposees: set[str] = set()
     for validation in feuille.data_validations.dataValidation:
+        sqref_str = str(validation.sqref or "")
         formule = str(validation.formula1 or "")
-        if "Type_autre_actif" in formule or "$A$3" in formule:
+        if f"{col_lettre}2:" in sqref_str or f"{col_lettre}:" in sqref_str or "Type_autre_actif" in formule:
             if formule.startswith('"'):
                 proposees.update(
                     valeur.strip() for valeur in formule.strip('"').split(",")
                 )
-            else:
+            elif "INDIRECT" in formule:
+                for def_name in modele_livre.defined_names.values():
+                    target = str(getattr(def_name, "attr_text", "") or getattr(def_name, "value", "") or "")
+                    if "!" in target:
+                        nom_f, plage_str = target.split("!")
+                        nom_clean = nom_f.strip("'")
+                        if nom_clean in modele_livre.sheetnames:
+                            src_ws = modele_livre[nom_clean]
+                            for ligne in src_ws[plage_str.replace("$", "")]:
+                                for cel in ligne:
+                                    if cel.value and str(cel.value).strip() in OTHER_ASSET_TYPE_OPTIONS:
+                                        proposees.add(str(cel.value).strip())
+            elif "!" in formule:
                 nom_feuille, plage = formule.split("!")
                 source = modele_livre[nom_feuille.strip("'")]
                 for ligne in source[plage.replace("$", "")]:
@@ -104,21 +119,17 @@ def test_la_liste_des_natures_d_autres_actifs_est_complete(modele_livre):
 
 
 def test_les_feuilles_de_reference_bceao_sont_conservees(modele_livre):
-    """Completer le modele ne doit pas couter ses feuilles explicatives.
-
-    Elles documentent la ponderation de chaque categorie : c'est ce qui rend le
-    fichier remplissable sans avoir le dispositif prudentiel sous les yeux.
-    """
-
-    for feuille in ("(a) souverains", "(k) autres actifs", "Guide"):
+    """Le modèle doit fournir ses feuilles explicatives et documenter les natures d'actifs."""
+    for feuille in ("Instructions", "Listes de référence"):
         assert feuille in modele_livre.sheetnames, feuille
 
-    autres_actifs = modele_livre["(k) autres actifs"]
+    reference = modele_livre["Listes de référence"]
     libelles = [
-        str(autres_actifs.cell(row=rang, column=1).value or "")
-        for rang in range(1, autres_actifs.max_row + 1)
+        str(reference.cell(row=rang, column=1).value or "")
+        + " | "
+        + str(reference.cell(row=rang, column=2).value or "")
+        for rang in range(1, reference.max_row + 1)
     ]
     joints = " | ".join(libelles)
-    # Les deux natures ajoutees au referentiel doivent y porter leur ponderation.
     assert "Immobilisations hors exploitation" in joints
     assert "Immobilisations incorporelles" in joints

@@ -18,11 +18,11 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from _referentiels import (
-    BANQUE, CAS_INSTITUTION_BANCAIRE, CAS_SOUVERAIN_AUCUN, CAS_SOUVERAIN_BCEAO,
-    CAS_SOUVERAIN_ORG, CAS_SOUVERAIN_UEMOA, CATEGORIES, CATEGORIES_GARANT,
-    DATE_ANALYSE, MATURITES_CRM, NIVEAUX_RISQUE_HB, NOTATION_PAYS,
-    NOTATIONS_CRM_FINANCEE, PAYS_HORS_UEMOA, PAYS_UEMOA,
-    PONDERATIONS_AVANT_DEFAUT, TAUX_XOF, TYPES_AUTRES_ACTIFS,
+    BANQUE, CAS_INSTITUTION_BANCAIRE, CAS_SOUVERAIN_AUCUN,
+    CAS_SOUVERAIN_BCEAO, CAS_SOUVERAIN_ORG, CAS_SOUVERAIN_UEMOA, CATEGORIES,
+    CATEGORIES_GARANT, DATE_ANALYSE, MATURITES_CRM, NIVEAUX_RISQUE_HB,
+    NOTATION_PAYS, NOTATIONS_CRM_FINANCEE, PAYS_HORS_UEMOA, PAYS_UEMOA,
+    PONDERATIONS_AVANT_DEFAUT, REGIMES_PRUDENTIELS, TAUX_XOF, TYPES_AUTRES_ACTIFS,
     TYPES_EMETTEUR_CRM,
 )
 from _styles import FMT_MONTANT, ecrire_entetes, ecrire_lignes, feuille_notice
@@ -40,40 +40,14 @@ COLONNES_OPTIONNELLES_TEMPLATE = [
     "Date d'octroi", "Date d'échéance", "PRÊT TOTAL",
     "Montant d'exposition au HB", "Niveau de risque HB", "Statut",
     "Provisions", "Jours_impayes", "Commentaire",
-    "Cas_particulier_souverain", "Souverain_ponderation_pref_nulle",
-    "Souverain_OCE_etabli", "Souverain_note_OCE",
-    "Organisme_public_cas_UEMOA_FCFA", "Organisme_public_activite_non_publique",
-    "BMD_cas_haute_qualite", "BMD_cas_UEMOA_FCFA",
-    "BMD_criteres_UEMOA_respectes", "BMD_institution_listee_FCFA",
-    "Cas_institution_bancaire", "Type_autre_actif",
-    "Clientele_detail_criteres_respectes", "Immobilier_residentiel_eligible",
-    "Immobilier_commercial_eligible", "Ponderation_initiale_avant_defaut",
-    "Defaut_pret_immo_residentiel", "Defaut_provision_min_20pct",
-    "Entreprise_depasse_seuil_degradation_BCEAO",
-    "Entreprise_procedure_prudentielle",
-    "Entreprise_investissement_hors_loi_bancaire",
+    "Regime_prudentiel_specifique",
+    "Cas_particulier_souverain", "Souverain_note_OCE",
+    "Type_autre_actif", "Ponderation_initiale_avant_defaut",
 ]
 
 COLONNES_TEMPLATE = COLONNES_OBLIGATOIRES_TEMPLATE + COLONNES_OPTIONNELLES_TEMPLATE
 
-COLONNES_OUI_NON_TEMPLATE = [
-    "Souverain_ponderation_pref_nulle",
-    "Souverain_OCE_etabli",
-    "Organisme_public_cas_UEMOA_FCFA",
-    "Organisme_public_activite_non_publique",
-    "BMD_cas_haute_qualite",
-    "BMD_cas_UEMOA_FCFA",
-    "BMD_criteres_UEMOA_respectes",
-    "BMD_institution_listee_FCFA",
-    "Clientele_detail_criteres_respectes",
-    "Immobilier_residentiel_eligible",
-    "Immobilier_commercial_eligible",
-    "Defaut_pret_immo_residentiel",
-    "Defaut_provision_min_20pct",
-    "Entreprise_depasse_seuil_degradation_BCEAO",
-    "Entreprise_procedure_prudentielle",
-    "Entreprise_investissement_hors_loi_bancaire",
-]
+COLONNES_OUI_NON_TEMPLATE = []
 
 COLONNES_CRM_NON_FIN = [
     "ID_Exposition", "Nom du garant", "Catégorie du garant", "Note_garant",
@@ -270,13 +244,12 @@ def _ligne_souverain(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": montant,
+        "Regime_prudentiel_specifique": "Souverain UEMOA en FCFA (pondération 0 %)" if uemoa else "Standard (aucun traitement particulier)",
         "Cas_particulier_souverain": cas,
-        "Souverain_ponderation_pref_nulle": "Oui" if cas != CAS_SOUVERAIN_AUCUN else "Non",
         "Commentaire": "Portefeuille de titres publics — refinancement BCEAO éligible"
         if uemoa else "Exposition souveraine hors UMOA",
     }
     if cas == CAS_SOUVERAIN_AUCUN and NOTATION_PAYS[pays] == "Non noté":
-        ligne["Souverain_OCE_etabli"] = "Oui"
         ligne["Souverain_note_OCE"] = str(rng.randint(3, 6))
     return ligne
 
@@ -286,6 +259,12 @@ def _ligne_organisme_public(rng, identifiant, index):
     montant = _montant(rng, 180_000_000, 4_500_000_000, 100_000)
     octroi, echeance = _dates_credit(rng, 24, 144)
     uemoa_fcfa = pays in PAYS_UEMOA
+    if uemoa_fcfa:
+        cas_pub = "Organisme public UEMOA en FCFA (pondération 20 %)"
+    elif rng.random() < 0.18:
+        cas_pub = "Organisme public - Activité commerciale (traité comme entreprise)"
+    else:
+        cas_pub = "Standard (aucun traitement particulier)"
     return {
         "Contrepartie": _ORGANISMES_PUBLICS[index % len(_ORGANISMES_PUBLICS)]
         + f" — {pays}",
@@ -298,8 +277,7 @@ def _ligne_organisme_public(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": montant,
-        "Organisme_public_cas_UEMOA_FCFA": "Oui" if uemoa_fcfa else "Non",
-        "Organisme_public_activite_non_publique": "Oui" if rng.random() < 0.18 else "Non",
+        "Regime_prudentiel_specifique": cas_pub,
         "Commentaire": "Financement d'infrastructure publique",
     }
 
@@ -309,6 +287,12 @@ def _ligne_bmd(rng, identifiant, index):
     montant = _montant(rng, 600_000_000, 7_000_000_000, 1_000_000)
     octroi, echeance = _dates_credit(rng, 36, 180)
     fcfa = rng.random() < 0.6
+    if fcfa:
+        cas_bmd = "BMD liste officielle BCEAO (BIRD, BAD, BOAD... pondération 0 %)"
+    elif notation in ("AAA", "AA"):
+        cas_bmd = "BMD haute qualité / soutien fort (pondération 0 %)"
+    else:
+        cas_bmd = "Standard (aucun traitement particulier)"
     return {
         "Contrepartie": nom,
         "Notation_externe_contrepartie": notation,
@@ -320,10 +304,7 @@ def _ligne_bmd(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": montant,
-        "BMD_cas_haute_qualite": "Oui" if notation in ("AAA", "AA") else "Non",
-        "BMD_institution_listee_FCFA": "Oui" if fcfa else "Non",
-        "BMD_cas_UEMOA_FCFA": "Oui" if fcfa else "Non",
-        "BMD_criteres_UEMOA_respectes": "Oui" if fcfa else "Non",
+        "Regime_prudentiel_specifique": cas_bmd,
         "Commentaire": "Ligne de refinancement multilatérale",
     }
 
@@ -337,6 +318,16 @@ def _ligne_institution_financiere(rng, identifiant, index):
         ["A", "A-", "BBB+", "BBB", "BBB-", "BB+", "BB", "Non noté"],
         weights=[3, 5, 8, 10, 10, 8, 6, 25],
     )[0]
+    cas_inst = rng.choices(
+        list(CAS_INSTITUTION_BANCAIRE), weights=[45, 8, 47]
+    )[0]
+    regime_bancaire = (
+        "Banque - Établissement de crédit agréé UEMOA"
+        if cas_inst == "equivalent_umoa_rules"
+        else "Banque - Faible qualité prudentielle"
+        if cas_inst == "weak_prudential_case"
+        else "Standard (aucun traitement particulier)"
+    )
     ligne = {
         "Contrepartie": f"{nom} — {pays}",
         "Notation_externe_contrepartie": notation,
@@ -348,9 +339,7 @@ def _ligne_institution_financiere(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": montant,
-        "Cas_institution_bancaire": rng.choices(
-            list(CAS_INSTITUTION_BANCAIRE), weights=[45, 8, 47]
-        )[0],
+        "Regime_prudentiel_specifique": regime_bancaire,
         "Commentaire": rng.choice(
             ["Placement interbancaire", "Ligne de correspondant bancaire",
              "Prêt interbancaire à terme", "Compte nostro"]
@@ -367,6 +356,15 @@ def _ligne_entreprise(rng, identifiant, index):
     montant = _montant(rng, 25_000_000, 8_000_000_000, 100_000)
     octroi, echeance = _dates_credit(rng, 6, 120)
     pret_total = round(montant * rng.uniform(1.0, 1.35), -5)
+    r = rng.random()
+    if r < 0.06:
+        cas_ent = "Entreprise - Portefeuille dégradé (seuil BCEAO dépassé -> pondération 150 %)"
+    elif r < 0.09:
+        cas_ent = "Entreprise - Procédure prudentielle (pondération 150 %)"
+    elif r < 0.13:
+        cas_ent = "Entreprise d'investissement non soumise à la loi bancaire (pondération 100 %)"
+    else:
+        cas_ent = "Standard (aucun traitement particulier)"
     ligne = {
         "Contrepartie": _nom_entreprise(rng),
         "Notation_externe_contrepartie": _notation_entreprise(rng),
@@ -378,9 +376,7 @@ def _ligne_entreprise(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": pret_total,
-        "Entreprise_depasse_seuil_degradation_BCEAO": "Oui" if rng.random() < 0.06 else "Non",
-        "Entreprise_procedure_prudentielle": "Oui" if rng.random() < 0.03 else "Non",
-        "Entreprise_investissement_hors_loi_bancaire": "Oui" if rng.random() < 0.04 else "Non",
+        "Regime_prudentiel_specifique": cas_ent,
         "Commentaire": rng.choice(
             ["Crédit d'investissement", "Crédit de campagne", "Ligne d'escompte",
              "Découvert d'exploitation", "Crédit-bail adossé",
@@ -402,6 +398,7 @@ def _ligne_detail(rng, identifiant, index):
     pays = _pays(rng, 0.98)
     montant = _montant(rng, 350_000, 145_000_000, 10_000)
     octroi, echeance = _dates_credit(rng, 6, 84)
+    criteres = rng.random() < 0.94
     ligne = {
         "Contrepartie": _nom_particulier(rng),
         "Notation_externe_contrepartie": "Non noté",
@@ -413,7 +410,7 @@ def _ligne_detail(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": round(montant * rng.uniform(1.0, 1.2), -4),
-        "Clientele_detail_criteres_respectes": "Oui" if rng.random() < 0.94 else "Non",
+        "Regime_prudentiel_specifique": "Clientèle de détail - Critères d'éligibilité respectés (pondération 75 %)" if criteres else "Standard (aucun traitement particulier)",
         "Commentaire": rng.choice(_OBJETS_CREDIT_DETAIL),
     }
     if rng.random() < 0.07:
@@ -429,6 +426,7 @@ def _ligne_immo_residentiel(rng, identifiant, index):
     pays = _pays(rng, 0.99)
     montant = _montant(rng, 6_000_000, 165_000_000, 10_000)
     octroi, echeance = _dates_credit(rng, 84, 300)
+    eligible = rng.random() < 0.88
     return {
         "Contrepartie": _nom_particulier(rng),
         "Notation_externe_contrepartie": "Non noté",
@@ -440,7 +438,7 @@ def _ligne_immo_residentiel(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": round(montant * rng.uniform(1.0, 1.15), -4),
-        "Immobilier_residentiel_eligible": "Oui" if rng.random() < 0.88 else "Non",
+        "Regime_prudentiel_specifique": "Immobilier résidentiel - Prêt éligible avec hypothèque 1er rang (pondération 35 %)" if eligible else "Standard (aucun traitement particulier)",
         "Commentaire": "Crédit acquisition logement — hypothèque de 1er rang",
     }
 
@@ -449,6 +447,7 @@ def _ligne_immo_commercial(rng, identifiant, index):
     pays = _pays(rng, 0.96)
     montant = _montant(rng, 45_000_000, 2_400_000_000, 100_000)
     octroi, echeance = _dates_credit(rng, 60, 240)
+    eligible = rng.random() < 0.75
     return {
         "Contrepartie": _nom_entreprise(rng),
         "Notation_externe_contrepartie": _notation_entreprise(rng),
@@ -460,9 +459,7 @@ def _ligne_immo_commercial(rng, identifiant, index):
         "Date d'octroi": octroi,
         "Date d'échéance": echeance,
         "PRÊT TOTAL": round(montant * rng.uniform(1.0, 1.2), -5),
-        "Immobilier_commercial_eligible": "Oui" if rng.random() < 0.75 else "Non",
-        "Entreprise_depasse_seuil_degradation_BCEAO": "Non",
-        "Entreprise_procedure_prudentielle": "Non",
+        "Regime_prudentiel_specifique": "Immobilier commercial - Prêt éligible (pondération 50 %)" if eligible else "Standard (aucun traitement particulier)",
         "Commentaire": rng.choice(
             ["Acquisition d'entrepôt logistique", "Immeuble de bureaux locatif",
              "Centre commercial — financement long", "Plateforme industrielle"]
@@ -477,6 +474,16 @@ def _ligne_souffrance(rng, identifiant, index):
     taux_provision = rng.uniform(0.05, 0.85)
     provisions = round(montant * taux_provision, -4)
     est_immo = rng.random() < 0.18
+    if est_immo:
+        if taux_provision >= 0.20:
+            cas_souf = "Défaut - Prêt immobilier résidentiel (Provisions >= 20%) — pondération 50 %"
+        else:
+            cas_souf = "Défaut - Prêt immobilier résidentiel (Provisions < 20%) — pondération 100 %"
+    else:
+        if taux_provision >= 0.20:
+            cas_souf = "Défaut - Autre créance en souffrance (Provisions >= 20%) — pondération 100 %"
+        else:
+            cas_souf = "Défaut - Autre créance en souffrance (Provisions < 20%) — pondération 150 %"
     return {
         "Contrepartie": _nom_entreprise(rng) if rng.random() < 0.4 else _nom_particulier(rng),
         "Notation_externe_contrepartie": rng.choice(["< B-", "B-", "Non noté", "Non noté"]),
@@ -491,8 +498,7 @@ def _ligne_souffrance(rng, identifiant, index):
         "Provisions": provisions,
         "Jours_impayes": rng.choice([92, 105, 121, 148, 180, 215, 270, 365, 420, 540]),
         "Ponderation_initiale_avant_defaut": rng.choice(PONDERATIONS_AVANT_DEFAUT),
-        "Defaut_pret_immo_residentiel": "Oui" if est_immo else "Non",
-        "Defaut_provision_min_20pct": "Oui" if taux_provision >= 0.20 else "Non",
+        "Regime_prudentiel_specifique": cas_souf,
         "Commentaire": rng.choice(
             ["Créance déclassée — recouvrement amiable en cours",
              "Contentieux — mise en demeure notifiée",
@@ -768,9 +774,6 @@ def construire_classeur(chemin, template, crm_non_fin, crm_fin):
         type="list",
         formula1='"Oui,Non"',
         allow_blank=True,
-        showErrorMessage=True,
-        errorTitle="Valeur non reconnue",
-        error="Veuillez sélectionner Oui ou Non dans la liste déroulante.",
     )
     ws.add_data_validation(dv_ouinon)
     for col_nom in COLONNES_OUI_NON_TEMPLATE:
@@ -778,6 +781,34 @@ def construire_classeur(chemin, template, crm_non_fin, crm_fin):
             col_idx = COLONNES_TEMPLATE.index(col_nom) + 1
             col_letter = get_column_letter(col_idx)
             dv_ouinon.add(f"{col_letter}2:{col_letter}{len(template) + 500}")
+
+    ws_listes = wb.create_sheet("Listes (validation)")
+    ws_listes.sheet_state = "hidden"
+    col_liste_idx = 1
+
+    def _ajouter_validation(col_nom: str, options: tuple[str, ...]) -> None:
+        nonlocal col_liste_idx
+        if col_nom in COLONNES_TEMPLATE:
+            col_idx = COLONNES_TEMPLATE.index(col_nom) + 1
+            col_letter = get_column_letter(col_idx)
+            inline = ",".join(str(o) for o in options)
+            if len(inline) <= 240:
+                formule = f'"{inline}"'
+            else:
+                list_col_letter = get_column_letter(col_liste_idx)
+                for r, opt in enumerate(options, start=2):
+                    ws_listes.cell(row=r, column=col_liste_idx, value=opt)
+                formule = f"'Listes (validation)'!${list_col_letter}$2:${list_col_letter}${len(options) + 1}"
+                col_liste_idx += 1
+            dv = DataValidation(type="list", formula1=formule, allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{col_letter}2:{col_letter}{len(template) + 500}")
+
+    _ajouter_validation("Statut", ("Active", "En recouvrement", "Restructurée", "Contentieux", "Clôturée"))
+    _ajouter_validation("Type_CRM", ("Aucune", "CRM financee", "CRM non financee"))
+    _ajouter_validation("Niveau de risque HB", ("Risque faible", "Risque mineur", "Risque moyen", "Risque élevé", "Risque très élevé"))
+    _ajouter_validation("Regime_prudentiel_specifique", REGIMES_PRUDENTIELS)
+    _ajouter_validation("Ponderation_initiale_avant_defaut", PONDERATIONS_AVANT_DEFAUT)
 
     ws_nf = wb.create_sheet("CRM_non_financee")
     ecrire_entetes(ws_nf, COLONNES_CRM_NON_FIN, ligne=1)
