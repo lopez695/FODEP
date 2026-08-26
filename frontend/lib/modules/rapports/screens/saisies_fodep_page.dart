@@ -163,8 +163,7 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
     if (_enAttente.isEmpty) return;
     setState(() => _enregistrement = true);
     try {
-      final nombre =
-          await widget.api.enregistrerSaisiesFodep(_enAttente.values.toList());
+      await widget.api.enregistrerSaisiesFodep(_enAttente.values.toList());
       if (!mounted) return;
       _enAttente.clear();
       _modifieDepuisOuverture = true;
@@ -172,8 +171,12 @@ class _SaisiesFodepPageState extends State<SaisiesFodepPage> {
         _enregistrement = false;
         _future = widget.api.fetchSaisiesFodep();
       });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$nombre case(s) enregistrée(s).')),
+        const SnackBar(
+          content: Text('Enregistré avec succès'),
+          duration: Duration(seconds: 1),
+        ),
       );
     } catch (erreur) {
       if (!mounted) return;

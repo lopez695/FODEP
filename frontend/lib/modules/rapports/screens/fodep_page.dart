@@ -112,21 +112,18 @@ class _FodepPageState extends State<FodepPage> {
       // d'écrire, jamais d'un second calcul.
       final Uint8List octets;
       final String nomPropose;
-      final List<ReserveFodep> reserves;
       if (enPdf) {
         final contenu =
             await widget.api.fetchContenuFodep(dateArrete: _dateArrete);
         if (!mounted) return;
         octets = await construireFodepPdf(contenu: contenu);
         nomPropose = contenu.nomFichier.replaceFirst(RegExp(r'\.xlsx$'), '.pdf');
-        reserves = contenu.anomalies;
       } else {
         final export =
             await widget.api.downloadFodep(dateArrete: _dateArrete);
         if (!mounted) return;
         octets = export.bytes;
         nomPropose = export.fileName;
-        reserves = export.anomalies;
       }
       final extension = enPdf ? '.pdf' : '.xlsx';
       if (!mounted) return;
@@ -149,18 +146,7 @@ class _FodepPageState extends State<FodepPage> {
       );
       if (!mounted) return;
 
-      // L'export se termine sur sa confirmation, et rien d'autre. Les
-      // remarques n'arrêtent plus personne : elles restent atteignables d'un
-      // clic, pour qui veut les lire avant de signer.
-      _annoncer(
-        'Bien enregistré',
-        action: reserves.isEmpty
-            ? null
-            : (
-                libelle: 'Voir les remarques',
-                surAppui: () => _afficherLesReserves(reserves),
-              ),
-      );
+      _annoncer('Enregistré avec succès');
     } on FichierVerrouilleException catch (erreur) {
       _signaler(erreur.message);
     } on ApiException catch (erreur) {
@@ -226,22 +212,13 @@ class _FodepPageState extends State<FodepPage> {
     }
   }
 
-  void _annoncer(
-    String message, {
-    ({String libelle, VoidCallback surAppui})? action,
-  }) {
+  void _annoncer(String message) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        // Une remarque à lire demande plus de quatre secondes pour être vue.
-        duration: Duration(seconds: action == null ? 4 : 10),
-        action: action == null
-            ? null
-            : SnackBarAction(
-                label: action.libelle,
-                onPressed: action.surAppui,
-              ),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -256,79 +233,6 @@ class _FodepPageState extends State<FodepPage> {
     ));
   }
 
-  /// Ce qu'il reste à faire, puis ce qu'il faut savoir.
-  ///
-  /// La boîte affichait ses remarques d'affilée sous une seule consigne —
-  /// « complétez-les à la main avant de déposer la déclaration ». Or on ne
-  /// complète pas à la main une convention de report, ni un poste que
-  /// l'établissement ne détient pas : la consigne était fausse pour la plupart
-  /// des lignes, et les deux ou trois qui appelaient vraiment un geste s'y
-  /// noyaient. Chaque réserve porte donc sa nature, et l'écran la range.
-  Future<void> _afficherLesReserves(List<ReserveFodep> reserves) async {
-    final theme = Theme.of(context);
-    List<ReserveFodep> deNature(NatureReserve nature) =>
-        [for (final reserve in reserves) if (reserve.nature == nature) reserve];
-
-    final aVerifier = deNature(NatureReserve.aVerifier);
-    final conventions = deNature(NatureReserve.convention);
-    final informations = deNature(NatureReserve.information);
-
-    await showDialog<void>(
-      context: context,
-      builder: (contexte) => AlertDialog(
-        // Le titre confirme d'abord : la boîte s'ouvre sur un export qui vient
-        // de réussir, et accueillir par « À faire avant de transmettre »
-        // laissait croire à un échec. Ce qui reste à faire est porté par
-        // l'intertitre rouge, qui s'ouvre déjà et compte ses points.
-        title: const Text('Bien enregistré'),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  aVerifier.isEmpty
-                      ? "Rien n'appelle de correction. Les remarques ci-dessous "
-                          "disent comment l'application a rempli le "
-                          'formulaire : celui qui signe les endosse.'
-                      : 'Ce qui suit demande un geste avant de déposer la '
-                          "déclaration ; le reste dit comment l'application a rempli le "
-                          'formulaire.',
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-                ),
-                const SizedBox(height: 16),
-                if (aVerifier.isNotEmpty)
-                  _SectionReserves(
-                    titre: 'À compléter ou à vérifier',
-                    reserves: aVerifier,
-                    ouverte: true,
-                    couleur: AppTheme.danger,
-                  ),
-                if (conventions.isNotEmpty)
-                  _SectionReserves(
-                    titre: "Conventions retenues par l'application",
-                    reserves: conventions,
-                  ),
-                if (informations.isNotEmpty)
-                  _SectionReserves(
-                    titre: 'Pour information',
-                    reserves: informations,
-                  ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(contexte).pop(),
-            child: const Text("J'ai lu"),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -791,87 +695,3 @@ class _Etape extends StatelessWidget {
   }
 }
 
-/// Un groupe de réserves, sous son intitulé.
-///
-/// Ce qui appelle un geste s'ouvre ; les conventions et les constats se
-/// replient. Ils doivent rester consultables — celui qui signe les endosse —
-/// sans encombrer la seule chose à faire avant de déposer la déclaration.
-class _SectionReserves extends StatefulWidget {
-  const _SectionReserves({
-    required this.titre,
-    required this.reserves,
-    this.ouverte = false,
-    this.couleur,
-  });
-
-  final String titre;
-  final List<ReserveFodep> reserves;
-  final bool ouverte;
-  final Color? couleur;
-
-  @override
-  State<_SectionReserves> createState() => _SectionReservesState();
-}
-
-class _SectionReservesState extends State<_SectionReserves> {
-  late bool _ouverte = widget.ouverte;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final couleur = widget.couleur ?? theme.colorScheme.onSurfaceVariant;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: () => setState(() => _ouverte = !_ouverte),
-            borderRadius: BorderRadius.circular(4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Icon(
-                    _ouverte ? Icons.expand_less : Icons.expand_more,
-                    size: 18,
-                    color: couleur,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${widget.titre} (${widget.reserves.length})',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: couleur,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_ouverte)
-            for (final reserve in widget.reserves)
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 9),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('•  '),
-                    Expanded(
-                      child: Text(
-                        reserve.message,
-                        style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        ],
-      ),
-    );
-  }
-}
