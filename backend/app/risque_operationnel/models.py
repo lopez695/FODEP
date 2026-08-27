@@ -458,7 +458,21 @@ class AibCalculResult(BaseModel):
     donnees_insuffisantes: bool
 
 
-# ─── BLOC A2 — AS (Approche Standard) ────────────────────────────────────────
+class ExerciceAsView(BaseModel):
+    annee: int
+    dans_la_moyenne: bool
+
+
+class MillesimeUpdate(BaseModel):
+    """Nouvelle annee d'un exercice deja saisi.
+
+    Se tromper de millesime obligeait a supprimer l'exercice puis a le
+    ressaisir -- huit lignes de metier pour l'approche standard. L'annee se
+    corrige desormais sans toucher aux montants.
+    """
+
+    nouvelle_annee: int
+
 
 class PnbParLigneCreate(BaseModel):
     produit_brut_ligne: float

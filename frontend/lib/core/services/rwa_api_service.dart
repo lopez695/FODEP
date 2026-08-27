@@ -1147,11 +1147,32 @@ class RwaApiService {
       int annee, Map<String, dynamic> data) async {
     final json = await _client.put('/risque-operationnel/aib/pnb/$annee', data)
         as Map<String, dynamic>;
+    // Le RWA Opérationnel du dashboard global (métrique 'rwa_op', donc aussi
+    // 'rwa' total et les ratios qui en découlent) vaut `apr_operationnel_retenu`
+    // côté backend, c'est-à-dire l'approche indicateur de base ou l'approche
+    // standard — jamais le BIC. Seules les écritures BIC invalidaient pourtant
+    // le cache : le tableau de bord global gardait son ancien RWA opérationnel
+    // pendant que l'onglet Risque Opérationnel affichait le nouveau.
+    _dashboardFuture = null;
     return PnbAnnuelView.fromJson(json);
   }
 
   Future<void> deletePnbAnnuel(int annee) async {
     await _client.delete('/risque-operationnel/aib/pnb/$annee');
+    _dashboardFuture = null;
+  }
+
+  /// Corrige le millésime d'un exercice sans toucher aux montants : une année
+  /// saisie de travers se rattrapait sinon par une suppression suivie d'une
+  /// ressaisie complète.
+  Future<void> renommerExerciceAib(int annee, int nouvelleAnnee) async {
+    await _client.put(
+      '/risque-operationnel/aib/exercices/$annee/millesime',
+      {'nouvelle_annee': nouvelleAnnee},
+    );
+    // Renommer un exercice change la fenêtre des trois derniers, donc la
+    // moyenne : le RWA opérationnel bouge.
+    _dashboardFuture = null;
   }
 
   Future<ParametresAib> fetchAibParametres() async {
@@ -1163,6 +1184,9 @@ class RwaApiService {
   Future<ParametresAib> updateAibParametres(Map<String, dynamic> data) async {
     final json = await _client.put('/risque-operationnel/aib/parametres', data)
         as Map<String, dynamic>;
+    // Alpha et multiplicateur entrent directement dans l'exigence de
+    // l'indicateur de base, donc dans le RWA opérationnel du dashboard.
+    _dashboardFuture = null;
     return ParametresAib.fromJson(json);
   }
 
@@ -1193,6 +1217,7 @@ class RwaApiService {
       '/risque-operationnel/as/beta-lignes/${Uri.encodeComponent(ligneMetier)}',
       {'beta': beta},
     ) as Map<String, dynamic>;
+    _dashboardFuture = null;
     return BetaLigneView.fromJson(json);
   }
 
@@ -1210,11 +1235,26 @@ class RwaApiService {
       '/risque-operationnel/as/pnb-lignes/$annee/${Uri.encodeComponent(ligneMetier)}',
       {'produit_brut_ligne': pnb},
     ) as Map<String, dynamic>;
+    // Sans effet sur le dashboard tant que l'approche standard n'est pas
+    // autorisée, mais l'autorisation se pose sur un autre écran : mieux vaut
+    // invalider que dépendre de l'ordre dans lequel on passe d'un à l'autre.
+    _dashboardFuture = null;
     return PnbParLigneView.fromJson(json);
   }
 
   Future<void> deletePnbLignes(int annee) async {
     await _client.delete('/risque-operationnel/as/pnb-lignes/$annee');
+    _dashboardFuture = null;
+  }
+
+  /// Corrige le millésime d'un exercice : les huit lignes de métier suivent,
+  /// c'est l'année qui change et pas les montants.
+  Future<void> renommerExerciceAs(int annee, int nouvelleAnnee) async {
+    await _client.put(
+      '/risque-operationnel/as/exercices/$annee/millesime',
+      {'nouvelle_annee': nouvelleAnnee},
+    );
+    _dashboardFuture = null;
   }
 
   Future<ParametresAs> fetchAsParametres() async {
@@ -1226,6 +1266,9 @@ class RwaApiService {
   Future<ParametresAs> updateAsParametres(Map<String, dynamic> data) async {
     final json = await _client.put('/risque-operationnel/as/parametres', data)
         as Map<String, dynamic>;
+    // `as_autorisee` décide laquelle des deux approches alimente le RWA
+    // opérationnel : c'est le paramètre qui déplace le plus ce chiffre.
+    _dashboardFuture = null;
     return ParametresAs.fromJson(json);
   }
 

@@ -1774,7 +1774,7 @@ class _FxKpiSection extends StatelessWidget {
               label: 'RWA Change',
               value: fmt(result.rwaChange),
               unit: 'FCFA',
-              subtitle: 'Exigence FP × 11,11',
+              subtitle: 'Exigence FP × 12,5',
             ),
           ),
           const SizedBox(width: 10),

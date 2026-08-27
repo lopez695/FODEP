@@ -1,6 +1,7 @@
 // Ce fichier decrit les donnees et regles du module expositions.
 
 import '../../../core/utils/currency_conversion.dart';
+import '../../../core/utils/prudentiel.dart';
 
 String _normalizeExposureLabel(String value) {
   return value
@@ -3054,7 +3055,7 @@ ExposureComputation computeDraftMetrics(ExposureDraft draft) {
       finalRw: fcec,
       ead: ead,
       rwa: rwa,
-      capital: rwa * 0.09,
+      capital: capitalMinimum(rwa),
       effectiveCoverage: 0.0,
       haircut: 0.0,
     );
@@ -3088,7 +3089,7 @@ ExposureComputation computeDraftMetrics(ExposureDraft draft) {
     finalRw: finalRw,
     ead: ead,
     rwa: rwa,
-    capital: rwa * 0.09,
+    capital: capitalMinimum(rwa),
     effectiveCoverage: effectiveCoverage,
     haircut: haircut,
   );

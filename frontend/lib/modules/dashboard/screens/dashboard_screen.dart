@@ -11,6 +11,7 @@ import '../models/dashboard_models.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/dashboard_charts_section.dart';
 import '../widgets/dashboard_top_metrics_grid.dart';
+import '../../../core/utils/prudentiel.dart';
 
 /// Ecran principal de pilotage des RWA et du capital.
 class DashboardScreen extends StatefulWidget {
@@ -87,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final capitalMetric = DashboardMetric(
           key: 'capital_credit',
           label: 'Capital min. requis (crédit)',
-          value: rwaCredit * 0.09,
+          value: capitalMinimum(rwaCredit),
           variation: '',
           trend: const [],
         );

@@ -6,6 +6,7 @@ import '../../../core/utils/currency_conversion.dart';
 import '../../../core/utils/formatters.dart';
 import '../models/dashboard_models.dart';
 import 'dashboard_design.dart';
+import '../../../core/utils/prudentiel.dart';
 
 class DashboardRwaDonut extends StatefulWidget {
   const DashboardRwaDonut({super.key, this.currency = 'XOF', required this.data});
@@ -100,7 +101,7 @@ class _DashboardRwaDonutState extends State<DashboardRwaDonut> {
                 ),
                 child: Text.rich(
                   TextSpan(
-                    text: AppFormatters.compactNumber(total * 0.09),
+                    text: AppFormatters.compactNumber(capitalMinimum(total)),
                     children: [
                       TextSpan(
                         text: amountUnit.label,

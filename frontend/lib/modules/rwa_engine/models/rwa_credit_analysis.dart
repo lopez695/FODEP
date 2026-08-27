@@ -1,6 +1,8 @@
 // Modèle de l'analyse RWA Crédit renvoyée par le backend (/rwa-credit/analyse).
 // Le frontend se contente d'afficher ces valeurs : aucun calcul métier ici.
 
+import '../../../core/utils/prudentiel.dart';
+
 class RwaCreditComparisonPeriod {
   const RwaCreditComparisonPeriod({
     required this.key,
@@ -94,7 +96,7 @@ class RwaCreditAgentRow {
   final double ead;
   final double exposureTotal;
   final double rwa;
-  double get capitalRequired => rwa * 0.09;
+  double get capitalRequired => capitalMinimum(rwa);
   final double contribution;
   // Champs Phase 3 tolérants au null (résilience hot reload).
   final double? averageWeight;
@@ -162,7 +164,7 @@ class RwaCreditTotals {
   final double ead;
   final double exposureTotal;
   final double rwa;
-  double get capitalRequired => rwa * 0.09;
+  double get capitalRequired => capitalMinimum(rwa);
 
   factory RwaCreditTotals.fromJson(Map<String, dynamic> json) {
     return RwaCreditTotals(

@@ -805,7 +805,7 @@ _MarketEquityRiskMeasure _marketEquityRiskMeasure(
     // colonne que la BCEAO verrouille (RM047 = 0,04 ; RM048 = 0,08). Y déclarer
     // une exigence calculée à 9 % donnerait un état où l'exigence ne vaut pas
     // la position multipliée par sa pondération. Le passage de l'exigence à
-    // l'actif pondéré se fait ensuite par le multiplicateur (× 11,11), et non
+    // l'actif pondéré se fait ensuite par le multiplicateur (× 12,5), et non
     // en gonflant le taux ici.
     specificTotal += value * (isLiquid ? 0.04 : 0.08);
   }

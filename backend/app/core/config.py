@@ -41,9 +41,18 @@ class Settings:
     # les fonds propres effectifs doivent couvrir au moins 9 % des risques
     # ponderes. Le coussin de conservation de 2,5 % (§92) est une exigence
     # DISTINCTE, portee separement (CONSERVATION_BUFFER) : l'exigence globale
-    # coussin inclus est de 11,5 %. Le « capital minimum reglementaire » d'une
-    # exposition est donc RWA x 9 %. Parametrable via l'environnement.
-    capital_ratio: float = float(os.getenv("MINIMUM_CAPITAL_RATIO", "0.09"))
+    # coussin inclus est de 11,5 %.
+    #
+    # Le « capital minimum reglementaire » d'une exposition est RWA x 8 %, le
+    # taux de Bale dont 12,5 est l'inverse : les deux conversions se repondent,
+    # une exigence K donne RWA = K x 12,5 et RWA x 8 % redonne K. A 9 % le
+    # tour ne bouclait pas et le capital minimum affiche depassait de 12,5 %
+    # l'exigence dont il decoulait.
+    #
+    # A ne pas confondre avec MIN_SOLVENCY_RATIO (9 %), le ratio que
+    # l'etablissement doit tenir : c'est un seuil de conformite, pas un taux
+    # de conversion. Parametrable via l'environnement.
+    capital_ratio: float = float(os.getenv("MINIMUM_CAPITAL_RATIO", "0.08"))
     # Seuil de tolerance pour le controle de reconciliation du tableau RWA.
     rwa_reconciliation_threshold: float = float(
         os.getenv("RWA_RECONCILIATION_THRESHOLD", "0.005")

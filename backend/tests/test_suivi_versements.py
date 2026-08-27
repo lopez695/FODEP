@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from app.core.config import settings
 from app.expositions import suivi_service
 from app.expositions.models import ExposureCreate
 from app.expositions.services import create_exposition, update_exposition
@@ -319,7 +320,12 @@ def test_versement_reduit_ead_rwa_et_capital(temp_db):
     assert record["ead_total_amount"] == pytest.approx(48_500_000.0)
     assert record["rwa"] == pytest.approx(48_500_000.0)
     assert record["rwa"] < rwa_initial
-    assert record["capital"] == pytest.approx(record["rwa"] * 0.09)
+    # Le taux vient de la configuration, il n'est pas recopie ici : c'est
+    # justement un taux fige dans un coin qui avait laisse cohabiter deux
+    # conventions de capital minimum dans l'outil.
+    assert record["capital"] == pytest.approx(
+        record["rwa"] * settings.capital_ratio
+    )
 
 
 def test_versements_successifs_cumulent_sans_deriver(temp_db):

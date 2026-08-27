@@ -11,6 +11,7 @@ import '../../../core/utils/currency_conversion.dart';
 import '../../../core/utils/formatters.dart';
 import '../../expositions/models/exposition_models.dart';
 import '../models/rwa_credit_analysis.dart';
+import '../../../core/utils/prudentiel.dart';
 
 
 const double _pageRadius = 8;
@@ -618,7 +619,7 @@ class _SummaryCardsRow extends StatelessWidget {
       ),
       _SummaryCard(
         title: 'CAPITAL REQUIS',
-        value: _formatMoney(totals.rwa * 0.09, maxDecimals: 2),
+        value: _formatMoney(capitalMinimum(totals.rwa), maxDecimals: 2),
         subtitle: 'RWA × $ratioLabel',
       ),
     ];

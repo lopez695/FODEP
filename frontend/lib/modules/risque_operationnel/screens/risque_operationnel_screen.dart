@@ -22,7 +22,6 @@ import '../../../shared/widgets/section_card.dart';
 import '../../dashboard/models/dashboard_models.dart';
 import '../../dashboard/widgets/dashboard_design.dart';
 import '../../risque_credit_shared/widgets/credit_data_table_card.dart';
-import '../../risque_credit_shared/widgets/credit_stat_card.dart';
 import '../models/ro_models.dart';
 import '../widgets/ro_criteres_dashboard.dart';
 import '../widgets/ro_format.dart' show roAmount;
@@ -923,10 +922,13 @@ class _RoDashboardHeader extends StatelessWidget {
           const SizedBox(width: 16),
           Tooltip(
             excludeFromSemantics: true,
-            message: 'Dashboard Opérationnel - Art. 313 & 89 UMOA\n\n'
-                'Capital minimum = 15 % × PNB moyen positif (BIA - Art. 89)\n'
-                'RWA = Capital minimum × 11,11 (= 1 / 9 %, ratio de solvabilité)\n'
-                'Statut : Conforme si les seuils prudentiels sont respectés',
+            message: 'Dashboard Opérationnel - Art. 301 & 90 UMOA\n\n'
+                'Capital minimum = 15 % × PNB moyen positif (AIB - Art. 301)\n'
+                'RWA = Exigence × 12,5 (multiplicateur réglementaire, art. 90)\n'
+                'Les deux tuiles reprennent le calcul de l\'onglet '
+                'Indicateur de Base\n'
+                'Statut : À compléter tant qu\'aucun exercice de produit '
+                'brut n\'est saisi',
             preferBelow: false,
             decoration: BoxDecoration(
               color: const Color(0xFF1E293B),
@@ -1132,22 +1134,22 @@ class _RoDashSummaryRow extends StatelessWidget {
 
     final items = <({String label, String value, Color color, String subtitle})>[
       (
-        label: 'Capital minimum (Art. 89)',
+        label: 'Capital minimum (Art. 301)',
         value: roAmount(context, data.widget1.exigenceFondsPropres),
         color: _kBlue,
-        subtitle: '15 % × PNB moyen positif (BIA)',
+        subtitle: '15 % × PNB moyen positif (onglet AIB)',
       ),
       (
         label: 'RWA opérationnel',
         value: roAmount(context, data.widget1.aprRisqueOp),
         color: AppColors.prudentialSolvency,
-        subtitle: 'Capital minimum × 11,11 (1 / 9 %)',
+        subtitle: 'Exigence AIB × 12,5 (art. 90)',
       ),
       (
         label: 'Statut réglementaire',
         value: data.widget1.statutReglementaire,
         color: statutColor,
-        subtitle: 'Conforme si seuils respectés',
+        subtitle: 'À compléter sans exercice PNB saisi',
       ),
       (
         label: 'Incidents (mois)',
@@ -3431,6 +3433,7 @@ class _CartographieViewState extends State<_CartographieView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FutureBuilder<List<RoRisque>>(
       future: _future,
       builder: (ctx, snap) {
@@ -3442,95 +3445,288 @@ class _CartographieViewState extends State<_CartographieView> {
         final eleve    = items.where((r) => r.niveauBrut > 9 && r.niveauBrut <= 16).length;
         final critique = items.where((r) => r.niveauBrut > 16).length;
 
-        return Column(
-          children: [
-            // ── KPI + action ──────────────────────────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _CartographieSummaryBar(
-                    total: items.length,
-                    faible: faible,
-                    eleve: eleve,
-                    critique: critique,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                FilledButton.icon(
-                  onPressed: () => _showForm(),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Nouveau risque'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // ── Layout principal ──────────────────────────────────────────
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top Header ──────────────────────────────────────────────
+              Row(
                 children: [
-                  // Colonne gauche : matrice
-                  SizedBox(
-                    width: 330,
-                    child: SectionCard(
-                      title: 'Matrice d\'exposition 5×5',
-                      child: SingleChildScrollView(
-                        child: _RoRiskMatrix(risques: items),
-                      ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          'Synthèse de la cartographie des risques',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          excludeFromSemantics: true,
+                          message: 'Cartographie des risques - Art. 313 UMOA\n\n'
+                              'Score = Probabilité × Impact (matrice 5×5)\n'
+                              'Faible   : P×I ≤ 4 (surveillance standard)\n'
+                              'Élevé    : P×I 10–16 (plan d\'action recommandé)\n'
+                              'Critique : P×I > 16 (action immédiate obligatoire)',
+                          preferBelow: false,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          textStyle: const TextStyle(fontSize: 12, color: Colors.white, height: 1.5),
+                          padding: const EdgeInsets.all(12),
+                          child: const Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.accent),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  // Colonne droite : liste
-                  Expanded(
-                    child: items.isEmpty
-                        ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.map_outlined, size: 52, color: _kMuted.withValues(alpha: 0.3)),
-                            const SizedBox(height: 12),
-                            const Text('Aucun risque enregistré.', style: TextStyle(color: _kMuted, fontSize: 13)),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              onPressed: () => _showForm(),
-                              icon: const Icon(Icons.add_rounded, size: 16),
-                              label: const Text('Ajouter le premier risque'),
-                            ),
-                          ]))
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Text('${items.length} risque${items.length > 1 ? 's' : ''} cartographié${items.length > 1 ? 's' : ''}',
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                const Spacer(),
-                                if (critique > 0)
-                                  _badge('$critique critique${critique > 1 ? 's' : ''}', _kDanger),
-                              ]),
-                              const SizedBox(height: 10),
-                              Expanded(
-                                child: ListView.separated(
-                                  itemCount: items.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                                  itemBuilder: (_, idx) {
-                                    final r = items[idx];
-                                    return _RisqueListItem(
-                                      risque: r,
-                                      onEdit: () => _showForm(edit: r),
-                                      onDelete: () => _confirm(ctx,
-                                        'Supprimer "${r.nom}" ?',
-                                        () async { await widget.api.deleteRoRisque(r.id); _reload(); }),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
+                  FilledButton.icon(
+                    onPressed: () => _showForm(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _kBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Nouveau risque', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              // ── 4 KPI Stat Cards ─────────────────────────────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 1000
+                      ? 4
+                      : (constraints.maxWidth >= 540 ? 2 : 1);
+                  final stats = [
+                    _ModernPertesStatCard(
+                      label: 'Risques cartographiés',
+                      value: '${items.length}',
+                      helper: 'Total du référentiel',
+                      tag: 'TOTAL',
+                      icon: Icons.map_rounded,
+                      accentColor: _kBlue,
+                    ),
+                    _ModernPertesStatCard(
+                      label: 'Niveau faible',
+                      value: '$faible',
+                      helper: 'P×I ≤ 4 • Surveillance',
+                      tag: 'FAIBLE',
+                      icon: Icons.check_circle_outline_rounded,
+                      accentColor: _kSuccess,
+                    ),
+                    _ModernPertesStatCard(
+                      label: 'Niveau élevé',
+                      value: '$eleve',
+                      helper: 'P×I 10–16 • Plan recommandé',
+                      tag: 'ÉLEVÉ',
+                      icon: Icons.warning_amber_rounded,
+                      accentColor: const Color(0xFFF97316),
+                    ),
+                    _ModernPertesStatCard(
+                      label: 'Niveau critique',
+                      value: '$critique',
+                      helper: 'P×I > 16 • Action immédiate',
+                      tag: 'CRITIQUE',
+                      icon: Icons.error_outline_rounded,
+                      accentColor: _kDanger,
+                    ),
+                  ];
+
+                  if (columns == 4) {
+                    return Row(
+                      children: [
+                        for (var i = 0; i < stats.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 12),
+                          Expanded(child: stats[i]),
+                        ],
+                      ],
+                    );
+                  }
+
+                  return GridView.count(
+                    crossAxisCount: columns,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 2.8,
+                    children: stats,
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              // ── Main Section : Matrice 5x5 + Référentiel ──────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 980;
+                  if (!isWide) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _RoRiskMatrix(risques: items),
+                        const SizedBox(height: 16),
+                        _buildRisquesPanel(items, critique, ctx),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 440,
+                        child: _RoRiskMatrix(risques: items),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildRisquesPanel(items, critique, ctx),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildRisquesPanel(List<RoRisque> items, int critique, BuildContext ctx) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF13233E) : Colors.white;
+    final border = isDark ? const Color(0xFF263856) : const Color(0xFFE2E8F0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: isDark ? 0.20 : 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.list_alt_rounded, size: 16, color: _kBlue),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Référentiel des risques (${items.length})',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              if (critique > 0)
+                _badge('$critique critique${critique > 1 ? 's' : ''}', _kDanger),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.map_outlined,
+                        size: 32,
+                        color: _kBlue.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Aucun risque cartographié pour le moment.',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Ajoutez vos risques pour alimenter la matrice d\'exposition 5×5.',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: () => _showForm(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _kBlue.withValues(alpha: 0.5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16, color: _kBlue),
+                      label: const Text('Ajouter le premier risque', style: TextStyle(fontWeight: FontWeight.w700, color: _kBlue)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, idx) {
+                final r = items[idx];
+                return _RisqueListItem(
+                  risque: r,
+                  onEdit: () => _showForm(edit: r),
+                  onDelete: () => _confirm(
+                    ctx,
+                    'Supprimer "${r.nom}" ?',
+                    () async {
+                      await widget.api.deleteRoRisque(r.id);
+                      _reload();
+                    },
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }
@@ -3704,110 +3900,6 @@ class _RisqueListItem extends StatelessWidget {
       ),
     ),
   );
-}
-
-// ─── Barre KPI Cartographie (style Dashboard) ────────────────────────────────
-
-class _CartographieSummaryBar extends StatelessWidget {
-  const _CartographieSummaryBar({
-    required this.total,
-    required this.faible,
-    required this.eleve,
-    required this.critique,
-  });
-  final int total, faible, eleve, critique;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = <({String label, String value, Color color, String subtitle})>[
-      (
-        label: 'Risques cartographiés',
-        value: '$total',
-        color: _kBlue,
-        subtitle: 'Total du référentiel de risques',
-      ),
-      (
-        label: 'Niveau faible',
-        value: '$faible',
-        color: _kSuccess,
-        subtitle: 'P×I ≤ 4 - surveillance standard',
-      ),
-      (
-        label: 'Niveau élevé',
-        value: '$eleve',
-        color: const Color(0xFFF97316),
-        subtitle: 'P×I 10–16 - plan recommandé',
-      ),
-      (
-        label: 'Niveau critique',
-        value: '$critique',
-        color: _kDanger,
-        subtitle: 'P×I > 16 - action immédiate',
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Synthèse de la cartographie des risques',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _kMuted),
-              ),
-            ),
-            Tooltip(
-              excludeFromSemantics: true,
-              message: 'Cartographie des risques - Art. 313 UMOA\n\n'
-                  'Score = Probabilité × Impact (matrice 5×5)\n'
-                  'Faible : P×I ≤ 4 - surveillance standard\n'
-                  'Élevé  : P×I 10–16 - plan d\'action recommandé\n'
-                  'Critique : P×I > 16 - action immédiate obligatoire',
-              preferBelow: false,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              textStyle: const TextStyle(fontSize: 12, color: Colors.white, height: 1.5),
-              padding: const EdgeInsets.all(14),
-              child: const Icon(Icons.info_outline_rounded, size: 15, color: AppTheme.accent),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 900
-                ? 4
-                : constraints.maxWidth >= 560
-                    ? 2
-                    : 1;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                mainAxisExtent: 130,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return RoHeroStatCard(
-                  label: item.label,
-                  value: item.value,
-                  valueColor: item.color,
-                  subtitle: item.subtitle,
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
 }
 
 // ─── VIEW 6 : CONTROLES ───────────────────────────────────────────────────────
@@ -6787,8 +6879,6 @@ class _RegistreViewState extends State<_RegistreView> {
     final cached = _apply(_cachedItems);
     final cBrute = cached.fold(0.0, (s, i) => s + i.perteBrute);
     final cNette = cached.fold(0.0, (s, i) => s + i.perteNette);
-    final cKro   = cNette * 0.15;
-    final cApr   = cKro * kMultiplicateurRwaReglementaire;
 
     // Tout (filtres + tableau + KPI) est regroupé dans UNE seule carte, comme
     // sur le tableau Expositions (SectionCard unique englobant l'ensemble).
@@ -6825,8 +6915,8 @@ class _RegistreViewState extends State<_RegistreView> {
                 },
               ),
             ),
-            const SizedBox(height: 6),
-            _buildPertesStatGrid(cached.length, cBrute, cNette, cKro, cApr),
+            const SizedBox(height: 5),
+            _buildPertesStatGrid(cached.length, cBrute, cNette),
           ],
         ),
       ),
@@ -7290,63 +7380,59 @@ class _RegistreViewState extends State<_RegistreView> {
 
   // ── helpers UI ──────────────────────────────────────────────────────────────
 
-  Widget _buildPertesStatGrid(
-      int count, double brute, double nette, double kro, double apr) {
-    final stats = [
-      CreditStatCard(
-        label: 'Pertes enregistrées',
-        value: '$count',
-        helper: 'Registre consolidé',
-        icon: Icons.list_alt_outlined,
-        color: AppTheme.accent,
-      ),
-      CreditStatCard(
-        label: 'Perte brute',
-        value: AppFormatters.currency(brute),
-        helper: 'Exposition totale avant atténuation',
-        icon: Icons.trending_down_outlined,
-        color: _kDanger,
-      ),
-      CreditStatCard(
-        label: 'Perte nette',
-        value: AppFormatters.currency(nette),
-        helper: 'Base de calcul BIA - Art. 313.b UMOA',
-        icon: Icons.account_balance_outlined,
-        color: _kDanger,
-      ),
-      CreditStatCard(
-        label: 'Capital minimum (Art. 89)',
-        value: AppFormatters.currency(kro),
-        helper: '15 % de la perte nette',
-        icon: Icons.shield_outlined,
-        color: AppColors.prudentialSolvency,
-      ),
-      CreditStatCard(
-        label: 'RWA opérationnel',
-        value: AppFormatters.currency(apr),
-        helper: 'Capital minimum × 12,5',
-        icon: Icons.bar_chart_outlined,
-        color: AppColors.marketNeutral,
-      ),
-    ];
+  Widget _buildPertesStatGrid(int count, double brute, double nette) {
+    final recouvrement = (brute - nette).clamp(0.0, double.infinity);
+    final tauxRecouvrement = brute > 0 ? (recouvrement / brute * 100) : 0.0;
+
+    final card1 = _ModernPertesStatCard(
+      label: 'Pertes enregistrées',
+      value: '$count',
+      helper: count <= 1 ? '$count événement consolidé' : '$count événements consolidés',
+      tag: 'REGISTRE',
+      icon: Icons.receipt_long_rounded,
+      accentColor: const Color(0xFF4F46E5), // Indigo
+    );
+
+    final card2 = _ModernPertesStatCard(
+      label: 'Perte brute cumulée',
+      value: AppFormatters.currency(brute),
+      helper: 'Impact total avant atténuation',
+      tag: 'BRUT',
+      icon: Icons.trending_down_rounded,
+      accentColor: const Color(0xFFD97706), // Amber
+    );
+
+    final card3 = _ModernPertesStatCard(
+      label: 'Perte nette résiduelle',
+      value: AppFormatters.currency(nette),
+      helper: brute > 0
+          ? 'Recouvré : ${AppFormatters.currency(recouvrement)} (${tauxRecouvrement.toStringAsFixed(1)} %)'
+          : 'Après déduction des recouvrements',
+      tag: 'NET',
+      icon: Icons.account_balance_wallet_outlined,
+      accentColor: const Color(0xFFE11D48), // Rose / Danger
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth >= 1100
-            ? ((constraints.maxWidth - AppTheme.spacing * 4) / 5)
-                .clamp(0.0, 210.0)
-                .toDouble()
-            : constraints.maxWidth >= 620
-                ? ((constraints.maxWidth - AppTheme.spacing) / 2)
-                    .clamp(0.0, 210.0)
-                    .toDouble()
-                : constraints.maxWidth;
-
-        return Wrap(
-          spacing: AppTheme.spacing,
-          runSpacing: AppTheme.spacing,
+        if (constraints.maxWidth >= 820) {
+          return Row(
+            children: [
+              Expanded(child: card1),
+              const SizedBox(width: 12),
+              Expanded(child: card2),
+              const SizedBox(width: 12),
+              Expanded(child: card3),
+            ],
+          );
+        }
+        return Column(
           children: [
-            for (final stat in stats) SizedBox(width: width, child: stat),
+            card1,
+            const SizedBox(height: 8),
+            card2,
+            const SizedBox(height: 8),
+            card3,
           ],
         );
       },
@@ -10706,9 +10792,16 @@ class _RoIncidentWizardDialogState extends State<_RoIncidentWizardDialog> {
 
 // ─── Shared visual widgets ────────────────────────────────────────────────────
 
-class _RoRiskMatrix extends StatelessWidget {
+class _RoRiskMatrix extends StatefulWidget {
   const _RoRiskMatrix({required this.risques});
   final List<RoRisque> risques;
+
+  @override
+  State<_RoRiskMatrix> createState() => _RoRiskMatrixState();
+}
+
+class _RoRiskMatrixState extends State<_RoRiskMatrix> {
+  (int, int)? _selectedCell;
 
   static Color _zoneColor(int p, int i) {
     final s = p * i;
@@ -10726,169 +10819,378 @@ class _RoRiskMatrix extends StatelessWidget {
     return 'Critique';
   }
 
-  List<String> _namesAt(int p, int i) =>
-      risques.where((r) => r.probabilite == p && r.impact == i).map((r) => r.nom).toList();
+  List<RoRisque> _risksAt(int p, int i) =>
+      widget.risques.where((r) => r.probabilite == p && r.impact == i).toList();
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const cellSz = 42.0;
+    final bg = isDark ? const Color(0xFF13233E) : Colors.white;
+    final border = isDark ? const Color(0xFF263856) : const Color(0xFFE2E8F0);
+    const cellSz = 48.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Axes + grille ─────────────────────────────────────────────────
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Colonne gauche : label vertical + numéros P
-            Column(children: [
-              // Espace pour aligner avec le label "IMPACT →" + chiffres
-              const SizedBox(height: 34),
-              // Numéros P (5 → 1, top → bottom)
-              ...List.generate(5, (pi) {
-                final p = 5 - pi;
-                return SizedBox(
-                  height: cellSz + 3,
-                  child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    if (pi == 2)
-                      const RotatedBox(quarterTurns: -1,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 4),
-                          child: Text('PROBABILITÉ ↑',
-                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700,
-                              color: _kMuted, letterSpacing: 0.7)),
-                        ))
-                    else
-                      const SizedBox(width: 60),
-                    Text('$p',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kMuted)),
-                  ]),
-                );
-              }),
-            ]),
-            const SizedBox(width: 6),
-            // Colonne droite : axe Impact (haut) + grille
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Axe Impact
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('IMPACT →',
-                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700,
-                      color: _kMuted, letterSpacing: 0.8)),
-                  const SizedBox(height: 4),
-                  Row(children: List.generate(5, (i) => SizedBox(
-                    width: cellSz + 3,
-                    child: Text('${i + 1}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kMuted)),
-                  ))),
-                ]),
-                const SizedBox(height: 4),
-                // Grille 5×5
-                ...List.generate(5, (pi) {
-                  final p = 5 - pi;
-                  return Row(
-                    children: List.generate(5, (ii) {
-                      final impact = ii + 1;
-                      final names = _namesAt(p, impact);
-                      final cnt   = names.length;
-                      final c     = _zoneColor(p, impact);
-                      final zl    = _zoneLabel(p, impact);
-                      final score = p * impact;
+    final selected = _selectedCell;
+    final selectedRisks = selected != null ? _risksAt(selected.$1, selected.$2) : <RoRisque>[];
 
-                      return ExcludeSemantics(
-                        child: Tooltip(
-                        excludeFromSemantics: true,
-                        key: ValueKey('matrix_${p}_$impact'),
-                        message: cnt == 0
-                            ? 'P=$p × I=$impact = $score ($zl)\nAucun risque positionné ici'
-                            : 'P=$p × I=$impact = $score ($zl)\n${names.join('\n')}',
-                        waitDuration: const Duration(milliseconds: 300),
-                        showDuration: const Duration(seconds: 6),
-                        textStyle: const TextStyle(fontSize: 11, color: Colors.white, height: 1.55),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E2A3A),
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Container(
-                          width: cellSz,
-                          height: cellSz,
-                          margin: const EdgeInsets.all(1.5),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                c.withValues(alpha: isDark ? 0.38 : 0.20),
-                                c.withValues(alpha: isDark ? 0.20 : 0.09),
-                              ],
-                            ),
-                            border: Border.all(
-                              color: cnt > 0 ? c.withValues(alpha: 0.75) : c.withValues(alpha: 0.30),
-                              width: cnt > 0 ? 1.5 : 0.8,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: cnt > 0
-                                ? [BoxShadow(color: c.withValues(alpha: 0.18), blurRadius: 5)]
-                                : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: cnt > 0
-                              ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  Text('$cnt',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: cnt > 9 ? 13 : 17,
-                                      color: c, height: 1.0)),
-                                  Text('risque${cnt > 1 ? 's' : ''}',
-                                    style: TextStyle(fontSize: 7,
-                                      color: c.withValues(alpha: 1.0),
-                                      fontWeight: FontWeight.w700, letterSpacing: -0.2)),
-                                ])
-                              : Text('$score',
-                                  style: TextStyle(fontSize: 10,
-                                    color: c.withValues(alpha: 1.0),
-                                    fontWeight: FontWeight.w700)),
-                        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Titre du bloc matrice ─────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: isDark ? 0.20 : 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.grid_view_rounded, size: 16, color: _kBlue),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Matrice d\'exposition 5×5',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A),
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Probabilité (Fréquence) × Impact (Gravité)',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: isDark ? 0.18 : 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: _kBlue.withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  '${widget.risques.length} risque${widget.risques.length > 1 ? 's' : ''}',
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: _kBlue),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // ── Axes + Grille ─────────────────────────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Colonne gauche : label vertical + numéros P (5 -> 1)
+              Column(
+                children: [
+                  const SizedBox(height: 32),
+                  ...List.generate(5, (pi) {
+                    final p = 5 - pi;
+                    return SizedBox(
+                      height: cellSz + 4,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (pi == 2)
+                            const RotatedBox(
+                              quarterTurns: -1,
+                              child: Padding(
+                                padding: EdgeInsets.only(right: 6),
+                                child: Text(
+                                  'PROBABILITÉ ↑',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    color: _kMuted,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(width: 58),
+                          Container(
+                            width: 18,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$p',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(width: 6),
+              // Colonne droite : Axe Impact (1 -> 5) + Grille
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Axe Impact
+                    const Row(
+                      children: [
+                        Text(
+                          'IMPACT →',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            color: _kMuted,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: List.generate(5, (i) => Container(
+                        width: cellSz,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          ),
+                        ),
+                      )),
+                    ),
+                    const SizedBox(height: 6),
+                    // Grille 5×5
+                    ...List.generate(5, (pi) {
+                      final p = 5 - pi;
+                      return Row(
+                        children: List.generate(5, (ii) {
+                          final impact = ii + 1;
+                          final risks = _risksAt(p, impact);
+                          final cnt = risks.length;
+                          final c = _zoneColor(p, impact);
+                          final score = p * impact;
+                          final isCellSelected = selected?.$1 == p && selected?.$2 == impact;
+
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (isCellSelected) {
+                                  _selectedCell = null;
+                                } else {
+                                  _selectedCell = (p, impact);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              width: cellSz,
+                              height: cellSz,
+                              margin: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    c.withValues(alpha: isCellSelected ? (isDark ? 0.55 : 0.35) : (isDark ? 0.30 : 0.14)),
+                                    c.withValues(alpha: isCellSelected ? (isDark ? 0.35 : 0.20) : (isDark ? 0.15 : 0.05)),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: isCellSelected
+                                      ? Colors.white
+                                      : (cnt > 0 ? c.withValues(alpha: 0.90) : c.withValues(alpha: 0.35)),
+                                  width: isCellSelected ? 2.2 : (cnt > 0 ? 1.5 : 0.9),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: isCellSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: c.withValues(alpha: 0.50),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : (cnt > 0
+                                        ? [
+                                            BoxShadow(
+                                              color: c.withValues(alpha: 0.25),
+                                              blurRadius: 4,
+                                            ),
+                                          ]
+                                        : null),
+                              ),
+                              alignment: Alignment.center,
+                              child: cnt > 0
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '$cnt',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 15,
+                                            color: isDark ? Colors.white : c,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 1),
+                                        Text(
+                                          'risque${cnt > 1 ? 's' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 7.5,
+                                            color: isDark ? const Color(0xFFE2E8F0) : c,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Text(
+                                      '$score',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: c.withValues(alpha: 0.95),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                            ),
+                          );
+                        }),
                       );
                     }),
-                  );
-                }),
-              ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // ── Inspecteur de cellule sélectionnée ─────────────────────────────
+          if (selected != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _zoneColor(selected.$1, selected.$2).withValues(alpha: isDark ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _zoneColor(selected.$1, selected.$2).withValues(alpha: 0.35),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _zoneColor(selected.$1, selected.$2),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Cellule P=${selected.$1} × I=${selected.$2} (Score : ${selected.$1 * selected.$2} — ${_zoneLabel(selected.$1, selected.$2)})',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: _zoneColor(selected.$1, selected.$2),
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: () => setState(() => _selectedCell = null),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 14,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (selectedRisks.isEmpty)
+                    Text(
+                      'Aucun risque positionné dans cette cellule.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: selectedRisks.map((r) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: _zoneColor(selected.$1, selected.$2).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          r.nom,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                ],
+              ),
             ),
+            const SizedBox(height: 12),
           ],
-        ),
-        const SizedBox(height: 14),
-        // ── Légende ───────────────────────────────────────────────────────
-        Wrap(spacing: 10, runSpacing: 6, children: [
-          _legendItem('Faible ≤4', _kSuccess),
-          _legendItem('Moyen 5–9', _kWarning),
-          _legendItem('Élevé 10–16', const Color(0xFFF97316)),
-          _legendItem('Critique >16', _kDanger),
-        ]),
-        if (risques.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: _kBlue.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: _kBlue.withValues(alpha: 0.15)),
-            ),
-            child: const Row(children: [
-              Icon(Icons.touch_app_rounded, size: 11, color: _kBlue),
-              SizedBox(width: 5),
-              Text('Survolez une cellule pour voir les risques',
-                style: TextStyle(fontSize: 10, color: _kMuted)),
-            ]),
+          // ── Légende ───────────────────────────────────────────────────────
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _legendItem('Faible ≤4', _kSuccess),
+              _legendItem('Moyen 5–9', _kWarning),
+              _legendItem('Élevé 10–16', const Color(0xFFF97316)),
+              _legendItem('Critique >16', _kDanger),
+            ],
           ),
         ],
-      ],
+      ),
     );
   }
 
@@ -10896,17 +11198,44 @@ class _RoRiskMatrix extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
-        width: 12, height: 12,
+        width: 10,
+        height: 10,
         decoration: BoxDecoration(
-          color: c.withValues(alpha: 0.22),
+          color: c.withValues(alpha: 0.30),
           borderRadius: BorderRadius.circular(3),
-          border: Border.all(color: c.withValues(alpha: 0.55)),
+          border: Border.all(color: c, width: 1.1),
         ),
       ),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: _kMuted)),
+      const SizedBox(width: 4),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kMuted),
+      ),
     ],
   );
+}
+
+String _formatRoExact(num value) {
+  if (value == 0) return '0 FCFA';
+  final s = value.abs().toStringAsFixed(0);
+  final formatted = s.replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (m) => '${m[1]} ',
+  );
+  return '${value < 0 ? '-' : ''}$formatted FCFA';
+}
+
+String _formatRoCompact(num value) {
+  final absVal = value.abs();
+  final sign = value < 0 ? '-' : '';
+  if (absVal >= 1000000000) {
+    return '$sign${(absVal / 1000000000).toStringAsFixed(2)} Md';
+  } else if (absVal >= 1000000) {
+    return '$sign${(absVal / 1000000).toStringAsFixed(1)} M';
+  } else if (absVal >= 1000) {
+    return '$sign${(absVal / 1000).toStringAsFixed(0)} k';
+  }
+  return '$sign${absVal.toStringAsFixed(0)}';
 }
 
 class _RoPieChart extends StatelessWidget {
@@ -10917,7 +11246,16 @@ class _RoPieChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = items.fold(0, (s, e) => s + e.valeur);
     if (total == 0) return const SizedBox();
-    final palette = [_kBlue, _kSuccess, _kWarning, _kDanger, AppColors.prudentialSolvency, AppColors.marketNeutral, const Color(0xFFF97316), const Color(0xFF84CC16)];
+    final palette = [
+      _kBlue,
+      _kSuccess,
+      _kWarning,
+      _kDanger,
+      AppColors.prudentialSolvency,
+      AppColors.marketNeutral,
+      const Color(0xFFF97316),
+      const Color(0xFF84CC16)
+    ];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final sorted = items.asMap().entries.toList()
@@ -10931,66 +11269,81 @@ class _RoPieChart extends StatelessWidget {
           final c = palette[entry.key % palette.length];
           final pct = total > 0 ? entry.value.valeur / total : 0.0;
           final pctStr = (pct * 100).toStringAsFixed(1);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 11),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 9, height: 9,
-                      decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        entry.value.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? AppTheme.darkText : AppTheme.text,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$pctStr %',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Stack(
+          final tooltipMsg = entry.value.valeur >= 100000
+              ? '${entry.value.label}\n${_formatRoExact(entry.value.valeur)} ($pctStr %)'
+              : '${entry.value.label}\n${entry.value.valeur} incident(s) ($pctStr %)';
+
+          return Tooltip(
+            message: tooltipMsg,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xE61E293B) : const Color(0xF20F172A),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: isDark ? const Color(0x44FFFFFF) : const Color(0x22000000)),
+            ),
+            textStyle: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
                       Container(
+                        width: 9,
                         height: 9,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: isDark ? c.withValues(alpha: 0.14) : c.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(6),
+                        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          entry.value.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppTheme.darkText : AppTheme.text,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      FractionallySizedBox(
-                        widthFactor: pct.clamp(0.0, 1.0),
-                        child: Container(
-                          height: 9,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [c.withValues(alpha: 0.75), c],
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$pctStr %',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 9,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: isDark ? c.withValues(alpha: 0.14) : c.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: pct.clamp(0.0, 1.0),
+                          child: Container(
+                            height: 9,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [c.withValues(alpha: 0.75), c],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -10999,11 +11352,85 @@ class _RoPieChart extends StatelessWidget {
   }
 }
 
-class _RoLineChartPainter extends CustomPainter {
-  const _RoLineChartPainter({required this.dataBlue, required this.dataGreen, required this.labels});
+// ─── Interactive Line Chart ──────────────────────────────────────────────────
+
+class _RoInteractiveLineChart extends StatefulWidget {
+  const _RoInteractiveLineChart({
+    required this.dataBlue,
+    required this.dataGreen,
+    required this.labels,
+    required this.isDark,
+  });
+
   final List<double> dataBlue;
   final List<double> dataGreen;
   final List<String> labels;
+  final bool isDark;
+
+  @override
+  State<_RoInteractiveLineChart> createState() => _RoInteractiveLineChartState();
+}
+
+class _RoInteractiveLineChartState extends State<_RoInteractiveLineChart> {
+  int? _hoverIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.dataBlue.isEmpty) {
+      return const Center(
+        child: Text('Aucune donnée', style: TextStyle(color: _kMuted)),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MouseRegion(
+          onHover: (event) {
+            const padL = 48.0, padR = 8.0;
+            final w = constraints.maxWidth - padL - padR;
+            if (w <= 0 || widget.labels.length <= 1) return;
+            final x = event.localPosition.dx - padL;
+            final step = w / (widget.labels.length - 1);
+            final idx = (x / step).round().clamp(0, widget.labels.length - 1);
+            if (_hoverIndex != idx) {
+              setState(() => _hoverIndex = idx);
+            }
+          },
+          onExit: (_) {
+            if (_hoverIndex != null) {
+              setState(() => _hoverIndex = null);
+            }
+          },
+          child: CustomPaint(
+            painter: _RoLineChartPainter(
+              dataBlue: widget.dataBlue,
+              dataGreen: widget.dataGreen,
+              labels: widget.labels,
+              hoverIndex: _hoverIndex,
+              isDark: widget.isDark,
+            ),
+            size: Size.infinite,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RoLineChartPainter extends CustomPainter {
+  const _RoLineChartPainter({
+    required this.dataBlue,
+    required this.dataGreen,
+    required this.labels,
+    this.hoverIndex,
+    this.isDark = false,
+  });
+
+  final List<double> dataBlue;
+  final List<double> dataGreen;
+  final List<String> labels;
+  final int? hoverIndex;
+  final bool isDark;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -11015,14 +11442,24 @@ class _RoLineChartPainter extends CustomPainter {
     final maxV = all.reduce(math.max);
     if (maxV == 0) return;
 
-    final gridPaint = Paint()..color = const Color(0x22000000)..strokeWidth = 0.5;
+    final gridPaint = Paint()
+      ..color = (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000)).withValues(alpha: 0.08)
+      ..strokeWidth = 0.5;
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     const gridLines = 4;
     for (var i = 0; i <= gridLines; i++) {
       final y = padT + h - (i / gridLines) * h;
       canvas.drawLine(Offset(padL, y), Offset(padL + w, y), gridPaint);
       final val = (maxV * i / gridLines).round();
-      textPainter.text = TextSpan(text: val >= 1000000 ? '${(val / 1000000).toStringAsFixed(1)}M' : '$val', style: const TextStyle(color: _kMuted, fontSize: 8));
+      final lbl = val >= 1000000000
+          ? '${(val / 1000000000).toStringAsFixed(1)}Md'
+          : val >= 1000000
+              ? '${(val / 1000000).toStringAsFixed(1)}M'
+              : '$val';
+      textPainter.text = TextSpan(
+        text: lbl,
+        style: const TextStyle(color: _kMuted, fontSize: 8),
+      );
       textPainter.layout();
       textPainter.paint(canvas, Offset(padL - textPainter.width - 4, y - textPainter.height / 2));
     }
@@ -11035,7 +11472,20 @@ class _RoLineChartPainter extends CustomPainter {
         final y = padT + h - (data[i] / maxV) * h;
         i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
-      canvas.drawPath(path, Paint()..color = color..strokeWidth = 1.8..style = PaintingStyle.stroke..strokeCap = StrokeCap.round);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+
+      for (var i = 0; i < data.length; i++) {
+        final x = padL + (i / (data.length - 1)) * w;
+        final y = padT + h - (data[i] / maxV) * h;
+        canvas.drawCircle(Offset(x, y), 2.5, Paint()..color = color);
+      }
     }
 
     drawLine(dataBlue, _kBlue);
@@ -11043,7 +11493,7 @@ class _RoLineChartPainter extends CustomPainter {
 
     final step = labels.length > 1 ? w / (labels.length - 1) : w;
     for (var i = 0; i < labels.length; i++) {
-      if (i % 3 != 0) continue;
+      if (labels.length > 6 && i % 2 != 0) continue;
       textPainter.text = TextSpan(text: labels[i], style: const TextStyle(color: _kMuted, fontSize: 8));
       textPainter.layout();
       textPainter.paint(canvas, Offset(padL + i * step - textPainter.width / 2, padT + h + 6));
@@ -11058,10 +11508,423 @@ class _RoLineChartPainter extends CustomPainter {
     textPainter.text = const TextSpan(text: 'Nette', style: TextStyle(color: _kMuted, fontSize: 8));
     textPainter.layout();
     textPainter.paint(canvas, const Offset(padL + 84, padT - 8));
+
+    // Info-bulle flottante interactive lors du survol
+    if (hoverIndex != null && hoverIndex! >= 0 && hoverIndex! < dataBlue.length) {
+      final idx = hoverIndex!;
+      final hX = labels.length > 1 ? padL + (idx / (labels.length - 1)) * w : padL + w / 2;
+      final yB = padT + h - (dataBlue[idx] / maxV) * h;
+      final yG = padT + h - (dataGreen[idx] / maxV) * h;
+
+      // Ligne verticale de repère
+      final guidePaint = Paint()
+        ..color = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.25)
+        ..strokeWidth = 1.2
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(Offset(hX, padT), Offset(hX, padT + h), guidePaint);
+
+      // Points d'accroche mis en valeur
+      canvas.drawCircle(Offset(hX, yB), 5.5, Paint()..color = _kBlue);
+      canvas.drawCircle(Offset(hX, yB), 2.5, Paint()..color = Colors.white);
+      canvas.drawCircle(Offset(hX, yG), 5.5, Paint()..color = _kSuccess);
+      canvas.drawCircle(Offset(hX, yG), 2.5, Paint()..color = Colors.white);
+
+      final moisLbl = idx < labels.length ? labels[idx] : '';
+      final valB = dataBlue[idx];
+      final valG = dataGreen[idx];
+      final valRecup = (valB - valG).clamp(0.0, double.infinity);
+
+      final tooltipSpan = TextSpan(
+        children: [
+          TextSpan(
+            text: '$moisLbl\n',
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(
+            text: '● Perte brute : ${_formatRoExact(valB)}\n',
+            style: const TextStyle(
+              color: _kBlue,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          TextSpan(
+            text: '● Perte nette : ${_formatRoExact(valG)}',
+            style: const TextStyle(
+              color: _kSuccess,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (valRecup > 0)
+            TextSpan(
+              text: '\n● Recouvrement : ${_formatRoExact(valRecup)}',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      );
+
+      textPainter.text = tooltipSpan;
+      textPainter.layout();
+
+      const ttPadH = 9.0;
+      const ttPadV = 7.0;
+      final ttW = textPainter.width + ttPadH * 2;
+      final ttH = textPainter.height + ttPadV * 2;
+
+      // Positionnement automatique pour ne pas déborder
+      var ttX = hX + 12;
+      if (ttX + ttW > size.width - padR) {
+        ttX = hX - ttW - 12;
+      }
+      var ttY = math.min(yB, yG) - ttH - 8;
+      if (ttY < padT) {
+        ttY = math.max(yB, yG) + 12;
+      }
+      if (ttY + ttH > size.height - padB) {
+        ttY = size.height - padB - ttH;
+      }
+
+      final ttRect = Rect.fromLTWH(ttX, ttY, ttW, ttH);
+      final bgPaint = Paint()
+        ..color = isDark ? const Color(0xF01E293B) : const Color(0xF5FFFFFF)
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = isDark ? const Color(0x44FFFFFF) : const Color(0x22000000)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+
+      // Ombre portée
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          ttRect.shift(const Offset(0, 3)),
+          const Radius.circular(8),
+        ),
+        Paint()..color = const Color(0x3A000000),
+      );
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(ttRect, const Radius.circular(8)),
+        bgPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(ttRect, const Radius.circular(8)),
+        borderPaint,
+      );
+
+      textPainter.paint(canvas, Offset(ttX + ttPadH, ttY + ttPadV));
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _RoLineChartPainter old) => old.dataBlue != dataBlue;
+  bool shouldRepaint(covariant _RoLineChartPainter old) =>
+      old.dataBlue != dataBlue ||
+      old.dataGreen != dataGreen ||
+      old.hoverIndex != hoverIndex ||
+      old.isDark != isDark;
+}
+
+// ─── Interactive Vertical Bar Chart ──────────────────────────────────────────
+
+class _RoInteractiveVertBarChart extends StatefulWidget {
+  const _RoInteractiveVertBarChart({
+    required this.items,
+    required this.isDark,
+    required this.palette,
+    this.isCurrency = false,
+  });
+
+  final List<RoRepartitionItem> items;
+  final bool isDark;
+  final List<Color> palette;
+  final bool isCurrency;
+
+  @override
+  State<_RoInteractiveVertBarChart> createState() =>
+      _RoInteractiveVertBarChartState();
+}
+
+class _RoInteractiveVertBarChartState
+    extends State<_RoInteractiveVertBarChart> {
+  int? _hoverIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return const Center(
+        child: Text('Aucun incident', style: TextStyle(color: _kMuted)),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MouseRegion(
+          onHover: (event) {
+            const padL = 8.0, padR = 8.0;
+            final w = constraints.maxWidth - padL - padR;
+            if (w <= 0 || widget.items.isEmpty) return;
+            final slotW = w / widget.items.length;
+            final x = event.localPosition.dx - padL;
+            if (x >= 0 && x <= w) {
+              final idx = (x / slotW).floor().clamp(0, widget.items.length - 1);
+              if (_hoverIndex != idx) {
+                setState(() => _hoverIndex = idx);
+              }
+            } else if (_hoverIndex != null) {
+              setState(() => _hoverIndex = null);
+            }
+          },
+          onExit: (_) {
+            if (_hoverIndex != null) {
+              setState(() => _hoverIndex = null);
+            }
+          },
+          child: CustomPaint(
+            painter: _RoVertBarChartPainter(
+              items: widget.items,
+              isDark: widget.isDark,
+              palette: widget.palette,
+              hoverIndex: _hoverIndex,
+              isCurrency: widget.isCurrency,
+            ),
+            size: Size.infinite,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RoVertBarChartPainter extends CustomPainter {
+  const _RoVertBarChartPainter({
+    required this.items,
+    required this.isDark,
+    required this.palette,
+    this.hoverIndex,
+    this.isCurrency = false,
+  });
+
+  final List<RoRepartitionItem> items;
+  final bool isDark;
+  final List<Color> palette;
+  final int? hoverIndex;
+  final bool isCurrency;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (items.isEmpty) return;
+    const padL = 8.0, padR = 8.0, padT = 18.0, padB = 36.0;
+    final w = size.width - padL - padR;
+    final h = size.height - padT - padB;
+    final maxV = items.map((e) => e.valeur).reduce(math.max).toDouble();
+    if (maxV == 0) return;
+
+    final total = items.fold(0, (s, e) => s + e.valeur);
+    final slotW = w / items.length;
+    final barW = slotW * 0.55;
+
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+
+    // Grille horizontale
+    final gridPaint = Paint()
+      ..color = (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000))
+          .withValues(alpha: 0.06)
+      ..strokeWidth = 0.5;
+    for (var i = 0; i <= 4; i++) {
+      final y = padT + h - (i / 4) * h;
+      canvas.drawLine(Offset(padL, y), Offset(padL + w, y), gridPaint);
+    }
+
+    for (var i = 0; i < items.length; i++) {
+      final color = palette[i % palette.length];
+      final barH = (items[i].valeur / maxV) * h;
+      final x = padL + i * slotW + (slotW - barW) / 2;
+      final y = padT + h - barH;
+      final isHovered = hoverIndex == i;
+
+      // Fond de barre
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, padT, barW, h),
+          const Radius.circular(4),
+        ),
+        Paint()
+          ..color = color.withValues(
+            alpha: isHovered ? (isDark ? 0.22 : 0.16) : (isDark ? 0.12 : 0.08),
+          ),
+      );
+
+      // Barre remplie
+      if (barH > 0) {
+        final barRect = Rect.fromLTWH(x, y, barW, barH);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(barRect, const Radius.circular(4)),
+          Paint()
+            ..shader = LinearGradient(
+              colors: isHovered
+                  ? [color.withValues(alpha: 0.90), color]
+                  : [color.withValues(alpha: 0.70), color],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ).createShader(barRect),
+        );
+
+        if (isHovered) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(barRect, const Radius.circular(4)),
+            Paint()
+              ..color = Colors.white.withValues(alpha: 0.8)
+              ..strokeWidth = 1.5
+              ..style = PaintingStyle.stroke,
+          );
+        }
+      }
+
+      // Valeur au-dessus (écriture compacte si grand nombre pour ne pas déborder)
+      final displayVal = (isCurrency || items[i].valeur >= 1000000)
+          ? _formatRoCompact(items[i].valeur)
+          : '${items[i].valeur}';
+
+      textPainter.text = TextSpan(
+        text: displayVal,
+        style: TextStyle(
+          color: isHovered ? (isDark ? Colors.white : const Color(0xFF0F172A)) : color,
+          fontSize: 9,
+          fontWeight: isHovered ? FontWeight.w800 : FontWeight.w700,
+        ),
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(x + barW / 2 - textPainter.width / 2, y - 13),
+      );
+
+      // Label X (tronqué sur l'axe)
+      final lbl = items[i].label.length > 7
+          ? '${items[i].label.substring(0, 7)}.'
+          : items[i].label;
+      textPainter.text = TextSpan(
+        text: lbl,
+        style: TextStyle(
+          color: isHovered ? (isDark ? Colors.white : const Color(0xFF0F172A)) : _kMuted,
+          fontSize: 7.5,
+          fontWeight: isHovered ? FontWeight.w700 : FontWeight.w500,
+        ),
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(x + barW / 2 - textPainter.width / 2, padT + h + 5),
+      );
+    }
+
+    // Info-bulle flottante interactive sur la barre survolée
+    if (hoverIndex != null && hoverIndex! >= 0 && hoverIndex! < items.length) {
+      final idx = hoverIndex!;
+      final item = items[idx];
+      final color = palette[idx % palette.length];
+      final barH = (item.valeur / maxV) * h;
+      final x = padL + idx * slotW + (slotW - barW) / 2;
+      final y = padT + h - barH;
+      final pct = total > 0 ? (item.valeur / total * 100).toStringAsFixed(1) : '0.0';
+
+      final fullValStr = (isCurrency || item.valeur >= 100000)
+          ? _formatRoExact(item.valeur)
+          : '${item.valeur} incident(s)';
+
+      final tooltipSpan = TextSpan(
+        children: [
+          TextSpan(
+            text: '${item.label}\n',
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(
+            text: '● Valeur : $fullValStr\n',
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          TextSpan(
+            text: '● Part : $pct % du total',
+            style: TextStyle(
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+
+      textPainter.text = tooltipSpan;
+      textPainter.layout();
+
+      const ttPadH = 9.0;
+      const ttPadV = 7.0;
+      final ttW = textPainter.width + ttPadH * 2;
+      final ttH = textPainter.height + ttPadV * 2;
+
+      var ttX = x + barW / 2 - ttW / 2;
+      if (ttX < padL) ttX = padL;
+      if (ttX + ttW > size.width - padR) ttX = size.width - padR - ttW;
+
+      var ttY = y - ttH - 18;
+      if (ttY < padT) {
+        ttY = y + 10;
+      }
+      if (ttY + ttH > size.height - padB) {
+        ttY = size.height - padB - ttH;
+      }
+
+      final ttRect = Rect.fromLTWH(ttX, ttY, ttW, ttH);
+      final bgPaint = Paint()
+        ..color = isDark ? const Color(0xF01E293B) : const Color(0xF5FFFFFF)
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = color.withValues(alpha: 0.6)
+        ..strokeWidth = 1.2
+        ..style = PaintingStyle.stroke;
+
+      // Ombre portée
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          ttRect.shift(const Offset(0, 3)),
+          const Radius.circular(8),
+        ),
+        Paint()..color = const Color(0x3A000000),
+      );
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(ttRect, const Radius.circular(8)),
+        bgPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(ttRect, const Radius.circular(8)),
+        borderPaint,
+      );
+
+      textPainter.paint(canvas, Offset(ttX + ttPadH, ttY + ttPadV));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoVertBarChartPainter old) =>
+      old.items != items ||
+      old.hoverIndex != hoverIndex ||
+      old.isDark != isDark;
 }
 
 // ─── Suivi des incidents - mini-dashboard ────────────────────────────────────
@@ -11091,19 +11954,12 @@ class _IncidentsDashSection extends StatelessWidget {
       subtitle: 'Pertes brutes et nettes sur 12 mois',
       child: SizedBox(
         height: 190,
-        child: data.evolutionPertes.isEmpty
-            ? const Center(
-                child: Text('Aucune donnée', style: TextStyle(color: _kMuted)))
-            : CustomPaint(
-                painter: _RoLineChartPainter(
-                  dataBlue:
-                      data.evolutionPertes.map((e) => e.perteBrute).toList(),
-                  dataGreen:
-                      data.evolutionPertes.map((e) => e.perteNette).toList(),
-                  labels: data.evolutionPertes.map((e) => e.mois).toList(),
-                ),
-                size: Size.infinite,
-              ),
+        child: _RoInteractiveLineChart(
+          dataBlue: data.evolutionPertes.map((e) => e.perteBrute).toList(),
+          dataGreen: data.evolutionPertes.map((e) => e.perteNette).toList(),
+          labels: data.evolutionPertes.map((e) => e.mois).toList(),
+          isDark: isDark,
+        ),
       ),
     );
 
@@ -11112,17 +11968,12 @@ class _IncidentsDashSection extends StatelessWidget {
       subtitle: 'Répartition des incidents par nature',
       child: SizedBox(
         height: 190,
-        child: data.repartitionType.isEmpty
-            ? const Center(
-                child: Text('Aucun incident', style: TextStyle(color: _kMuted)))
-            : CustomPaint(
-                painter: _RoVertBarChartPainter(
-                  items: data.repartitionType,
-                  isDark: isDark,
-                  palette: _palette,
-                ),
-                size: Size.infinite,
-              ),
+        child: _RoInteractiveVertBarChart(
+          items: data.repartitionType,
+          isDark: isDark,
+          palette: _palette,
+          isCurrency: false,
+        ),
       ),
     );
 
@@ -11131,17 +11982,12 @@ class _IncidentsDashSection extends StatelessWidget {
       subtitle: 'Poids relatif par périmètre',
       child: SizedBox(
         height: 180,
-        child: data.repartitionLigneMetier.isEmpty
-            ? const Center(
-                child: Text('Aucun incident', style: TextStyle(color: _kMuted)))
-            : CustomPaint(
-                painter: _RoVertBarChartPainter(
-                  items: data.repartitionLigneMetier,
-                  isDark: isDark,
-                  palette: _palette,
-                ),
-                size: Size.infinite,
-              ),
+        child: _RoInteractiveVertBarChart(
+          items: data.repartitionLigneMetier,
+          isDark: isDark,
+          palette: _palette,
+          isCurrency: true,
+        ),
       ),
     );
 
@@ -11199,99 +12045,6 @@ class _IncidentsDashSection extends StatelessWidget {
   }
 }
 
-// ─── Vertical bar chart ───────────────────────────────────────────────────────
-
-class _RoVertBarChartPainter extends CustomPainter {
-  const _RoVertBarChartPainter({
-    required this.items,
-    required this.isDark,
-    required this.palette,
-  });
-  final List<RoRepartitionItem> items;
-  final bool isDark;
-  final List<Color> palette;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (items.isEmpty) return;
-    const padL = 8.0, padR = 8.0, padT = 18.0, padB = 36.0;
-    final w = size.width - padL - padR;
-    final h = size.height - padT - padB;
-    final maxV = items.map((e) => e.valeur).reduce(math.max).toDouble();
-    if (maxV == 0) return;
-
-    final slotW = w / items.length;
-    final barW = slotW * 0.55;
-
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    // Grille horizontale
-    final gridPaint = Paint()
-      ..color = (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000))
-          .withValues(alpha: 0.06)
-      ..strokeWidth = 0.5;
-    for (var i = 0; i <= 4; i++) {
-      final y = padT + h - (i / 4) * h;
-      canvas.drawLine(Offset(padL, y), Offset(padL + w, y), gridPaint);
-    }
-
-    for (var i = 0; i < items.length; i++) {
-      final color = palette[i % palette.length];
-      final barH = (items[i].valeur / maxV) * h;
-      final x = padL + i * slotW + (slotW - barW) / 2;
-      final y = padT + h - barH;
-
-      // Fond de barre
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTWH(x, padT, barW, h), const Radius.circular(4)),
-        Paint()..color = color.withValues(alpha: isDark ? 0.12 : 0.08),
-      );
-
-      // Barre remplie
-      if (barH > 0) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(x, y, barW, barH), const Radius.circular(4)),
-          Paint()
-            ..shader = LinearGradient(
-              colors: [color.withValues(alpha: 0.70), color],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ).createShader(Rect.fromLTWH(x, y, barW, barH)),
-        );
-      }
-
-      // Valeur au-dessus
-      textPainter.text = TextSpan(
-        text: '${items[i].valeur}',
-        style: TextStyle(
-            color: color, fontSize: 9, fontWeight: FontWeight.w700),
-      );
-      textPainter.layout();
-      textPainter.paint(
-          canvas, Offset(x + barW / 2 - textPainter.width / 2, y - 13));
-
-      // Label X (tronqué à 7 chars)
-      final lbl = items[i].label.length > 7
-          ? '${items[i].label.substring(0, 7)}.'
-          : items[i].label;
-      textPainter.text = TextSpan(
-        text: lbl,
-        style: const TextStyle(color: _kMuted, fontSize: 7.5),
-      );
-      textPainter.layout();
-      textPainter.paint(
-          canvas,
-          Offset(x + barW / 2 - textPainter.width / 2, padT + h + 5));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RoVertBarChartPainter old) =>
-      old.items != items;
-}
-
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
 
@@ -11341,5 +12094,159 @@ TableCell _cellFlex(String text) => TableCell(
     child: Text(text, style: const TextStyle(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
   ),
 );
+
+class _ModernPertesStatCard extends StatefulWidget {
+  const _ModernPertesStatCard({
+    required this.label,
+    required this.value,
+    required this.helper,
+    required this.tag,
+    required this.icon,
+    required this.accentColor,
+    this.badgeWidget,
+  });
+
+  final String label;
+  final String value;
+  final String helper;
+  final String tag;
+  final IconData icon;
+  final Color accentColor;
+  final Widget? badgeWidget;
+
+  @override
+  State<_ModernPertesStatCard> createState() => _ModernPertesStatCardState();
+}
+
+class _ModernPertesStatCardState extends State<_ModernPertesStatCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final border = isDark
+        ? (_hovered ? widget.accentColor.withValues(alpha: 0.60) : const Color(0xFF334155))
+        : (_hovered ? widget.accentColor.withValues(alpha: 0.50) : const Color(0xFFE2E8F0));
+    final labelColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final valueColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final helperColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(0, _hovered ? -1.5 : 0, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: border, width: 1.1),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: _hovered ? 0.30 : 0.15)
+                  : widget.accentColor.withValues(alpha: _hovered ? 0.10 : 0.03),
+              blurRadius: _hovered ? 10 : 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: widget.accentColor.withValues(alpha: isDark ? 0.20 : 0.10),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: widget.accentColor.withValues(alpha: isDark ? 0.35 : 0.20),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                widget.icon,
+                size: 16,
+                color: widget.accentColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.label.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9.2,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                            color: labelColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      if (widget.badgeWidget != null)
+                        widget.badgeWidget!
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: widget.accentColor.withValues(alpha: isDark ? 0.18 : 0.08),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            widget.tag,
+                            style: TextStyle(
+                              fontSize: 8.0,
+                              fontWeight: FontWeight.w800,
+                              color: widget.accentColor,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 1.5),
+                  Text(
+                    widget.value,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: valueColor,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    widget.helper,
+                    style: TextStyle(
+                      fontSize: 9.2,
+                      fontWeight: FontWeight.w500,
+                      color: helperColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 

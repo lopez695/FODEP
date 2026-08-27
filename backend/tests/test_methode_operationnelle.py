@@ -100,9 +100,14 @@ def test_l_approche_standard_renseigne_l_ep23_et_vide_l_ep21(methode):
 
 @pytest.fixture
 def trois_exercices():
-    """Ajoute deux exercices de produit brut par ligne, puis les retire."""
+    """Configure la base avec exactement trois exercices, puis rétablit l'état d'origine."""
 
     from app.risque_operationnel.services import calcul_as
+
+    with database_manager.transaction() as connexion:
+        sauvegarde = connexion.execute(
+            "SELECT annee, ligne_metier, produit_brut_ligne FROM op_pnb_par_ligne"
+        ).fetchall()
 
     reference = calcul_as().detail_par_annee
     assert reference, "l'essai suppose un exercice deja saisi"
@@ -111,6 +116,7 @@ def trois_exercices():
     ajoutees = (annee_connue - 2, annee_connue - 1)
 
     with database_manager.transaction() as connexion:
+        connexion.execute("DELETE FROM op_pnb_par_ligne WHERE annee != ?", (annee_connue,))
         for annee in ajoutees:
             for ligne_metier, pnb in modele.items():
                 connexion.execute(
@@ -120,11 +126,19 @@ def trois_exercices():
                     """,
                     (annee, ligne_metier, pnb / 2),
                 )
-    yield annee_connue, ajoutees
-    with database_manager.transaction() as connexion:
-        connexion.execute(
-            "DELETE FROM op_pnb_par_ligne WHERE annee IN (?, ?)", ajoutees
-        )
+    try:
+        yield annee_connue, ajoutees
+    finally:
+        with database_manager.transaction() as connexion:
+            connexion.execute("DELETE FROM op_pnb_par_ligne")
+            for annee, ligne_metier, pnb in sauvegarde:
+                connexion.execute(
+                    """
+                    INSERT INTO op_pnb_par_ligne(annee, ligne_metier, produit_brut_ligne)
+                    VALUES (?, ?, ?)
+                    """,
+                    (annee, ligne_metier, pnb),
+                )
 
 
 def test_l_exigence_est_la_moyenne_des_trois_exercices(methode, trois_exercices):
@@ -165,6 +179,288 @@ def test_l_exigence_est_la_moyenne_des_trois_exercices(methode, trois_exercices)
         )
     finally:
         produit.classeur.close()
+
+
+def test_le_diviseur_de_l_approche_standard_reste_trois():
+    """« (h) = moyenne des totaux c, e et g » : le diviseur ne suit pas la saisie.
+
+    Le module divisait par le nombre d'exercices enregistres -- la regle de
+    l'indicateur de base, dont le diviseur n est bien le nombre d'exercices a
+    produit brut positif (art. 301). L'approche standard n'a pas cette
+    provision : avec un seul exercice saisi, l'ecran affichait le triple de ce
+    que l'EP23 transmis fait lire a la BCEAO sur ses propres colonnes.
+    """
+
+    from app.risque_operationnel.services import calcul_as
+
+    calcul = calcul_as()
+    exercices = [detail for detail in calcul.detail_par_annee if detail.renseignee]
+    if len(exercices) >= 3:
+        pytest.skip("la base porte deja les trois exercices")
+
+    assert exercices, "l'essai suppose au moins un exercice saisi"
+    assert calcul.k_as == pytest.approx(
+        sum(detail.k_retenu for detail in exercices) / 3
+    ), "les exercices manquants comptent pour zero, ils ne quittent pas la moyenne"
+
+
+def test_un_exercice_deficitaire_reste_au_denominateur(trois_exercices):
+    """Art. 309 : le total annuel est plancher a zero, l'exercice reste compte.
+
+    Le plancher porte sur le numerateur, pas sur le diviseur : un exercice
+    deficitaire ne doit pas alleger l'exigence des deux autres en sortant de
+    la moyenne.
+    """
+
+    from app.risque_operationnel.services import calcul_as
+
+    _, ajoutees = trois_exercices
+    assert len(calcul_as().detail_par_annee) == 3
+
+    deficitaire = min(ajoutees)
+    with database_manager.transaction() as connexion:
+        connexion.execute(
+            "UPDATE op_pnb_par_ligne "
+            "SET produit_brut_ligne = -produit_brut_ligne WHERE annee = ?",
+            (deficitaire,),
+        )
+
+    calcul = calcul_as()
+    annee_negative = next(
+        detail for detail in calcul.detail_par_annee if detail.annee == deficitaire
+    )
+    assert annee_negative.k_total < 0
+    assert annee_negative.k_retenu == 0.0
+
+    autres = [
+        detail.k_retenu
+        for detail in calcul.detail_par_annee
+        if detail.annee != deficitaire
+    ]
+    assert calcul.k_as == pytest.approx(sum(autres) / 3), (
+        "trois exercices au denominateur, pas les deux qui restent positifs"
+    )
+
+
+def test_le_comparatif_bia_exclut_les_exercices_non_positifs():
+    """Le comparatif du BIC porte le nom de l'AIB : il doit en suivre la regle.
+
+    Art. 301 : la moyenne porte sur les produits bruts annuels POSITIFS, et le
+    diviseur n est leur nombre. Le comparatif divisait par trois en comptant
+    les exercices nuls ou negatifs -- sous le meme intitule « Approche
+    indicateur de base », il annoncait donc un montant que l'onglet dedie
+    contredisait, et l'ecart affiche face au CRR3 s'en trouvait fausse.
+    """
+
+    from app.risque_operationnel.services import (
+        _compute_pnb_effectif,
+        calcul_bic,
+        get_aib_parametres,
+    )
+
+    resultat = calcul_bic()
+    positifs = [
+        pnb
+        for pnb in (_compute_pnb_effectif(entree) for entree in resultat.inputs)
+        if pnb > 0
+    ]
+    if not positifs:
+        pytest.skip("aucun exercice a produit brut positif dans la base")
+
+    attendu = sum(positifs) / len(positifs) * get_aib_parametres().alpha
+    assert resultat.ofr_bia == pytest.approx(attendu)
+
+    # Et le diviseur suit bien la saisie : trois exercices n'entrent dans la
+    # moyenne que s'ils sont trois a etre positifs.
+    if len(positifs) < 3:
+        assert resultat.ofr_bia > sum(positifs) / 3 * get_aib_parametres().alpha
+
+
+def test_l_approche_standard_refuse_un_quatrieme_exercice(trois_exercices):
+    """Les trois exercices saisis, on modifie ou on retire -- on n'ajoute plus.
+
+    L'Approche Standard porte sur exactement trois exercices. Au-delà, un
+    exercice serait accepté par la base puis écarté du calcul sans que rien
+    ne le dise.
+    """
+
+    from app.risque_operationnel.models import PnbParLigneCreate
+    from app.risque_operationnel.services import (
+        EXERCICES_MOYENNE_AS,
+        calcul_as,
+        list_exercices_as,
+        upsert_pnb_ligne,
+    )
+
+    annee_connue, ajoutees = trois_exercices
+    depart = [e.annee for e in list_exercices_as()]
+    assert len(depart) == EXERCICES_MOYENNE_AS
+    ligne = calcul_as().detail_par_annee[-1].lignes[0].ligne_metier
+
+    candidate = min(depart) - 1
+    with pytest.raises(ValueError, match="3 exercices"):
+        upsert_pnb_ligne(
+            candidate, ligne, PnbParLigneCreate(produit_brut_ligne=1000.0)
+        )
+
+    # Rien n'a été écrit, et l'Approche Standard porte toujours sur trois exercices.
+    assert len(list_exercices_as()) == EXERCICES_MOYENNE_AS
+    assert len(calcul_as().detail_par_annee) == EXERCICES_MOYENNE_AS
+
+
+def test_les_trois_exercices_en_place_restent_modifiables(trois_exercices):
+    """Le plafond porte sur l'ajout d'un millesime, pas sur la correction."""
+
+    from app.risque_operationnel.models import PnbParLigneCreate
+    from app.risque_operationnel.services import calcul_as, upsert_pnb_ligne
+
+    _, ajoutees = trois_exercices
+    annee = min(ajoutees)
+    detail = next(d for d in calcul_as().detail_par_annee if d.annee == annee)
+    ligne = detail.lignes[0].ligne_metier
+    avant = detail.lignes[0].pnb
+
+    vue = upsert_pnb_ligne(
+        annee, ligne, PnbParLigneCreate(produit_brut_ligne=avant + 5000.0)
+    )
+    assert vue.produit_brut_ligne == pytest.approx(avant + 5000.0)
+
+
+def test_le_millesime_d_un_exercice_se_corrige(trois_exercices):
+    """Se tromper d'annee ne doit pas couter la ressaisie des huit lignes.
+
+    Le millesime etait fige des l'enregistrement : le corriger passait par la
+    suppression de l'exercice, donc par la perte du produit brut des huit
+    lignes de metier. L'annee change maintenant seule, les montants suivent.
+    """
+
+    from app.risque_operationnel.services import calcul_as, renommer_exercice_as
+
+    _, ajoutees = trois_exercices
+    annee = min(ajoutees)
+    avant = next(d for d in calcul_as().detail_par_annee if d.annee == annee)
+    montants = {ligne.ligne_metier: ligne.pnb for ligne in avant.lignes}
+    libre = min(ajoutees) - 5
+
+    renommer_exercice_as(annee, libre)
+    try:
+        annees = [d.annee for d in calcul_as().detail_par_annee]
+        assert annee not in annees
+        assert libre in annees
+
+        apres = next(d for d in calcul_as().detail_par_annee if d.annee == libre)
+        assert {ligne.ligne_metier: ligne.pnb for ligne in apres.lignes} == montants
+        assert apres.k_retenu == pytest.approx(avant.k_retenu)
+    finally:
+        renommer_exercice_as(libre, annee)
+
+
+def test_le_millesime_ne_peut_pas_ecraser_un_exercice_existant(trois_exercices):
+    """Renommer sur une annee deja saisie fusionnerait deux exercices."""
+
+    from app.risque_operationnel.services import calcul_as, renommer_exercice_as
+
+    annees = [d.annee for d in calcul_as().detail_par_annee]
+    assert len(annees) == 3
+
+    with pytest.raises(ValueError, match="deja saisi"):
+        renommer_exercice_as(annees[0], annees[1])
+
+    # Les trois exercices sont intacts.
+    assert [d.annee for d in calcul_as().detail_par_annee] == annees
+
+
+def test_le_millesime_de_l_indicateur_de_base_se_corrige_aussi():
+    """Meme correction cote AIB, ou le champ annee etait fige lui aussi.
+
+    Le formulaire desactivait le champ des qu'un exercice existait : corriger
+    une annee obligeait a supprimer l'exercice, donc a perdre le produit brut
+    et sa reference documentaire. Renommer les conserve.
+    """
+
+    from app.risque_operationnel.services import (
+        list_pnb_annuel,
+        renommer_exercice_aib,
+    )
+
+    exercices = list_pnb_annuel()
+    assert exercices, "l'essai suppose au moins un exercice AIB saisi"
+
+    avant = min(exercices, key=lambda a: a.annee)
+    libre = avant.annee - 5
+    assert libre not in {a.annee for a in exercices}
+
+    renommer_exercice_aib(avant.annee, libre)
+    try:
+        vues = {a.annee: a for a in list_pnb_annuel()}
+        assert avant.annee not in vues
+        assert vues[libre].produit_brut_total == pytest.approx(
+            avant.produit_brut_total
+        )
+        assert vues[libre].source_document == avant.source_document
+    finally:
+        renommer_exercice_aib(libre, avant.annee)
+
+    # Et l'exercice a bien retrouve sa place.
+    assert avant.annee in {a.annee for a in list_pnb_annuel()}
+
+
+def test_le_tableau_de_bord_reprend_l_exigence_de_l_indicateur_de_base():
+    """Les deux tuiles du dashboard sont celles de l'onglet AIB, au FCFA pres.
+
+    Elles derivaient K d'un cumul de pertes d'incidents (« 15 % des pertes »),
+    ce que l'article 301 ne dit nulle part : l'exigence porte sur le PRODUIT
+    BRUT des trois derniers exercices, pas sur les pertes subies. Sous le meme
+    intitule « capital minimum » et « RWA operationnel », les deux ecrans
+    annoncaient des montants a plusieurs ordres de grandeur l'un de l'autre.
+    """
+
+    from app.risque_operationnel.services import calcul_aib, get_dashboard
+
+    aib = calcul_aib()
+    tuiles = get_dashboard().widget1
+
+    assert tuiles.exigence_fonds_propres == pytest.approx(aib.k_ib)
+    assert tuiles.apr_risque_op == pytest.approx(aib.apr_aib)
+    # Et le RWA reste l'exigence multipliee par 12,5, pas divisee par un ratio.
+    assert tuiles.apr_risque_op == pytest.approx(tuiles.exigence_fonds_propres * 12.5)
+
+
+def test_le_statut_du_tableau_de_bord_signale_l_absence_d_exercice():
+    """« Conforme » compare a zero ne pouvait jamais dire autre chose.
+
+    Le statut valait « Conforme » si k_ib >= 0, ce qu'aucune exigence de fonds
+    propres ne peut manquer : la tuile affichait la meme chose en toute
+    circonstance, y compris sans le moindre exercice enregistre.
+    """
+
+    from app.risque_operationnel.services import calcul_aib, get_dashboard
+
+    attendu = "À compléter" if calcul_aib().donnees_insuffisantes else "Conforme"
+    assert get_dashboard().widget1.statut_reglementaire == attendu
+
+
+def test_les_deux_tableaux_de_bord_annoncent_le_meme_rwa_operationnel(methode):
+    """Le dashboard global et l'onglet Risque Operationnel, sur la meme ligne.
+
+    Le global lit `apr_operationnel_retenu` (l'approche appliquee), l'onglet
+    lisait un proxy bati sur les pertes d'incidents. Deux chemins, deux
+    assiettes, un seul intitule : « RWA operationnel ».
+    """
+
+    from app.dashboard.services import get_dashboard_snapshot
+    from app.risque_operationnel.services import (
+        apr_operationnel_retenu,
+        get_dashboard,
+    )
+
+    methode(False)  # l'indicateur de base est la methode appliquee
+    metriques = {m.key: m.value for m in get_dashboard_snapshot().metrics}
+
+    assert metriques["rwa_op"] == pytest.approx(apr_operationnel_retenu())
+    assert metriques["rwa_op"] == pytest.approx(
+        get_dashboard().widget1.apr_risque_op
+    )
 
 
 def test_l_ep23_ventile_les_huit_lignes_de_metier(methode):
@@ -234,7 +530,12 @@ def test_enregistrer_un_exercice_ne_retire_pas_les_autres():
         upsert_pnb_ligne,
     )
 
-    # Deux millesimes hors de portee des donnees reelles, retires ensuite.
+    with database_manager.transaction() as connexion:
+        sauvegarde = connexion.execute(
+            "SELECT annee, ligne_metier, produit_brut_ligne FROM op_pnb_par_ligne"
+        ).fetchall()
+        connexion.execute("DELETE FROM op_pnb_par_ligne")
+
     ancien, recent = 2001, 2002
     ligne_metier = "Banque de détail"
     try:
@@ -254,5 +555,10 @@ def test_enregistrer_un_exercice_ne_retire_pas_les_autres():
         assert not get_pnb_lignes(ancien)
         assert get_pnb_lignes(recent), "le retrait a emporte l'exercice voisin"
     finally:
-        delete_pnb_lignes(ancien)
-        delete_pnb_lignes(recent)
+        with database_manager.transaction() as connexion:
+            connexion.execute("DELETE FROM op_pnb_par_ligne")
+            for annee, l_metier, pnb in sauvegarde:
+                connexion.execute(
+                    "INSERT INTO op_pnb_par_ligne(annee, ligne_metier, produit_brut_ligne) VALUES (?, ?, ?)",
+                    (annee, l_metier, pnb),
+                )

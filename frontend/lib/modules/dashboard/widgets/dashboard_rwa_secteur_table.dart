@@ -6,6 +6,7 @@ import '../../../core/utils/currency_conversion.dart';
 import '../../../core/utils/formatters.dart';
 import '../models/dashboard_models.dart';
 import 'dashboard_design.dart';
+import '../../../core/utils/prudentiel.dart';
 
 class DashboardRwaSecteurChart extends StatelessWidget {
   const DashboardRwaSecteurChart({super.key, required this.currency, this.data});
@@ -159,9 +160,9 @@ class DashboardRwaSecteurChart extends StatelessWidget {
     final rwaMarket = convertCurrencyAmount(rwaMarketXof, fromCurrency: 'XOF', toCurrency: currency) / amountUnit.divisor;
     final rwaOp = convertCurrencyAmount(rwaOpXof, fromCurrency: 'XOF', toCurrency: currency) / amountUnit.divisor;
     
-    final capCredit = rwaCredit * 0.09;
-    final capMarket = rwaMarket * 0.09;
-    final capOp = rwaOp * 0.09;
+    final capCredit = capitalMinimum(rwaCredit);
+    final capMarket = capitalMinimum(rwaMarket);
+    final capOp = capitalMinimum(rwaOp);
 
     // Percentages
     final pctCredit = rwaTotalXof > 0 ? (rwaCreditXof / rwaTotalXof) : 0.0;

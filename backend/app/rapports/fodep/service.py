@@ -571,10 +571,9 @@ def _remplir_ep21(classeur) -> tuple[float, list[Reserve]]:
         anomalies.append(convention(
             f"APR opérationnel : l'EP21 impose le multiplicateur "
             f"{MULTIPLICATEUR_APR_FODEP:.1f}, là où le module Risque "
-            f"Opérationnel applique 1 / "
-            f"{parametres.ratio_solvabilite_min:.0%}. L'APR déclaré "
-            f"({apr:,.0f} FCFA) diffère donc de celui du tableau de bord "
-            f"({calcul.apr_aib:,.0f} FCFA)."
+            f"Opérationnel applique {parametres.multiplicateur_rwa:.4g}. "
+            f"L'APR déclaré ({apr:,.0f} FCFA) diffère donc de celui du "
+            f"tableau de bord ({calcul.apr_aib:,.0f} FCFA)."
         ))
     if calcul.donnees_insuffisantes:
         anomalies.append(a_verifier(
@@ -1064,10 +1063,11 @@ def _remplir_ep23(classeur) -> tuple[float, list[Reserve]]:
         ))
     elif len(exercices) < 3:
         anomalies.append(a_verifier(
-            f"EP23 : l'exigence est la moyenne des trois derniers exercices ; "
+            f"EP23 : l'exigence est la moyenne de trois exercices ; "
             f"{len(exercices)} seulement {'est enregistré' if len(exercices) == 1 else 'sont enregistrés'} "
-            f"({', '.join(str(exercice.annee) for exercice in exercices)}). Le montant "
-            "déclaré porte donc sur ce qui est disponible."
+            f"({', '.join(str(exercice.annee) for exercice in exercices)}). Les "
+            "exercices manquants comptent pour zéro dans la moyenne : le montant "
+            "déclaré est donc minoré tant qu'ils ne sont pas saisis."
         ))
 
     anomalies.append(convention(

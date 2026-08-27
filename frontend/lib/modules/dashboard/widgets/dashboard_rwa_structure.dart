@@ -4,6 +4,7 @@ import '../../../core/localization/app_localization.dart';
 import '../../../core/state/portfolio_amount_unit_scope.dart';
 import '../../../core/utils/formatters.dart';
 import 'dashboard_design.dart';
+import '../../../core/utils/prudentiel.dart';
 
 /// Décomposition des RWA et Méthodologie.
 class DashboardRwaStructure extends StatelessWidget {
@@ -81,7 +82,7 @@ class DashboardRwaStructure extends StatelessWidget {
                 children: [
                   Text(p.label.split(' ').first.tr(context), style: TextStyle(fontSize: 13, color: c.muted)),
                   Text(
-                    '${AppFormatters.integer(p.amount * 0.09)} ${amountUnit.label}',
+                    '${AppFormatters.integer(capitalMinimum(p.amount))} ${amountUnit.label}',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
                   ),
                 ],

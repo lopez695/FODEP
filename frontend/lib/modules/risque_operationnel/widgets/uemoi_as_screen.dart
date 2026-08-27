@@ -29,8 +29,27 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
   // rafraîchissement ne doivent changer l'exercice choisi par l'utilisateur.
   int _anneeSelect = DateTime.now().year;
   bool _anneeInitialisee = false;
+
+  // « Modifier » sur un exercice doit conduire au tableau des huit lignes,
+  // pas laisser l'utilisateur le chercher au bas de la page.
+  final ScrollController _scrollCtrl = ScrollController();
+  final GlobalKey _saisieKey = GlobalKey();
   final Map<String, TextEditingController> _pnbCtrls = {};
   bool _saving = false;
+
+  // Le tableau des huit lignes ne s'ouvre que pour ajouter ou modifier un
+  // exercice. Affiche en permanence, il occupait tout l'ecran avec des champs
+  // qu'on ne venait pas remplir et repoussait le detail du calcul hors de vue.
+  bool _saisieOuverte = false;
+
+  /// L'Approche Standard porte sur exactement 3 exercices (N-2, N-1, N).
+  static const int _kExercicesMoyenne = 3;
+
+  List<int> get _anneesSaisies =>
+      _result?.detailParAnnee.map((d) => d.annee).toList() ?? const <int>[];
+  bool get _serieComplete => _anneesSaisies.length >= _kExercicesMoyenne;
+  bool get _ajoutBloque =>
+      _serieComplete && !_anneesSaisies.contains(_anneeSelect);
 
   @override
   void initState() {
@@ -43,6 +62,7 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     for (final c in _pnbCtrls.values) {
       c.dispose();
     }
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -94,8 +114,54 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     }
   }
 
-  // Change l'exercice cible du formulaire : demande l'année puis recharge
-  // les PNB par ligne enregistrés pour cette année (champs vides sinon).
+  // Vise un exercice dans le formulaire de saisie : recharge les PNB par
+  // ligne enregistrés pour cette année (champs vides sinon), puis amène le
+  // tableau sous les yeux. Appelée par le sélecteur d'exercice comme par les
+  // icônes « Modifier » et « Saisir » de la carte de moyenne — le refus du
+  // quatrième millésime vit ici, une seule fois pour tous les chemins.
+  Future<void> _selectionnerExercice(int annee) async {
+    if (annee != _anneeSelect) {
+      if (_serieComplete && !_anneesSaisies.contains(annee)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.warning,
+            content: Text(
+                'Les trois exercices de la moyenne sont saisis '
+                '(${_anneesSaisies.join(', ')}). Retirez-en un avant de '
+                'saisir $annee.'),
+          ),
+        );
+        return;
+      }
+      setState(() {
+        _anneeSelect = annee;
+        _saisieOuverte = true;
+      });
+      final lignes = await widget.api.fetchPnbLignes(annee);
+      final lignesMap = {
+        for (final l in lignes) l.ligneMetier: l.produitBrutLigne
+      };
+      if (!mounted) return;
+      setState(() {
+        for (final e in _pnbCtrls.entries) {
+          final val = lignesMap[e.key];
+          e.value.text = val != null ? val.toStringAsFixed(0) : '';
+        }
+      });
+    }
+    if (!mounted) return;
+    setState(() => _saisieOuverte = true);
+    final cible = _saisieKey.currentContext;
+    if (cible != null && cible.mounted) {
+      await Scrollable.ensureVisible(cible,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic);
+    }
+  }
+
+  // Change l'exercice cible du formulaire : demande l'année puis délègue à
+  // `_selectionnerExercice`.
   Future<void> _changerExercice() async {
     final ctrl = TextEditingController(text: '$_anneeSelect');
     final year = await showDialog<int>(
@@ -134,16 +200,181 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     if (year == null || year < 2000 || year > 2100 || year == _anneeSelect) {
       return;
     }
-    setState(() => _anneeSelect = year);
-    final lignes = await widget.api.fetchPnbLignes(year);
-    final lignesMap = {for (final l in lignes) l.ligneMetier: l.produitBrutLigne};
-    if (!mounted) return;
-    setState(() {
-      for (final e in _pnbCtrls.entries) {
-        final val = lignesMap[e.key];
-        e.value.text = val != null ? val.toStringAsFixed(0) : '';
+    // Le refus du quatrième millésime est porté par `_selectionnerExercice` :
+    // il vaut mieux le refuser au choix de l'année qu'après la saisie des huit
+    // lignes de métier.
+    await _selectionnerExercice(year);
+  }
+
+  // Ouvre le formulaire sur un nouvel exercice. L'en-tête portait un
+  // sélecteur « Exercice 2026 » qui donnait à croire que la carte affichait
+  // un exercice existant, alors qu'elle sert à en saisir un.
+  Future<void> _ajouterExercice() async {
+    if (_serieComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.warning,
+          content: Text(
+              'Les trois exercices de l\'Approche Standard sont saisis '
+              '(${_anneesSaisies.join(', ')}). Retirez-en un avant '
+              "d'en ajouter un autre."),
+        ),
+      );
+      return;
+    }
+    // Proposer la première année manquante plutôt que l'année en cours :
+    // c'est celle qu'on vient compléter neuf fois sur dix.
+    var suggestion = DateTime.now().year;
+    if (_anneesSaisies.isNotEmpty) {
+      final recent = _anneesSaisies.reduce((a, b) => a > b ? a : b);
+      suggestion = recent;
+      while (_anneesSaisies.contains(suggestion)) {
+        suggestion--;
       }
-    });
+    }
+    final ctrl = TextEditingController(text: '$suggestion');
+    final annee = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ajouter un exercice'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "L'Approche Standard porte sur 3 exercices (N-2, N-1, N). "
+              '${_kExercicesMoyenne - _anneesSaisies.length} exercice(s) restant(s) à saisir.',
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Exercice (année)',
+                hintText: 'ex. 2025',
+              ),
+              onSubmitted: (v) {
+                final y = int.tryParse(v.trim());
+                if (y != null) Navigator.pop(dialogContext, y);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final y = int.tryParse(ctrl.text.trim());
+              if (y != null) Navigator.pop(dialogContext, y);
+            },
+            child: const Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (annee == null) return;
+    if (annee < 2000 || annee > 2100) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Année invalide : $annee'),
+            backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+    // Une année déjà saisie n'est pas un ajout : c'est sa modification, et
+    // `_selectionnerExercice` recharge alors ses montants.
+    await _selectionnerExercice(annee);
+  }
+
+  // Corrige l'année d'un exercice déjà saisi. Se tromper de millésime
+  // coûtait la ressaisie des huit lignes de métier : il fallait retirer
+  // l'exercice puis tout resaisir sur la bonne année. Ici seule l'étiquette
+  // change, les montants suivent.
+  Future<void> _changerMillesime(int annee) async {
+    final ctrl = TextEditingController(text: '$annee');
+    final nouvelle = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text("Année de l'exercice $annee"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Les produits bruts des huit lignes de métier sont conservés : '
+              "seule l'année change.",
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Nouvelle année',
+                hintText: 'ex. 2025',
+              ),
+              onSubmitted: (v) {
+                final y = int.tryParse(v.trim());
+                if (y != null) Navigator.pop(dialogContext, y);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final y = int.tryParse(ctrl.text.trim());
+              if (y != null) Navigator.pop(dialogContext, y);
+            },
+            child: const Text('Corriger'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (nouvelle == null || nouvelle == annee) return;
+    if (nouvelle < 2000 || nouvelle > 2100) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Année invalide : $nouvelle'),
+            backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+    try {
+      await widget.api.renommerExerciceAs(annee, nouvelle);
+      // Le formulaire visait l'exercice renommé : le suivre, sinon il
+      // pointerait une année désormais vide.
+      if (_anneeSelect == annee) _anneeSelect = nouvelle;
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Exercice $annee corrigé en $nouvelle'),
+              backgroundColor: AppTheme.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erreur : $e'), backgroundColor: AppTheme.danger),
+        );
+      }
+    }
   }
 
   // Retire un exercice de la moyenne. Tant que l'enregistrement effaçait les
@@ -178,6 +409,9 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     try {
       await widget.api.deletePnbLignes(annee);
       await _load();
+      // L'exercice retire, le formulaire pointerait une annee vide : le
+      // refermer plutot que de laisser huit champs sans objet.
+      if (mounted) setState(() => _saisieOuverte = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -196,15 +430,29 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
   }
 
   Future<void> _saveAllLignes() async {
+    if (_ajoutBloque) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.warning,
+          content: Text(
+              'Les trois exercices de la moyenne sont saisis '
+              '(${_anneesSaisies.join(', ')}). Retirez-en un avant de saisir '
+              '$_anneeSelect.'),
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       for (final entry in _pnbCtrls.entries) {
-        final val = double.tryParse(entry.value.text.trim().replaceAll(' ', ''));
-        if (val != null) {
-          await widget.api.upsertPnbLigne(_anneeSelect, entry.key, val);
-        }
+        final val = double.tryParse(entry.value.text.trim().replaceAll(' ', '')) ?? 0.0;
+        await widget.api.upsertPnbLigne(_anneeSelect, entry.key, val);
       }
       await _load();
+      // La saisie est finie : l'exercice figure desormais dans la moyenne et
+      // dans son propre tableau, plus haut. Laisser le formulaire ouvert
+      // aurait masque ce resultat.
+      if (mounted) setState(() => _saisieOuverte = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -243,6 +491,7 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
+      controller: _scrollCtrl,
       padding: AppSpacing.pageInsets,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,17 +512,28 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
             ),
             AppSpacing.gapSm,
           ] else if (r.detailParAnnee.length < 3) ...[
-            // L'exigence est une moyenne sur trois exercices : tant qu'il en
-            // manque, elle porte sur ce qui est disponible, et l'EP23 transmis
-            // à la BCEAO le signale. Autant le dire ici, là où on saisit.
+            // Le diviseur de la moyenne est trois, pas le nombre d'exercices
+            // saisis : un exercice manquant pèse donc zéro et tire l'exigence
+            // vers le bas. Le dire ici, là où on saisit, plutôt que de laisser
+            // lire un montant qu'on croirait définitif.
             _NoticeBanner(
               color: AppTheme.warning,
               icon: Icons.event_busy_outlined,
               text: '${r.detailParAnnee.length} exercice(s) sur 3 saisi(s)'
                   ' (${r.detailParAnnee.map((d) => d.annee).join(', ')}).'
-                  ' L\'exigence est la moyenne des trois derniers exercices :'
-                  ' elle porte pour l\'instant sur ce qui est disponible.',
+                  ' L\'exigence est la moyenne de trois exercices : les'
+                  ' exercices manquants comptent pour zéro, elle est donc'
+                  ' sous-estimée tant qu\'ils ne sont pas saisis.',
             ),
+            AppSpacing.gapSm,
+          ],
+
+          // Le passage des totaux annuels à l'exigence : c'est là que le
+          // diviseur trois se voit. Sans cette carte, l'écran alignait des
+          // totaux par exercice puis un K_AS qui n'en découlait visiblement
+          // pas — et rien ne montrait qu'un exercice manquant pèse zéro.
+          if (!r.donneesInsuffisantes) ...[
+            _buildMoyenneCard(context, isDark, r),
             AppSpacing.gapSm,
           ],
 
@@ -286,7 +546,10 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
           ],
 
           // Saisie PNB par ligne - carte tableau façon dashboard
-          _buildPnbSaisieCard(context, isDark),
+          KeyedSubtree(
+            key: _saisieKey,
+            child: _buildPnbSaisieCard(context, isDark),
+          ),
         ],
       ),
     );
@@ -297,6 +560,306 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
   // langage visuel que le "Tableau des données" du Risque de Marché. ────────
 
   static const _kPrimary = Color(0xFF2563EB);
+
+  // ── Carte « Moyenne des trois exercices » — la ligne RO036 du formulaire,
+  // « (h) = moyenne des totaux c, e et g ». Le diviseur vaut trois quel que
+  // soit le nombre d'exercices saisis : un exercice absent, ou dont le total
+  // annuel est négatif, entre pour zéro sans quitter la moyenne (art. 309).
+  // L'écran alignait les totaux annuels puis une exigence qui n'en découlait
+  // visiblement pas ; le passage de l'un à l'autre se lit maintenant ici.
+  Widget _buildMoyenneCard(BuildContext context, bool isDark, AsCalculResult r) {
+    final border = isDark ? const Color(0xFF263856) : const Color(0xFFDDE7F6);
+    final surface = isDark ? const Color(0xFF101B31) : Colors.white;
+    final soft = isDark ? const Color(0xFF162642) : const Color(0xFFF3F7FD);
+    final text = isDark ? const Color(0xFFEAF2FF) : const Color(0xFF1B2235);
+    final muted = isDark ? const Color(0xFF8BA3C7) : const Color(0xFF64748B);
+    final headerBg = isDark ? const Color(0xFF1B2C4A) : const Color(0xFF234A84);
+    final sep = border.withValues(alpha: 0.7);
+    const amber = Color(0xFFF59E0B);
+
+    // Trois places, comme les trois paires de colonnes de l'EP23. Elles
+    // partent des exercices réellement saisis — le calcul retient les trois
+    // plus récents, qui ne se suivent pas forcément — puis se complètent avec
+    // les millésimes manquants les plus proches. Prendre N-2, N-1, N depuis le
+    // plus récent aurait fait disparaître de la carte un exercice ancien qui
+    // pèse pourtant dans la moyenne.
+    final parAnnee = {for (final d in r.detailParAnnee) d.annee: d};
+    final attendus = <int>[...parAnnee.keys];
+    var candidat = attendus.last - 1;
+    while (attendus.length < 3) {
+      if (!attendus.contains(candidat)) attendus.add(candidat);
+      candidat--;
+    }
+    attendus.sort();
+    final somme = attendus.fold<double>(
+        0, (total, annee) => total + (parAnnee[annee]?.kRetenu ?? 0));
+
+    Widget cellule(Widget child,
+        {double? width, bool expanded = false, bool right = false}) {
+      final c = Container(
+        width: width,
+        height: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+        decoration: BoxDecoration(border: Border(right: BorderSide(color: sep))),
+        child: child,
+      );
+      return expanded ? Expanded(child: c) : c;
+    }
+
+    Widget entete(String label,
+        {double? width,
+        bool expanded = false,
+        bool right = false,
+        bool center = false}) {
+      final c = Container(
+        width: width,
+        height: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: center
+            ? Alignment.center
+            : (right ? Alignment.centerRight : Alignment.centerLeft),
+        decoration: BoxDecoration(
+          border: Border(
+              right: BorderSide(color: Colors.white.withValues(alpha: 0.14))),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: center ? 9.6 : 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: center ? 0.5 : 0)),
+      );
+      return expanded ? Expanded(child: c) : c;
+    }
+
+    Widget ligneExercice(int annee, bool zebre) {
+      final d = parAnnee[annee];
+      final manquant = d == null;
+      final plancher = d != null && d.kTotal < 0;
+      final mention = manquant
+          ? 'Non saisi — compté pour zéro'
+          : (plancher ? 'Total négatif — ramené à zéro' : '');
+      return Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: zebre
+              ? (isDark
+                  ? const Color(0xFF14233D).withValues(alpha: 0.55)
+                  : const Color(0xFFF5F9FF))
+              : surface,
+          border: Border(top: BorderSide(color: sep)),
+        ),
+        child: Row(
+          children: [
+            cellule(
+              Text('Exercice $annee',
+                  style: TextStyle(
+                      color: manquant ? muted : text,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600)),
+              expanded: true,
+            ),
+            cellule(
+              Text(mention,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: amber,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600)),
+              width: 266,
+              right: true,
+            ),
+            cellule(
+              Text(roAmount(context, d?.kRetenu ?? 0),
+                  maxLines: 1,
+                  style: TextStyle(
+                      color: manquant ? muted : text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+              width: 190,
+              right: true,
+            ),
+            // Agir sur l'exercice sans passer par le sélecteur d'année : la
+            // ligne qu'on regarde porte ses propres commandes, comme le
+            // tableau de l'Indicateur de Base.
+            SizedBox(
+              width: 124,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: manquant
+                        ? 'Saisir l\'exercice $annee'
+                        : 'Modifier l\'exercice $annee',
+                    onPressed: () => _selectionnerExercice(annee),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: Icon(
+                        manquant
+                            ? Icons.playlist_add_outlined
+                            : Icons.edit_outlined,
+                        size: 16,
+                        color: manquant
+                            ? amber
+                            : (isDark
+                                ? const Color(0xFFB8C7E0)
+                                : const Color(0xFF334155))),
+                  ),
+                  // Ni année à corriger, ni exercice à retirer, sur une
+                  // année qui n'a jamais été saisie.
+                  if (!manquant)
+                    IconButton(
+                      tooltip: "Changer l'année de l'exercice $annee",
+                      onPressed: () => _changerMillesime(annee),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(Icons.edit_calendar_outlined,
+                          size: 16,
+                          color: isDark
+                              ? const Color(0xFFB8C7E0)
+                              : const Color(0xFF334155)),
+                    ),
+                  if (!manquant)
+                    IconButton(
+                      tooltip: 'Retirer l\'exercice $annee de la moyenne',
+                      onPressed: () => _retirerExercice(annee),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.delete_outline,
+                          size: 16, color: AppTheme.danger),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.14 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Moyenne des trois exercices (K_AS)',
+                    style: TextStyle(
+                        color: text,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+              Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _kPrimary.withValues(alpha: isDark ? 0.22 : 0.10),
+                  border: Border.all(color: _kPrimary),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('RO036 : (h) = moyenne de c, e et g',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : _kPrimary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: border),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    height: 40,
+                    color: headerBg,
+                    child: Row(
+                      children: [
+                        entete('Exercice retenu dans la moyenne', expanded: true),
+                        entete('', width: 266),
+                        entete('Total retenu (RO035)', width: 190, right: true),
+                        entete('ACTIONS', width: 124, center: true),
+                      ],
+                    ),
+                  ),
+                  for (var i = 0; i < attendus.length; i++)
+                    ligneExercice(attendus[i], i.isOdd),
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: soft,
+                      border: Border(top: BorderSide(color: border)),
+                    ),
+                    child: Row(
+                      children: [
+                        cellule(
+                          Text('Exigence de fonds propres K_AS',
+                              style: TextStyle(
+                                  color: muted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700)),
+                          expanded: true,
+                        ),
+                        cellule(
+                          Text('${roAmount(context, somme)} ÷ 3',
+                              maxLines: 1,
+                              style: TextStyle(
+                                  color: muted,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600)),
+                          width: 266,
+                          right: true,
+                        ),
+                        cellule(
+                          Text(roAmount(context, r.kAs),
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  color: _kPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800)),
+                          width: 190,
+                          right: true,
+                        ),
+                        const SizedBox(width: 124),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── Carte "Détail du calcul" - un exercice : tableau des 8 lignes
   // avec K = PNB × β par ligne et total en pied de tableau. ─────────────────
@@ -392,6 +955,43 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: isDark ? Colors.white : _kPrimary)),
+              ),
+              // Les mêmes commandes que dans la carte de moyenne, sur la carte
+              // qu'on a sous les yeux : c'est ici qu'on relit un exercice et
+              // qu'on décide de le corriger ou de le retirer.
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Modifier l\'exercice ${d.annee}',
+                onPressed: () => _selectionnerExercice(d.annee),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(Icons.edit_outlined,
+                    size: 16,
+                    color: isDark
+                        ? const Color(0xFFB8C7E0)
+                        : const Color(0xFF334155)),
+              ),
+              IconButton(
+                tooltip: "Changer l'année de l'exercice ${d.annee}",
+                onPressed: () => _changerMillesime(d.annee),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(Icons.edit_calendar_outlined,
+                    size: 16,
+                    color: isDark
+                        ? const Color(0xFFB8C7E0)
+                        : const Color(0xFF334155)),
+              ),
+              IconButton(
+                tooltip: 'Retirer l\'exercice ${d.annee} de la moyenne',
+                onPressed: () => _retirerExercice(d.annee),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.delete_outline,
+                    size: 16, color: AppTheme.danger),
               ),
             ],
           ),
@@ -496,7 +1096,7 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                     child: Row(
                       children: [
                         dataCell(
-                          Text('K_AS retenu (plancher à 0)',
+                          Text('Total exercice — RO035 (plancher à 0)',
                               style: TextStyle(
                                   color: muted,
                                   fontSize: 11,
@@ -593,14 +1193,16 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
               // compteur, rien ne disait ici qu'il en manquait, et l'EP23
               // partait sur ce qui était disponible.
               Builder(builder: (context) {
-                final saisis = _result?.detailParAnnee.length ?? 0;
-                final complet = saisis >= 3;
+                final saisis = _anneesSaisies.length;
+                final complet = saisis >= _kExercicesMoyenne;
                 final couleur = complet ? AppTheme.success : _kPrimary;
                 return Tooltip(
                   message: complet
-                      ? 'Les trois exercices attendus sont saisis'
-                      : 'L\'exigence est la moyenne des trois derniers '
-                          'exercices : ${3 - saisis} reste(nt) à saisir',
+                      ? 'Les trois exercices attendus sont saisis : modifiez '
+                          'ou retirez-en un pour en saisir un autre'
+                      : 'L\'Approche Standard porte sur $_kExercicesMoyenne '
+                          'exercices : ${_kExercicesMoyenne - saisis} '
+                          'reste(nt) à saisir',
                   child: Container(
                     height: 28,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -622,7 +1224,7 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                           color: couleur,
                         ),
                         const SizedBox(width: 5),
-                        Text('$saisis/3 exercices',
+                        Text('$saisis/$_kExercicesMoyenne exercices',
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -632,47 +1234,96 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                   ),
                 );
               }),
-              Tooltip(
-                message: 'L\'exigence porte sur les trois derniers exercices - '
-                    'cliquez pour changer celui que vous saisissez',
-                child: InkWell(
-                  onTap: _changerExercice,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    height: 28,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _kPrimary.withValues(alpha: isDark ? 0.22 : 0.10),
-                      border: Border.all(color: _kPrimary),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.event_outlined,
-                            size: 12,
-                            color: isDark ? Colors.white : _kPrimary),
-                        const SizedBox(width: 5),
-                        Text('Exercice $_anneeSelect',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? Colors.white : _kPrimary)),
-                        const SizedBox(width: 6),
-                        Icon(Icons.edit_outlined,
-                            size: 12,
-                            color: isDark ? Colors.white : _kPrimary),
-                      ],
+              if (!_saisieOuverte)
+                Tooltip(
+                  message: _serieComplete
+                      ? 'Les trois exercices sont saisis '
+                          '(${_anneesSaisies.join(', ')}) : retirez-en un pour '
+                          'en ajouter un autre'
+                      : 'Saisir un exercice de plus dans la moyenne',
+                  child: SizedBox(
+                    height: 30,
+                    child: FilledButton.icon(
+                      onPressed: _serieComplete ? null : _ajouterExercice,
+                      icon: const Icon(Icons.add, size: 14),
+                      label: const Text('Ajouter un exercice',
+                          style: TextStyle(
+                              fontSize: 10.6, fontWeight: FontWeight.w600)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6)),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              if (_saisieOuverte)
+                Tooltip(
+                  message: 'Exercice en cours de saisie - cliquez pour en '
+                      'viser un autre',
+                  child: InkWell(
+                    onTap: _changerExercice,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _kPrimary.withValues(alpha: isDark ? 0.22 : 0.10),
+                        border: Border.all(color: _kPrimary),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.event_outlined,
+                              size: 12,
+                              color: isDark ? Colors.white : _kPrimary),
+                          const SizedBox(width: 5),
+                          Text('Exercice $_anneeSelect',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : _kPrimary)),
+                          const SizedBox(width: 6),
+                          Icon(Icons.edit_outlined,
+                              size: 12,
+                              color: isDark ? Colors.white : _kPrimary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // Refermer la saisie sans enregistrer.
+              if (_saisieOuverte) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Fermer la saisie',
+                  child: InkWell(
+                    onTap: () => setState(() => _saisieOuverte = false),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      height: 28,
+                      width: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: muted.withValues(alpha: 0.55)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.close, size: 14, color: muted),
+                    ),
+                  ),
+                ),
+              ],
               // Retrait de l'exercice affiché, proposé seulement s'il porte
               // des données : rien à retirer d'une année encore vierge.
-              if (_result?.detailParAnnee
-                      .any((d) => d.annee == _anneeSelect) ??
-                  false) ...[
+              if (_saisieOuverte &&
+                  (_result?.detailParAnnee
+                          .any((d) => d.annee == _anneeSelect) ??
+                      false)) ...[
                 const SizedBox(width: 8),
                 Tooltip(
                   message: 'Retirer l\'exercice $_anneeSelect de la moyenne',
@@ -696,7 +1347,48 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
               ],
             ],
           ),
-          const SizedBox(height: 12),
+
+          // Hors saisie, la carte se réduit à son en-tête : le détail du
+          // calcul reste visible au-dessus, au lieu d'être repoussé par huit
+          // champs qu'on ne venait pas remplir.
+          if (!_saisieOuverte) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: soft,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 13, color: muted),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      _serieComplete
+                          ? 'Les trois exercices de la moyenne sont saisis '
+                              '(${_anneesSaisies.join(', ')}). Utilisez les '
+                              'icônes Modifier, Changer l\'année ou Retirer '
+                              'sur un exercice ci-dessus.'
+                          : 'Aucune saisie en cours. Cliquez sur « Ajouter un '
+                              'exercice », ou sur l\'icône Modifier d\'un '
+                              'exercice déjà saisi pour en corriger le PNB.',
+                      style: TextStyle(
+                          color: muted,
+                          fontSize: 10.2,
+                          fontWeight: FontWeight.w500,
+                          height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
 
           // ── Note explicative ─────────────────────────────────────────────
           Container(
@@ -714,11 +1406,18 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    'L\'Approche Standard porte sur un seul exercice : saisissez le PNB '
-                    'de chacune des 8 lignes de métier pour l\'exercice $_anneeSelect. '
-                    'K_AS = somme des PNB × β (plancher à 0). Changer d\'exercice puis '
-                    'enregistrer remplace l\'exercice précédent : une seule année est '
-                    'conservée.',
+                    _ajoutBloque
+                        ? 'Les trois exercices de la moyenne sont saisis '
+                            '(${_anneesSaisies.join(', ')}). Vous pouvez les '
+                            'modifier ou en retirer un, mais pas en ajouter un '
+                            'quatrième : le calcul ne retient que les trois '
+                            'plus récents.'
+                        : 'Saisissez le PNB de chacune des 8 lignes de métier '
+                            'pour l\'exercice $_anneeSelect. Le total de '
+                            'l\'exercice vaut la somme des PNB × β, plancher à '
+                            'zéro, et K_AS est la moyenne de trois exercices. '
+                            'Les exercices saisis se cumulent : enregistrer '
+                            '$_anneeSelect ne remplace pas les autres.',
                     style: TextStyle(
                         color: muted,
                         fontSize: 10.2,
@@ -813,31 +1512,39 @@ class _UemoiAsScreenState extends State<UemoiAsScreen> {
           // ── Enregistrer ──────────────────────────────────────────────────
           Align(
             alignment: Alignment.centerRight,
-            child: SizedBox(
-              height: 32,
-              child: FilledButton.icon(
-                icon: _saving
-                    ? const SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save_outlined, size: 14),
-                label: Text(
-                    _saving ? 'Enregistrement…' : 'Enregistrer $_anneeSelect',
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w600)),
-                onPressed: _saving ? null : _saveAllLignes,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(3)),
+            child: Tooltip(
+              message: _ajoutBloque
+                  ? 'Les trois exercices de la moyenne sont saisis '
+                      '(${_anneesSaisies.join(', ')}) : retirez-en un pour '
+                      'saisir $_anneeSelect'
+                  : 'Enregistrer les huit lignes de métier de $_anneeSelect',
+              child: SizedBox(
+                height: 32,
+                child: FilledButton.icon(
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_outlined, size: 14),
+                  label: Text(
+                      _saving ? 'Enregistrement…' : 'Enregistrer $_anneeSelect',
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w600)),
+                  onPressed: (_saving || _ajoutBloque) ? null : _saveAllLignes,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(3)),
+                  ),
                 ),
               ),
             ),
           ),
+          ],
         ],
       ),
     );

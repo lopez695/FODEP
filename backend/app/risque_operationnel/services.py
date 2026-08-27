@@ -12,6 +12,7 @@ from database.connection import database_manager, utcnow_iso
 logger = logging.getLogger(__name__)
 
 from .models import (
+    ExerciceAsView,
     AibCalculResult,
     AsAnneeDetail,
     AsCalculResult,
@@ -884,19 +885,27 @@ def get_dashboard() -> DashboardData:
     current_month = today.strftime("%Y-%m")
     last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
 
-    with database_manager.transaction() as conn:
-        # Widget 1 : on calcule K approché depuis les pertes (méthode indicateur de base simplifiée)
-        total_pertes = conn.execute(
-            "SELECT COALESCE(SUM(perte_nette_calc), 0) as total FROM "
-            "(SELECT (perte_brute - perte_recuperee) as perte_nette_calc FROM ro_incidents)"
-        ).fetchone()["total"] or 0
-        # K_IB simplifié : 15% de la moyenne des pertes sur 3 ans (proxy)
-        k_ib = total_pertes * 0.15
-        # Conversion en équivalent RWA = K_IB / ratio de solvabilité (9 %),
-        # même formule que calcul_aib() - plus de multiplicateur 12,5 distinct.
-        ratio_solvabilite = get_aib_parametres().ratio_solvabilite_min
-        apr = k_ib / ratio_solvabilite if ratio_solvabilite else 0.0
+    # Widget 1 : l'exigence de l'indicateur de base, telle que la calcule
+    # l'onglet dedie -- une seule implementation pour une seule grandeur.
+    #
+    # La tuile derivait K d'un cumul de pertes d'incidents (« 15 % des pertes
+    # subies »), ce que l'article 301 ne dit nulle part : l'exigence porte sur
+    # le PRODUIT BRUT des trois derniers exercices. Les deux ecrans affichaient
+    # donc « capital minimum » et « RWA operationnel » sur des assiettes sans
+    # rapport, a plusieurs ordres de grandeur l'un de l'autre.
+    #
+    # Calcule avant d'ouvrir la transaction : `calcul_aib` prend sa propre
+    # connexion, l'imbriquer dans celle du tableau de bord n'aurait servi a
+    # rien.
+    aib = calcul_aib()
+    k_ib = aib.k_ib
+    apr = aib.apr_aib
+    # Le statut comparait k_ib a zero, ce qu'aucune exigence ne peut manquer :
+    # la tuile affichait « Conforme » en toute circonstance. Ce qu'elle peut
+    # dire de vrai, c'est si l'exigence repose sur des exercices renseignes.
+    statut = "À compléter" if aib.donnees_insuffisantes else "Conforme"
 
+    with database_manager.transaction() as conn:
         # Widget 2
         inc_mois = conn.execute(
             "SELECT COUNT(*) as cnt FROM ro_incidents WHERE date_occurrence LIKE ?",
@@ -980,7 +989,7 @@ def get_dashboard() -> DashboardData:
         widget1=DashboardWidget1(
             exigence_fonds_propres=k_ib,
             apr_risque_op=apr,
-            statut_reglementaire="Conforme" if k_ib >= 0 else "Attention",
+            statut_reglementaire=statut,
         ),
         widget2=DashboardWidget2(
             total_incidents_mois=inc_mois,
@@ -1229,8 +1238,20 @@ def calcul_bic(annee_n: int | None = None) -> OpRiskCalculResult:
     # automatiquement à partir d'ILDC/SC/FC — voir _compute_pnb_effectif /
     # _row_to_input), y compris pour les exercices absents de la base
     # (OpRiskInput par défaut → tous postes à 0 → PNB calculé = 0).
-    pnb_moy = sum(_compute_pnb_effectif(inp) for inp in inputs) / 3
-    ofr_bia = max(pnb_moy, 0.0) * 0.15
+    #
+    # Ce comparatif porte le nom de l'approche indicateur de base, il doit
+    # donc en appliquer la regle : la moyenne des produits bruts annuels
+    # POSITIFS, divisee par leur nombre (art. 301). Diviser par trois en
+    # comptant les exercices nuls ou negatifs donnait, sous le meme intitule,
+    # un montant different de celui de l'onglet Indicateur de Base -- l'ecart
+    # affiche face au CRR3 s'en trouvait fausse d'autant.
+    pnb_positifs = [
+        pnb
+        for pnb in (_compute_pnb_effectif(inp) for inp in inputs)
+        if pnb > 0
+    ]
+    pnb_moy = sum(pnb_positifs) / len(pnb_positifs) if pnb_positifs else 0.0
+    ofr_bia = pnb_moy * params_aib_alpha()
     rea_bia = ofr_bia * mult
     ecart = ofr_crr3 - ofr_bia
 
@@ -1288,14 +1309,17 @@ def upsert_pnb_annuel(annee: int, data: PnbAnnuelCreate) -> PnbAnnuelView:
             "SELECT annee FROM op_pnb_annuel WHERE annee = ?", (annee,)
         ).fetchone()
         if existing is None:
-            # L'Indicateur de Base porte sur exactement 3 exercices
-            # (N-2, N-1, N) : on refuse un 4e exercice plutôt que de fausser
-            # la moyenne ou d'écarter silencieusement une année.
+            # Le registre conserve cinq exercices ; la moyenne de l'article 301
+            # n'en retient que les trois derniers. Au-dela de cinq on refuse
+            # l'ajout plutot que de laisser grossir un historique dont plus
+            # personne ne sait ce qui compte.
             nb = conn.execute("SELECT COUNT(*) FROM op_pnb_annuel").fetchone()[0]
-            if nb >= 3:
+            if nb >= EXERCICES_REGISTRE_AIB:
                 raise ValueError(
-                    "L'Indicateur de Base porte sur 3 exercices (N-2, N-1, N). "
-                    "Supprimez un exercice existant avant d'en ajouter un autre."
+                    f"Le registre conserve {EXERCICES_REGISTRE_AIB} "
+                    "exercices au plus. Supprimez-en un avant d'en ajouter un "
+                    "autre. L'exigence porte de toute facon sur les trois "
+                    "derniers."
                 )
         if existing is None:
             conn.execute(
@@ -1347,6 +1371,17 @@ def update_aib_parametres(data: ParametresAibUpdate) -> ParametresAib:
     )
 
 
+def params_aib_alpha() -> float:
+    """Coefficient alpha de l'indicateur de base, tel qu'il est parametre.
+
+    Le comparatif du BIC le codait en dur a 15 % : un etablissement qui aurait
+    ajuste alpha sur l'onglet Indicateur de Base aurait vu les deux ecrans
+    diverger sur la meme approche.
+    """
+
+    return get_aib_parametres().alpha
+
+
 def calcul_aib() -> AibCalculResult:
     annees_saisies = list_pnb_annuel()
     params = get_aib_parametres()
@@ -1386,6 +1421,30 @@ def calcul_aib() -> AibCalculResult:
 # BLOC A2 — AS (Approche Standard) — art. 305-311
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# La moyenne de l'approche standard porte sur trois exercices, et le diviseur
+# vaut trois quoi qu'il arrive : un exercice dont le total est negatif compte
+# pour zero au numerateur sans sortir du denominateur (art. 309). C'est la
+# difference avec l'AIB, dont le diviseur n est le nombre d'exercices a
+# produit brut positif (art. 301).
+EXERCICES_MOYENNE_AS = 3
+EXERCICES_REGISTRE_AIB = 5
+
+
+def list_exercices_as() -> list[ExerciceAsView]:
+    """Liste les exercices de l'Approche Standard (3 exercices au plus)."""
+    with database_manager.read_connection() as conn:
+        annees = [
+            int(r["annee"])
+            for r in conn.execute(
+                "SELECT DISTINCT annee FROM op_pnb_par_ligne ORDER BY annee"
+            ).fetchall()
+        ]
+    return [
+        ExerciceAsView(annee=annee, dans_la_moyenne=True)
+        for annee in annees
+    ]
+
+
 def list_beta_lignes() -> list[BetaLigneView]:
     with database_manager.read_connection() as conn:
         rows = conn.execute("SELECT * FROM op_beta_lignes ORDER BY beta DESC, ligne_metier").fetchall()
@@ -1424,17 +1483,23 @@ def get_pnb_lignes(annee: int) -> list[PnbParLigneView]:
 def upsert_pnb_ligne(annee: int, ligne_metier: str, data: PnbParLigneCreate) -> PnbParLigneView:
     now = utcnow_iso()
     with database_manager.transaction() as conn:
-        # Les exercices s'accumulent. L'exigence de l'Approche Standard est la
-        # moyenne des TROIS derniers (Bale, et ligne RO035 de l'EP23) : effacer
-        # les autres années a chaque enregistrement rendait cette moyenne
-        # inatteignable, et la declaration transmise a la BCEAO ne portait
-        # jamais que sur un exercice. `calcul_as` lit les trois plus recents,
-        # `delete_pnb_lignes` retire un exercice saisi par erreur.
         existing = conn.execute(
             "SELECT annee FROM op_pnb_par_ligne WHERE annee=? AND ligne_metier=?",
             (annee, ligne_metier),
         ).fetchone()
         if existing is None:
+            annee_connue = conn.execute(
+                "SELECT 1 FROM op_pnb_par_ligne WHERE annee=? LIMIT 1", (annee,)
+            ).fetchone()
+            if annee_connue is None:
+                nb_annees = conn.execute(
+                    "SELECT COUNT(DISTINCT annee) FROM op_pnb_par_ligne"
+                ).fetchone()[0]
+                if nb_annees >= EXERCICES_MOYENNE_AS:
+                    raise ValueError(
+                        f"L'Approche Standard porte sur {EXERCICES_MOYENNE_AS} exercices (N-2, N-1, N). "
+                        "Retirez un exercice existant avant d'en ajouter un autre."
+                    )
             conn.execute(
                 "INSERT INTO op_pnb_par_ligne (annee, ligne_metier, produit_brut_ligne, modifie_le)"
                 " VALUES (?, ?, ?, ?)",
@@ -1467,6 +1532,81 @@ def delete_pnb_lignes(annee: int) -> None:
 
     with database_manager.transaction() as conn:
         conn.execute("DELETE FROM op_pnb_par_ligne WHERE annee = ?", (annee,))
+
+
+ANNEE_MIN_EXERCICE = 2000
+ANNEE_MAX_EXERCICE = 2100
+
+
+def _verifier_millesime(nouvelle_annee: int) -> None:
+    if not ANNEE_MIN_EXERCICE <= nouvelle_annee <= ANNEE_MAX_EXERCICE:
+        raise ValueError(
+            f"Annee invalide : {nouvelle_annee}. Elle doit se situer entre "
+            f"{ANNEE_MIN_EXERCICE} et {ANNEE_MAX_EXERCICE}."
+        )
+
+
+def renommer_exercice_aib(annee: int, nouvelle_annee: int) -> None:
+    """Corrige le millesime d'un exercice de l'indicateur de base.
+
+    Le champ annee du formulaire etait fige des qu'un exercice existait : une
+    annee saisie de travers ne se corrigeait qu'en supprimant l'exercice, donc
+    en perdant le produit brut et sa reference documentaire.
+    """
+
+    _verifier_millesime(nouvelle_annee)
+    if nouvelle_annee == annee:
+        return
+    with database_manager.transaction() as conn:
+        origine = conn.execute(
+            "SELECT 1 FROM op_pnb_annuel WHERE annee = ?", (annee,)
+        ).fetchone()
+        if origine is None:
+            raise ValueError(f"Aucun exercice {annee} n'est enregistre.")
+        cible = conn.execute(
+            "SELECT 1 FROM op_pnb_annuel WHERE annee = ?", (nouvelle_annee,)
+        ).fetchone()
+        if cible is not None:
+            raise ValueError(
+                f"L'exercice {nouvelle_annee} est deja saisi. Retirez-le avant "
+                f"de renommer {annee}."
+            )
+        conn.execute(
+            "UPDATE op_pnb_annuel SET annee = ?, modifie_le = ? WHERE annee = ?",
+            (nouvelle_annee, utcnow_iso(), annee),
+        )
+
+
+def renommer_exercice_as(annee: int, nouvelle_annee: int) -> None:
+    """Corrige le millesime d'un exercice de l'approche standard.
+
+    Les huit lignes de metier suivent l'exercice : c'est l'annee qui change,
+    pas les montants. Sans cela, une erreur de millesime coutait la ressaisie
+    des huit lignes.
+    """
+
+    _verifier_millesime(nouvelle_annee)
+    if nouvelle_annee == annee:
+        return
+    with database_manager.transaction() as conn:
+        origine = conn.execute(
+            "SELECT 1 FROM op_pnb_par_ligne WHERE annee = ? LIMIT 1", (annee,)
+        ).fetchone()
+        if origine is None:
+            raise ValueError(f"Aucun exercice {annee} n'est enregistre.")
+        cible = conn.execute(
+            "SELECT 1 FROM op_pnb_par_ligne WHERE annee = ? LIMIT 1",
+            (nouvelle_annee,),
+        ).fetchone()
+        if cible is not None:
+            raise ValueError(
+                f"L'exercice {nouvelle_annee} est deja saisi. Retirez-le avant "
+                f"de renommer {annee}."
+            )
+        conn.execute(
+            "UPDATE op_pnb_par_ligne SET annee = ?, modifie_le = ? WHERE annee = ?",
+            (nouvelle_annee, utcnow_iso(), annee),
+        )
 
 
 def get_as_parametres() -> ParametresAs:
@@ -1541,7 +1681,8 @@ def calcul_as() -> AsCalculResult:
         annees = [
             int(r["annee"])
             for r in conn.execute(
-                "SELECT DISTINCT annee FROM op_pnb_par_ligne ORDER BY annee DESC LIMIT 3"
+                "SELECT DISTINCT annee FROM op_pnb_par_ligne "
+                f"ORDER BY annee DESC LIMIT {EXERCICES_MOYENNE_AS}"
             ).fetchall()
         ]
         for annee in sorted(annees):
@@ -1559,8 +1700,14 @@ def calcul_as() -> AsCalculResult:
                 k_retenu=max(k_total, 0.0), renseignee=bool(lignes),
             ))
 
+    # Diviser par le nombre d'exercices saisis appliquait a l'AS la regle de
+    # l'AIB, que l'approche standard n'a pas : le formulaire pose « (h) =
+    # moyenne des totaux c, e et g » a la ligne RO036, soit une somme sur
+    # trois. Tant qu'un seul exercice etait saisi, le module affichait donc
+    # une exigence trois fois superieure a celle que l'EP23 transmis fait
+    # lire a la BCEAO sur ses propres colonnes.
     retenus = [detail.k_retenu for detail in detail_par_annee if detail.renseignee]
-    k_as = sum(retenus) / len(retenus) if retenus else 0.0
+    k_as = sum(retenus) / EXERCICES_MOYENNE_AS if retenus else 0.0
     # Meme regle que l'AIB : l'EP23 du FODEP pose APR = K_AS x 12,5. Les deux
     # approches doivent rester comparables dans la synthese, ce qu'un
     # multiplicateur different rendrait trompeur.

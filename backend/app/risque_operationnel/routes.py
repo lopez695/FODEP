@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
 
 from .models import (
+    MillesimeUpdate,
+    ExerciceAsView,
     AibCalculResult,
     AsCalculResult,
     BetaLigneUpdate,
@@ -246,6 +248,14 @@ def upsert_pnb_annuel(annee: int, data: PnbAnnuelCreate) -> PnbAnnuelView:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.put("/aib/exercices/{annee}/millesime", status_code=204)
+def renommer_exercice_aib(annee: int, data: MillesimeUpdate) -> None:
+    try:
+        services.renommer_exercice_aib(annee, data.nouvelle_annee)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.delete("/aib/pnb/{annee}", status_code=204)
 def delete_pnb_annuel(annee: int) -> None:
     services.delete_pnb_annuel(annee)
@@ -283,6 +293,11 @@ def update_beta_ligne(ligne_metier: str, data: BetaLigneUpdate) -> BetaLigneView
     return services.update_beta_ligne(ligne_metier, data)
 
 
+@router.get("/as/exercices", response_model=list[ExerciceAsView])
+def list_exercices_as() -> list[ExerciceAsView]:
+    return services.list_exercices_as()
+
+
 @router.get("/as/pnb-lignes/{annee}", response_model=list[PnbParLigneView])
 def get_pnb_lignes(annee: int) -> list[PnbParLigneView]:
     return services.get_pnb_lignes(annee)
@@ -290,7 +305,21 @@ def get_pnb_lignes(annee: int) -> list[PnbParLigneView]:
 
 @router.put("/as/pnb-lignes/{annee}/{ligne_metier:path}", response_model=PnbParLigneView)
 def upsert_pnb_ligne(annee: int, ligne_metier: str, data: PnbParLigneCreate) -> PnbParLigneView:
-    return services.upsert_pnb_ligne(annee, ligne_metier, data)
+    try:
+        return services.upsert_pnb_ligne(annee, ligne_metier, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+# Chemin distinct de `/as/pnb-lignes/{annee}/{ligne_metier:path}` : ce dernier
+# capture tout ce qui suit l'annee, un segment « millesime » y serait pris pour
+# une ligne de metier.
+@router.put("/as/exercices/{annee}/millesime", status_code=204)
+def renommer_exercice_as(annee: int, data: MillesimeUpdate) -> None:
+    try:
+        services.renommer_exercice_as(annee, data.nouvelle_annee)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.delete("/as/pnb-lignes/{annee}", status_code=204)

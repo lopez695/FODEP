@@ -2,6 +2,7 @@
 import 'package:intl/intl.dart';
 
 import '../localization/app_localization.dart';
+import 'currency_conversion.dart';
 
 /// Top-level formatter functions for easy access
 String formatLargeNumber(num value) => AppFormatters.compactNumber(value);
@@ -15,7 +16,7 @@ class AppFormatters {
   static final Map<String, NumberFormat> _percentFormatCache = {};
   static final Map<String, DateFormat> _shortDateFormatCache = {};
 
-  static String currency(num value, {String currencyCode = 'XOF'}) {
+  static String rawCurrency(num value, {String currencyCode = 'XOF'}) {
     final upper = currencyCode.toUpperCase();
     final locale =
         upper == 'USD' ? 'en_US' : AppLocalizations.currentLanguage.intlLocale;
@@ -29,6 +30,31 @@ class AppFormatters {
       );
     });
     return formatter.format(value);
+  }
+
+  static String currency(
+    num value, {
+    String currencyCode = 'XOF',
+    bool raw = false,
+    int maxDecimals = 2,
+  }) {
+    if (raw) {
+      return rawCurrency(value, currencyCode: currencyCode);
+    }
+    final unit = PortfolioAmountUnitPreference.current;
+    final val = value.toDouble();
+    if (val == 0) {
+      return '0 ${unit.label} ${currencySymbol(currencyCode)}';
+    }
+    final scaled = val / unit.divisor;
+    final absScaled = scaled.abs();
+    int decimals = maxDecimals;
+    if (absScaled > 0 && absScaled < 0.01) {
+      decimals = 4;
+    } else if (absScaled > 0 && absScaled < 1.0) {
+      decimals = 3;
+    }
+    return '${decimalNumber(scaled, maxDecimals: decimals)} ${unit.label} ${currencySymbol(currencyCode)}';
   }
 
   static String compactNumber(num value) {
@@ -73,46 +99,24 @@ class AppFormatters {
   static String formatAmountValue(double value, [double? divisor]) {
     final absolute = value.abs();
     if (absolute == 0) return '0';
-    if (divisor != null && divisor > 0) {
-      return decimalNumber(value / divisor, maxDecimals: 2);
-    }
-    if (absolute < 1000000) {
-      return decimalNumber(value, maxDecimals: 2);
-    } else if (absolute < 1000000000) {
-      return decimalNumber(value / 1000000, maxDecimals: 2);
-    } else {
-      return decimalNumber(value / 1000000000, maxDecimals: 2);
-    }
+    final effectiveDivisor =
+        divisor ?? PortfolioAmountUnitPreference.current.divisor;
+    return decimalNumber(value / effectiveDivisor, maxDecimals: 2);
   }
 
   static String formatAmountSuffix(double value, [String? unitLabel]) {
     if (unitLabel != null) {
       return unitLabel;
     }
-    final absolute = value.abs();
-    if (absolute == 0) return '';
-    if (absolute < 1000000) {
-      return '';
-    } else if (absolute < 1000000000) {
-      return 'M';
-    } else {
-      return 'Md';
-    }
+    return PortfolioAmountUnitPreference.current.label;
   }
 
-  static String compactAmount(num value) {
+  static String compactAmount(num value, [PortfolioAmountUnit? amountUnit]) {
+    final unit = amountUnit ?? PortfolioAmountUnitPreference.current;
     final amount = value.toDouble();
-    final absolute = amount.abs();
-    if (absolute == 0) return '0';
-    if (absolute >= 1000000000) {
-      return '${decimalNumber(amount / 1000000000, maxDecimals: 2)} Md';
-    } else if (absolute >= 1000000) {
-      return '${decimalNumber(amount / 1000000, maxDecimals: 2)} M';
-    } else if (absolute >= 1000) {
-      return '${decimalNumber(amount / 1000, maxDecimals: 2)} k';
-    } else {
-      return decimalNumber(amount, maxDecimals: 2);
-    }
+    if (amount == 0) return '0 ${unit.label}';
+    final scaled = amount / unit.divisor;
+    return '${decimalNumber(scaled, maxDecimals: 2)} ${unit.label}';
   }
 
   static String integer(num value) => _plainNumber().format(value.round());

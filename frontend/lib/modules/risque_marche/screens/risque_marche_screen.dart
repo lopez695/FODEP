@@ -8257,12 +8257,12 @@ class _BondKeyIndicatorSpec {
         unit: PortfolioAmountUnitPreference.current.label,
         icon: CupertinoIcons.chart_pie_fill,
         color: _marketDanger,
-        formula: r'RWA_{marché}=K_{marché}\times11{,}11',
+        formula: r'RWA_{marché}=K_{marché}\times12{,}5',
         detail:
-            'Conversion de l’exigence de fonds propres marché en actifs pondérés, au multiplicateur réglementaire de 11,11.',
+            'Conversion de l’exigence de fonds propres marché en actifs pondérés, au multiplicateur réglementaire de 12,5.',
         caption: 'Actifs pondérés marché',
         category: 'Prudentiel',
-        method: 'Exigence multipliée par 11,11',
+        method: 'Exigence multipliée par 12,5',
         reading:
             'Équivalent en actifs pondérés intégrable directement au ratio de solvabilité global.',
       ),
@@ -33298,7 +33298,7 @@ class _ChangeRiskScreenState extends State<_ChangeRiskScreen> {
                   borderRadius: BorderRadius.circular(AppTheme.radius),
                 ),
                 child: const Text(
-                  'Position_Nette_Globale = MAX(Total_Longues ; Total_Courtes)\n\nExigence_FP_Change = Position_Nette_Globale × 9 %\n\nRWA_Change = Exigence_FP_Change × 11,11',
+                  'Position_Nette_Globale = MAX(Total_Longues ; Total_Courtes)\n\nExigence_FP_Change = Position_Nette_Globale × 8 %\n\nRWA_Change = Exigence_FP_Change × 12,5',
                   style: TextStyle(fontFamily: 'monospace', fontSize: 12),
                 ),
               ),
@@ -33679,7 +33679,7 @@ class _ChangeRiskScreenState extends State<_ChangeRiskScreen> {
           _buildCalculationLine(
             context,
             label: 'RWA Change',
-            formula: '${_fmt(fx.capitalRequirement)} × 11,11',
+            formula: '${_fmt(fx.capitalRequirement)} × 12,5',
             value: _fmt(fx.marketRwa),
             valueColor: Colors.red[700],
             isBold: true,
@@ -34249,7 +34249,7 @@ Risque Spécifique = Position brute × 9 %
 Risque Général    = |Position nette| × 9 %
 
 Exigence FP Actions = Risque Spécifique + Risque Général
-RWA Actions = Exigence FP Actions × 11,11 (DISPRUD UMOA, Art. 395-401)''',
+RWA Actions = Exigence FP Actions × 12,5 (DISPRUD UMOA, Art. 395-401)''',
             // Ordre de lecture = chaîne du calcul prudentiel : chaque
             // position est suivie du risque qu'elle engendre, puis viennent
             // les agrégats (exigence, RWA).
@@ -35306,7 +35306,7 @@ L'exigence de fonds propres pour risque de marché est la somme des exigences pa
 • Exigence FP Change  : 8 % de la position nette globale (max longues/courtes)
 
 Exigence FP Marché = Σ exigences par risque
-RWA Marché = Exigence FP Marché × 11,11''',
+RWA Marché = Exigence FP Marché × 12,5''',
                         items: [
                           _SummaryItemData(
                               label: 'Encours total',
@@ -35362,7 +35362,7 @@ L'exigence de fonds propres pour risque de marché est la somme des exigences pa
 • Exigence FP Change  : 8 % de la position nette globale (max longues/courtes)
 
 Exigence FP Marché = Σ exigences par risque
-RWA Marché = Exigence FP Marché × 11,11''',
+RWA Marché = Exigence FP Marché × 12,5''',
                         items: [
                           _SummaryItemData(
                               label: 'Encours total',
@@ -35498,7 +35498,7 @@ RWA Marché = Exigence FP Marché × 11,11''',
 ///    un document remis à un superviseur, c'est une représentation fausse ;
 ///  * la barre « Risque » portait en réalité l'ASSIETTE (position), pas une
 ///    mesure de risque : le libellé annonçait 610 Md de risque de taux ;
-///  * « RWA » valait exactement « Exigence × 11,11 » : la même information,
+///  * « RWA » valait exactement « Exigence × 12,5 » : la même information,
 ///    affichée deux fois, occupait les deux tiers du graphique.
 ///
 /// Le registre retenu est celui d'un état prudentiel : un tableau aligné qui
@@ -35590,7 +35590,7 @@ class _MarketCapitalRequirementPanel extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             '* Assiette = base de calcul du compartiment. Densité = exigence rapportée à l\'assiette.\n'
-            'L\'équivalent RWA découle de l\'exigence (× 11,11) : il n\'ajoute pas d\'information, il change d\'unité.',
+            'L\'équivalent RWA découle de l\'exigence (× 12,5) : il n\'ajoute pas d\'information, il change d\'unité.',
             style: const TextStyle(
               fontSize: 9.0, 
               color: Colors.amber, 

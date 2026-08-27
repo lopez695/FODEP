@@ -22,6 +22,15 @@ CONSERVATION_BUFFER = 0.025
 # Exigence globale de solvabilité, coussin de conservation inclus : 11,5 %.
 GLOBAL_SOLVENCY_REQUIREMENT = MIN_SOLVENCY_RATIO + CONSERVATION_BUFFER
 
+# Multiplicateur des exigences de fonds propres marché et opérationnel dans
+# l'assiette du ratio (§90) : RWA = K × 12,5, l'inverse de 8 %.
+#
+# 12,5 et MIN_SOLVENCY_RATIO ne sont pas deux écritures d'une même chose :
+# le premier convertit une exigence en actifs pondérés, le second est le ratio
+# que l'établissement doit tenir sur ces actifs. Les confondre donne 1/0,09 =
+# 11,11 et minore les APR de 11 %.
+RWA_MULTIPLIER = 12.5
+
 # Ratio de capital minimum réglementaire UMOA par défaut (9 %, exigence
 # minimale de fonds propres §91c, sans coussin). Paramétrable via
 # settings.capital_ratio. L'exigence globale avec coussin de conservation
@@ -171,7 +180,12 @@ def calculate_rwa(ead: float, risk_weight: float) -> float:
 
 
 def calculate_capital(rwa: float, capital_ratio: float = settings.capital_ratio) -> float:
-    """Calcule le capital reglementaire minimum.
+    """Calcule le capital reglementaire minimum : RWA x 8 %.
+
+    L'inverse exact de RWA_MULTIPLIER, de sorte qu'une exigence K convertie en
+    actifs ponderes puis reconvertie redonne K. Le taux valait 9 %, le ratio de
+    solvabilite : le capital minimum affiche depassait alors de 12,5 %
+    l'exigence dont il decoulait.
 
     Entrees:
         rwa: actifs ponderes par les risques.
