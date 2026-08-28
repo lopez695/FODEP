@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime
 import math
 import unicodedata
@@ -16,9 +17,11 @@ from app.core.bceao_calculations import (
     calculate_fonds_propres,
     evaluate_ratios
 )
+from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 from app.market.services import resolve_market_capital
 from app.risque_operationnel.services import apr_operationnel_retenu
 from app.dashboard.models import (
+    FondsPropresExercice,
     DashboardMetric,
     DashboardProjectionPoint,
     DashboardSnapshot,
@@ -414,16 +417,50 @@ def _critical_incident_count(
 
     return incidents
 
-def get_dashboard_snapshot() -> DashboardSnapshot:
-    """Construit le contenu complet du tableau de bord."""
+@dataclass(frozen=True)
+class SoclePilier1:
+    """Le Pilier 1 tel que le dispositif le calcule, une fois pour toutes.
+
+    Deux ecrans qui montreraient des chiffres differents pour la meme notion
+    ne seraient credibles ni l'un ni l'autre. Le tableau de bord et l'ICAAP
+    partent donc de la meme lecture : le second ajoute ses add-ons a ce socle,
+    il ne le recalcule pas. Une seconde implantation du ratio de solvabilite
+    finirait par diverger de la premiere -- c'est deja arrive sur la lecture
+    des fonds propres (cf. `app.core.fonds_propres`).
+    """
+
+    fp_data: dict
+    fp_calc: dict
+    fp_detail: FondsPropresDetail
+    rm_calc: dict
+    rwa_operationnel: float
+    exposure_rows: list
+    gross_total: float
+    ead_total: float
+    rwa_credit: float
+    rwa_total: float
+    #: Assiette du ratio de levier, au sens de l'EP33.
+    exposition_levier: float
+    ratios: dict
+
+
+def socle_pilier1() -> SoclePilier1:
+    """Fonds propres, APR par type de risque et ratios reglementaires."""
+
     # FETCH REAL DATA
     with database_manager.read_connection() as conn:
         cursor = conn.cursor()
         
         # Fonds propres
-        cursor.execute("SELECT * FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1")
+        # L'exercice le plus recent fait foi. `date_analyse` ne sert plus a
+        # departager : c'est un horodatage de saisie, une correction portee
+        # en retard sur un exercice ancien le placait devant le plus recent.
+        cursor.execute(REQUETE_FONDS_PROPRES_COURANTS)
         fp_row = cursor.fetchone()
         fp_data = dict(fp_row) if fp_row else {}
+        historique_rows = cursor.execute(
+            "SELECT * FROM fonds_propres ORDER BY exercice DESC"
+        ).fetchall()
         
         # Risque Marché
         cursor.execute("SELECT * FROM risque_marche ORDER BY date_analyse DESC LIMIT 1")
@@ -464,6 +501,8 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
         deductions_prud_t2=fp_data.get("deductions_prud_t2", 0.0),
         tier2=fp_calc["t2"],
         total_fp=fp_calc["total_capital"],
+        exercice=fp_data.get("exercice"),
+        historique=_historique_fonds_propres(historique_rows),
     )
 
     exposure_rows = [_normalize_row(item) for item in list_expositions()]
@@ -474,6 +513,45 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
     
     # RWA Total = Crédit + Marché + Opérationnel
     rwa_total = rwa_credit + rwa_operationnel + rm_calc["rwa_marche"]
+
+    # Calculate Official Ratios (Solvency, Leverage, etc.)
+    # Le levier se mesure sur l'exposition au sens de l'EP33 — bilan net de
+    # provisions et hors bilan après conversion — et non sur l'exposition
+    # brute, qui compterait le hors bilan à son nominal entier.
+    exposition_levier = sum(
+        float(row["exposition_levier"]) for row in exposure_rows
+    )
+    ratios = evaluate_ratios(rwa_total, fp_calc, exposition_levier)
+
+    return SoclePilier1(
+        fp_data=fp_data,
+        fp_calc=fp_calc,
+        fp_detail=fp_detail,
+        rm_calc=rm_calc,
+        rwa_operationnel=rwa_operationnel,
+        exposure_rows=exposure_rows,
+        gross_total=gross_total,
+        ead_total=ead_total,
+        rwa_credit=rwa_credit,
+        rwa_total=rwa_total,
+        exposition_levier=exposition_levier,
+        ratios=ratios,
+    )
+
+
+def get_dashboard_snapshot() -> DashboardSnapshot:
+    """Construit le contenu complet du tableau de bord."""
+    socle = socle_pilier1()
+    fp_calc = socle.fp_calc
+    fp_detail = socle.fp_detail
+    rm_calc = socle.rm_calc
+    rwa_operationnel = socle.rwa_operationnel
+    exposure_rows = socle.exposure_rows
+    gross_total = socle.gross_total
+    ead_total = socle.ead_total
+    rwa_credit = socle.rwa_credit
+    rwa_total = socle.rwa_total
+    ratios = socle.ratios
 
     # Exigence de fonds propres du portefeuille : elle porte sur le RWA total
     # (crédit + marché + opérationnel), pas sur le seul risque de crédit, et
@@ -498,15 +576,6 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
     )
     residual_risk = max(gross_total - crm_gross, 0.0)
     covered_ratio = safe_ratio(crm_gross, gross_total)
-
-    # Calculate Official Ratios (Solvency, Leverage, etc.)
-    # Le levier se mesure sur l'exposition au sens de l'EP33 — bilan net de
-    # provisions et hors bilan après conversion — et non sur l'exposition
-    # brute, qui compterait le hors bilan à son nominal entier.
-    exposition_levier = sum(
-        float(row["exposition_levier"]) for row in exposure_rows
-    )
-    ratios = evaluate_ratios(rwa_total, fp_calc, exposition_levier)
 
     portfolio_rows = [
         PortfolioRow(
@@ -689,12 +758,77 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
         grands_risques=grands_risques,
     )
 
+def _historique_fonds_propres(rows) -> list[FondsPropresExercice]:
+    """Les exercices deja saisis, du plus recent au plus ancien.
+
+    Les agregats passent par `calculate_fonds_propres`, celle-la meme qui
+    calcule les fonds propres courants : une seconde implementation de la meme
+    somme finirait par diverger, et la carte contredirait son propre total.
+    """
+
+    historique: list[FondsPropresExercice] = []
+    for row in rows or []:
+        donnees = dict(row)
+        exercice = donnees.get("exercice")
+        if exercice is None:
+            continue
+        agregats = calculate_fonds_propres(donnees)
+        historique.append(FondsPropresExercice(
+            exercice=int(exercice),
+            capital_ordinaire=donnees.get("capital_ordinaire", 0.0) or 0.0,
+            reserves=donnees.get("reserves", 0.0) or 0.0,
+            resultats_report=donnees.get("resultats_report", 0.0) or 0.0,
+            resultat_eligible=donnees.get("resultat_eligible", 0.0) or 0.0,
+            deductions_prud_cet1=donnees.get("deductions_prud_cet1", 0.0) or 0.0,
+            cet1=agregats["cet1"],
+            instruments_at1=donnees.get("instruments_at1", 0.0) or 0.0,
+            primes_emission_at1=donnees.get("primes_emission_at1", 0.0) or 0.0,
+            deductions_prud_at1=donnees.get("deductions_prud_at1", 0.0) or 0.0,
+            at1=agregats["at1"],
+            tier1=agregats["t1"],
+            dettes_subordonnees_t2=donnees.get("dettes_subordonnees_t2", 0.0) or 0.0,
+            provisions_generales_t2=donnees.get("provisions_generales_t2", 0.0) or 0.0,
+            deductions_prud_t2=donnees.get("deductions_prud_t2", 0.0) or 0.0,
+            tier2=agregats["t2"],
+            total_fp=agregats["total_capital"],
+            modifie_le=str(donnees.get("modifie_le") or ""),
+        ))
+    return historique
+
+
+def delete_fonds_propres_exercice(exercice: int) -> DashboardSnapshot:
+    """Retire un exercice de l'historique des fonds propres.
+
+    Une annee saisie de travers se corrigeait sinon en la reecrivant, ce qui
+    laissait la mauvaise en place a cote de la bonne. Le retrait est explicite.
+    """
+
+    with database_manager.transaction() as conn:
+        curseur = conn.execute(
+            "SELECT COUNT(*) FROM fonds_propres WHERE exercice = ?", (exercice,)
+        )
+        if curseur.fetchone()[0] == 0:
+            raise ValueError(f"Aucun exercice {exercice} n'est enregistre.")
+        conn.execute("DELETE FROM fonds_propres WHERE exercice = ?", (exercice,))
+        conn.commit()
+
+    return get_dashboard_snapshot()
+
+
 def update_fonds_propres(update_data: FondsPropresUpdate) -> DashboardSnapshot:
     with database_manager.transaction() as conn:
         cursor = conn.cursor()
         
         # Obtenir l'ID existant ou en generer un nouveau
-        cursor.execute("SELECT id, date_analyse FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1")
+        # La saisie vise un exercice, pas « la derniere ligne ». Relire la
+        # plus recente pour la reecrire ecrasait l'exercice precedent a
+        # chaque mise a jour : la table n'a jamais porte plus d'un
+        # enregistrement, et les limites des EP36 a EP38 n'ont jamais eu
+        # leur denominateur N-1.
+        exercice = update_data.exercice
+        cursor.execute(
+            "SELECT id FROM fonds_propres WHERE exercice = ?", (exercice,)
+        )
         row = cursor.fetchone()
         
         now = datetime.now().isoformat()
@@ -720,13 +854,13 @@ def update_fonds_propres(update_data: FondsPropresUpdate) -> DashboardSnapshot:
             new_id = str(uuid.uuid4())
             cursor.execute('''
                 INSERT INTO fonds_propres (
-                    id, date_analyse, capital_ordinaire, reserves, resultats_report, resultat_eligible, deductions_prud_cet1,
+                    id, exercice, date_analyse, capital_ordinaire, reserves, resultats_report, resultat_eligible, deductions_prud_cet1,
                     instruments_at1, primes_emission_at1, deductions_prud_at1,
                     dettes_subordonnees_t2, provisions_generales_t2, deductions_prud_t2,
                     cree_le, modifie_le
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                new_id, now, update_data.capital_ordinaire, update_data.reserves, update_data.resultats_report,
+                new_id, exercice, now, update_data.capital_ordinaire, update_data.reserves, update_data.resultats_report,
                 update_data.resultat_eligible, update_data.deductions_prud_cet1,
                 update_data.instruments_at1, update_data.primes_emission_at1, update_data.deductions_prud_at1,
                 update_data.dettes_subordonnees_t2, update_data.provisions_generales_t2, update_data.deductions_prud_t2,

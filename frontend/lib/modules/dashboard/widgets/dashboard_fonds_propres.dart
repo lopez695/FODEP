@@ -4,7 +4,9 @@ import '../../../core/localization/app_localization.dart';
 import '../../../core/state/portfolio_amount_unit_scope.dart';
 import '../../../core/utils/currency_conversion.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/services/rwa_api_service.dart';
 import '../models/dashboard_models.dart';
+import '../screens/fonds_propres_detail_page.dart';
 import 'dashboard_design.dart';
 
 /// Structure des fonds propres réglementaires - décomposition par tier.
@@ -17,11 +19,16 @@ class DashboardFondsPropres extends StatelessWidget {
     this.currency = 'XOF',
     required this.data,
     this.onEdit,
+    this.api,
   });
 
   final String currency;
   final DashboardSnapshot data;
   final VoidCallback? onEdit;
+
+  /// Transmise à la page de détail, qui y saisit les exercices antérieurs.
+  /// Absente, la page s'ouvre en lecture — c'est le cas des essais de rendu.
+  final RwaApiService? api;
 
   // Jusqu'à 3 décimales utiles, sans zéros de remplissage - même précision
   // que les tooltips du graphique « Exigences de fonds propres » pour que le
@@ -225,7 +232,46 @@ class DashboardFondsPropres extends StatelessWidget {
               ),
             ),
           ),
+          _buildHistorique(context, fp),
         ],
+      ),
+    );
+  }
+
+  /// Accès à l'historique des fonds propres, sous la décomposition par tier.
+  ///
+  /// La carte porte l'exercice déclaré ; les millésimes antérieurs, leurs
+  /// écarts et leur détail poste par poste vivent sur leur propre page. Les
+  /// aligner ici en pastilles doublait l'information sans la rendre lisible.
+  ///
+  /// L'historique n'est pas une commodité : les limites des EP36 à EP38 se
+  /// mesurent, dit le formulaire, sur les fonds propres de l'exercice
+  /// PRÉCÉDENT.
+  Widget _buildHistorique(BuildContext context, FondsPropresDetail? fp) {
+    if (fp == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.open_in_new, size: 16),
+          label: Text('Voir historique'.tr(context)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.indigo,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            textStyle:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          ),
+          onPressed: () =>
+              FondsPropresDetailPage.ouvrir(context, fp, api: api),
+        ),
       ),
     );
   }

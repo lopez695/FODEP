@@ -294,11 +294,57 @@ const List<_MenuEntry> _stressChildren = [
   ),
 ];
 
+// Les sept composantes du PIEAFP, dans l'ordre ou elles se construisent.
+// Celles qui restent grisees attendent leur ecran : les afficher des
+// maintenant dit ou va le module, plutot que de laisser croire que l'ICAAP se
+// resume au socle reglementaire.
 const List<_MenuEntry> _icaapChildren = [
   _MenuEntry.leaf(
-    module: AppModule.icap,
-    icon: Icons.construction_outlined,
-    label: 'En cours de construction',
+    module: AppModule.icapCapitalReglementaire,
+    icon: Icons.account_balance_outlined,
+    label: 'Capital reglementaire',
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapAppetenceRisque,
+    icon: Icons.tune_outlined,
+    label: 'Appetence au risque',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapCapitalEconomique,
+    icon: Icons.calculate_outlined,
+    label: 'Capital economique',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapBuffersPrudentiels,
+    icon: Icons.layers_outlined,
+    label: 'Coussins prudentiels',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapAnalyseSolvabilite,
+    icon: Icons.balance_outlined,
+    label: 'Analyse de solvabilite',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapProjectionCapital,
+    icon: Icons.trending_up_outlined,
+    label: 'Projection du capital',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapPlansCapital,
+    icon: Icons.assignment_outlined,
+    label: 'Plan de fonds propres',
+    disabled: true,
+  ),
+  _MenuEntry.leaf(
+    module: AppModule.icapReportingIcaap,
+    icon: Icons.summarize_outlined,
+    label: 'Rapport PIEAFP',
+    disabled: true,
   ),
 ];
 

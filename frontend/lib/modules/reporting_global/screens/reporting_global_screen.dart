@@ -22,6 +22,8 @@ import '../../../shared/widgets/section_card.dart';
 import '../../dashboard/models/dashboard_models.dart';
 import '../../expositions/models/exposition_models.dart';
 import '../../rapports/screens/fodep_page.dart';
+import '../../rapports/models/report_models.dart';
+import '../../rapports/widgets/analyse_indicateurs.dart';
 import '../../risque_marche/repositories/foreign_exchange_repository.dart';
 import '../../risque_marche/services/market_data_import_store.dart';
 import '../../risque_marche/services/market_risk_aggregation_service.dart';
@@ -242,7 +244,15 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
     super.initState();
     _applyQuickPeriod('Mensuel');
     _loadPreview();
+    _analyseCourante = widget.api.fetchAnalyseFodepCourante();
   }
+
+  /// Ce que la declaration affirmera si elle part en l'etat.
+  ///
+  /// En tete de l'ecran, avant les parametres et l'apercu : une norme
+  /// franchie ou un ratio sous son plancher se decouvre ici, pas une fois le
+  /// fichier transmis.
+  late Future<AnalyseDeclaration> _analyseCourante;
 
   Future<void> _loadPreview() async {
     setState(() {
@@ -935,6 +945,12 @@ class _ReportingGlobalScreenState extends State<ReportingGlobalScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  FutureBuilder<AnalyseDeclaration>(
+                    future: _analyseCourante,
+                    builder: (context, instantane) =>
+                        AnalyseIndicateurs(instantane: instantane),
+                  ),
+                  const SizedBox(height: 16),
                   SectionCard(
                     title: '',
                     child: _buildReportParametersCard(context),

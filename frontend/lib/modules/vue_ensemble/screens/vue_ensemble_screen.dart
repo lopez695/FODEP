@@ -189,6 +189,7 @@ class _ExecutiveDashboard extends StatelessWidget {
                 final fondsPropres = DashboardFondsPropres(
                   currency: currency,
                   data: data,
+                  api: api,
                   onEdit: () async {
                     final saved = await DashboardFondsPropresDialog.show(
                       context,

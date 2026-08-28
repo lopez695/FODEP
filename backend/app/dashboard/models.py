@@ -88,9 +88,58 @@ class FondsPropresDetail(BaseModel):
     deductions_prud_t2: float = 0.0
     tier2: float = 0.0
     total_fp: float = 0.0
+    # Exercice auquel se rattachent ces fonds propres.
+    exercice: int | None = None
+    # Les exercices deja saisis, du plus recent au plus ancien. Les limites des
+    # EP36 a EP38 se mesurent sur les fonds propres de l'exercice PRECEDENT :
+    # sans cet historique, l'export les rapporte a l'exercice declare et le
+    # signale en reserve.
+    historique: list["FondsPropresExercice"] = []
+
+
+class FondsPropresExercice(BaseModel):
+    """Un exercice de l'historique des fonds propres, poste par poste.
+
+    Les onze postes saisis autant que les agregats : la page de detail les
+    compare d'un exercice a l'autre, et un ecart de total ne se lit que si on
+    voit lequel des postes a bouge.
+    """
+
+    exercice: int
+    # CET1
+    capital_ordinaire: float = 0.0
+    reserves: float = 0.0
+    resultats_report: float = 0.0
+    resultat_eligible: float = 0.0
+    deductions_prud_cet1: float = 0.0
+    cet1: float = 0.0
+    # AT1
+    instruments_at1: float = 0.0
+    primes_emission_at1: float = 0.0
+    deductions_prud_at1: float = 0.0
+    at1: float = 0.0
+    tier1: float = 0.0
+    # Tier 2
+    dettes_subordonnees_t2: float = 0.0
+    provisions_generales_t2: float = 0.0
+    deductions_prud_t2: float = 0.0
+    tier2: float = 0.0
+    total_fp: float = 0.0
+    modifie_le: str = ""
+
 
 class FondsPropresUpdate(BaseModel):
-    """Model de mise a jour manuelle des fonds propres."""
+    """Model de mise a jour manuelle des fonds propres.
+
+    L'exercice est OBLIGATOIRE. Il a d'abord ete facultatif, l'annee en cours
+    servant de defaut : un client qui ne l'envoyait pas -- une interface restee
+    sur une version anterieure -- ecrasait alors silencieusement l'exercice
+    courant avec les chiffres d'un autre. C'est arrive deux fois sur les fonds
+    propres declares. Mieux vaut un refus franc qu'une donnee remplacee sans
+    que personne ne le voie.
+    """
+
+    exercice: int = Field(..., ge=2000, le=2100)
     capital_ordinaire: float
     reserves: float
     resultats_report: float

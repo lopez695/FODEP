@@ -24,6 +24,7 @@ from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 
 from app.rapports.fodep.disposition import indexer_codes_dispru
+from app.rapports.fodep.reserves import Reserve
 from app.rapports.fodep.service import CHEMIN_MODELE, COLONNE_B
 
 # Sens de chaque norme de l'EP01, en dernier recours.
@@ -158,6 +159,12 @@ class AnalyseDeclaration(BaseModel):
 
     #: Ce qui empeche de conclure, s'il y a lieu.
     avertissements: list[str] = Field(default_factory=list)
+
+    #: Les reserves que l'export a formulees en renseignant le formulaire.
+    #: Vides pour une declaration deposee : elles naissent du remplissage, pas
+    #: de la lecture. C'est ce qui distingue l'analyse de la declaration EN
+    #: COURS de celle d'un fichier recu.
+    reserves: list[Reserve] = Field(default_factory=list)
 
     @property
     def depassees(self) -> list[NormeAnalysee]:
@@ -657,4 +664,41 @@ def analyser_declaration(octets: bytes, nom_fichier: str) -> AnalyseDeclaration:
         inventaire=inventaire,
         classeur=est_un_classeur,
         avertissements=avertissements,
+    )
+
+
+def analyser_declaration_en_cours(date_arrete=None) -> AnalyseDeclaration:
+    """Analyse la declaration que l'outil produirait aujourd'hui.
+
+    `analyser_declaration` lit un fichier recu ; celle-ci regarde ce que
+    l'application s'apprete a transmettre. Meme lecture, meme vocabulaire :
+    elle passe par `analyser_classeur`, de sorte qu'une norme se lise a
+    l'identique qu'elle vienne d'un depot ou du portefeuille en base -- deux
+    lectures separees finiraient par diverger sur le meme seuil.
+
+    S'y ajoute ce qu'un fichier recu ne peut pas porter : les reserves que le
+    remplissage a formulees. Une norme franchie et la reserve qui l'explique
+    se lisent alors au meme endroit.
+    """
+
+    from app.rapports.fodep.service import renseigner_classeur_fodep
+
+    produit = renseigner_classeur_fodep(date_arrete)
+    try:
+        tampon = BytesIO()
+        produit.classeur.save(tampon)
+        octets = tampon.getvalue()
+        reserves = list(produit.anomalies)
+    finally:
+        produit.classeur.close()
+
+    normes, controles, inventaire = analyser_classeur(octets)
+    return AnalyseDeclaration(
+        nom_fichier="Declaration en cours",
+        pages=0,
+        normes=normes,
+        controles=controles,
+        inventaire=inventaire,
+        classeur=True,
+        reserves=reserves,
     )

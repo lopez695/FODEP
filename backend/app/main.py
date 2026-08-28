@@ -22,6 +22,7 @@ from app.participations.routes import router as participations_router
 from app.rapports.routes import router as rapports_router
 from app.referentiels.routes import router as referentiels_router
 from app.risque_operationnel.routes import router as risque_operationnel_router
+from app.icaap.routes import router as icaap_router
 from app.rwa_credit.routes import router as rwa_credit_router
 from app.var_marche.routes import router as var_marche_router
 from database.connection import database_manager
@@ -146,6 +147,7 @@ app.include_router(market_router)
 app.include_router(risque_operationnel_router)
 app.include_router(rwa_credit_router)
 app.include_router(var_marche_router)
+app.include_router(icaap_router)
 
 
 @app.get("/sante")

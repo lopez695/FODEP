@@ -22,6 +22,7 @@ import 'modules/defauts_impayes/screens/defauts_impayes_screen.dart';
 import 'modules/expositions/screens/expositions_screen.dart';
 import 'modules/garanties/screens/garanties_screen.dart';
 import 'modules/hors_bilan/screens/hors_bilan_screen.dart';
+import 'modules/icaap/screens/capital_reglementaire_screen.dart';
 import 'modules/importations/screens/importations_screen.dart';
 import 'modules/rapports/screens/rapports_screen.dart';
 import 'modules/reporting_credit/screens/reporting_credit_screen.dart';
@@ -364,9 +365,10 @@ class _RwaAppState extends State<RwaApp> {
       AppModule.analyse => AnalyseScreen(api: _api),
       AppModule.stressTest =>
         const UnderConstructionScreen(title: 'Stress Test'),
+      AppModule.icapCapitalReglementaire =>
+        CapitalReglementaireScreen(api: _api),
       AppModule.icap ||
       AppModule.icapCapitalEconomique ||
-      AppModule.icapCapitalReglementaire ||
       AppModule.icapAppetenceRisque ||
       AppModule.icapBuffersPrudentiels ||
       AppModule.icapProjectionCapital ||

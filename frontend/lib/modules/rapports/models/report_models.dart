@@ -540,6 +540,25 @@ class EtatRenseigne {
 }
 
 /// Verdict d'ensemble sur une déclaration déposée.
+/// Une réserve formulée par l'export en renseignant le formulaire.
+class ReserveDeclaration {
+  const ReserveDeclaration({required this.nature, required this.message});
+
+  /// `a_verifier` demande un geste avant de transmettre ; `convention` est un
+  /// choix de l'application que le signataire endosse ; `information` est un
+  /// constat qui se lit et ne se corrige pas.
+  final String nature;
+  final String message;
+
+  bool get demandeUnGeste => nature == 'a_verifier';
+
+  factory ReserveDeclaration.fromJson(Map<String, dynamic> json) =>
+      ReserveDeclaration(
+        nature: json['nature'] as String? ?? 'information',
+        message: json['message'] as String? ?? '',
+      );
+}
+
 class AnalyseDeclaration {
   const AnalyseDeclaration({
     required this.nomFichier,
@@ -549,6 +568,7 @@ class AnalyseDeclaration {
     this.inventaire = const [],
     this.classeur = false,
     this.avertissements = const [],
+    this.reserves = const [],
   });
 
   final String nomFichier;
@@ -567,6 +587,14 @@ class AnalyseDeclaration {
 
   /// Ce qui empêche de conclure : PDF scanné, normes absentes, niveaux nuls.
   final List<String> avertissements;
+
+  /// Les réserves que le remplissage a formulées. Vides pour une déclaration
+  /// déposée : elles naissent de l'export, pas de la lecture.
+  final List<ReserveDeclaration> reserves;
+
+  /// Les réserves qui demandent un geste avant de transmettre.
+  List<ReserveDeclaration> get reservesAgir =>
+      reserves.where((r) => r.demandeUnGeste).toList();
 
   List<ControleCoherence> get ecarts => controles
       .where((controle) => controle.statut == StatutControle.ecart)
@@ -588,6 +616,11 @@ class AnalyseDeclaration {
         nomFichier: json['nom_fichier'] as String? ?? '',
         pages: (json['pages'] as num?)?.toInt() ?? 0,
         classeur: json['classeur'] == true,
+        reserves: [
+          for (final reserve
+              in (json['reserves'] as List<dynamic>?) ?? const [])
+            ReserveDeclaration.fromJson(reserve as Map<String, dynamic>),
+        ],
         normes: [
           for (final norme in (json['normes'] as List<dynamic>?) ?? const [])
             NormeAnalysee.fromJson(norme as Map<String, dynamic>),

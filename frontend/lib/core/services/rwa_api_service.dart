@@ -10,6 +10,7 @@ import '../../modules/dashboard/models/dashboard_models.dart';
 import '../../modules/expositions/models/exposition_models.dart';
 import '../../modules/expositions/models/suivi_versements_models.dart';
 import '../../modules/hors_bilan/models/hors_bilan_models.dart';
+import '../../modules/icaap/models/icaap_models.dart';
 import '../../modules/rapports/models/report_models.dart';
 import '../../modules/participations/models/participation_models.dart';
 import '../../modules/referentiels/models/referentiels_models.dart';
@@ -596,6 +597,17 @@ class RwaApiService {
     return DashboardSnapshot.fromJson(json);
   }
 
+  /// Retire un exercice de l'historique des fonds propres.
+  ///
+  /// Une année saisie de travers se corrigeait sinon en la réécrivant, ce qui
+  /// laissait la mauvaise en place à côté de la bonne.
+  Future<DashboardSnapshot> deleteFondsPropresExercice(int exercice) async {
+    final json = await _client.delete('/dashboard/fonds-propres/$exercice')
+        as Map<String, dynamic>;
+    _dashboardFuture = null;
+    return DashboardSnapshot.fromJson(json);
+  }
+
   /// Modèle Excel d'import des Fonds Propres Réglementaires (CET1/AT1/Tier2).
   Future<Uint8List> downloadFondsPropresImportTemplate() async {
     return _client.getBytes('/dashboard/fonds-propres/import/template');
@@ -683,6 +695,43 @@ class RwaApiService {
   /// Le PDF n'a pas à venir de cet outil : une déclaration d'un exercice
   /// précédent ou d'une autre entité s'analyse aussi bien. Seules les onze
   /// normes de l'EP01 sont confrontées à leurs seuils.
+  /// Analyse la déclaration que l'outil produirait aujourd'hui.
+  ///
+  /// Le pendant de [analyserDeclarationFodep], qui porte sur un fichier
+  /// déposé : ici c'est le portefeuille en base qui est lu, sans qu'aucun
+  /// fichier ne soit produit.
+  Future<AnalyseDeclaration> fetchAnalyseFodepCourante() async {
+    final json = await _client.get('/rapports/fodep/analyse-courante')
+        as Map<String, dynamic>;
+    return AnalyseDeclaration.fromJson(json);
+  }
+
+  /// Le socle Pilier 1 sur lequel le PIEAFP vient se greffer.
+  ///
+  /// Les fonds propres internes s'AJOUTENT aux exigences minimales, jamais ne
+  /// s'y substituent : l'ICAAP part donc de ce socle, lu a la meme source que
+  /// le tableau de bord.
+  Future<CapitalReglementaire> fetchIcaapCapitalReglementaire() async {
+    final json =
+        await _client.get('/icaap/capital-reglementaire') as Map<String, dynamic>;
+    return CapitalReglementaire.fromJson(json);
+  }
+
+  /// Fait avancer le cycle annuel du PIEAFP d'une etape.
+  Future<CycleIcaap> majStatutCycleIcaap(
+    int exercice, {
+    required String statut,
+    String organe = '',
+    String commentaire = '',
+  }) async {
+    final json = await _client.put('/icaap/exercices/$exercice/statut', {
+      'statut': statut,
+      'organe': organe,
+      'commentaire': commentaire,
+    }) as Map<String, dynamic>;
+    return CycleIcaap.fromJson(json);
+  }
+
   Future<AnalyseDeclaration> analyserDeclarationFodep(
     Uint8List pdf,
     String nomFichier,

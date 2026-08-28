@@ -22,6 +22,7 @@ from app.rwa_credit.models import (
 )
 from database.connection import database_manager
 from database.services.rwa_calculation_service import resolve_category
+from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 
 # Libellés complets des agents économiques (aucune troncature à l'écran).
 FULL_AGENT_LABELS: dict[str, str] = {
@@ -125,7 +126,7 @@ def _load_capital_position(rwa_credit: float) -> dict[str, float | bool | None]:
     with database_manager.read_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1"
+            REQUETE_FONDS_PROPRES_COURANTS
         )
         fp_row = cursor.fetchone()
         cursor.execute(

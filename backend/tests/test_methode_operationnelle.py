@@ -463,6 +463,60 @@ def test_les_deux_tableaux_de_bord_annoncent_le_meme_rwa_operationnel(methode):
     )
 
 
+def test_le_registre_de_l_indicateur_de_base_deborde_sa_moyenne():
+    """Cinq exercices conserves cote AIB, trois seulement dans la moyenne.
+
+    Les deux approches ne se traitent pas pareil : l'approche standard s'en
+    tient a trois exercices, l'indicateur de base tient un registre de cinq
+    pour garder sous la main les millesimes anterieurs. L'exigence, elle, reste
+    celle des trois derniers exercices a produit brut positif (art. 301).
+    """
+
+    from app.risque_operationnel.models import PnbAnnuelCreate
+    from app.risque_operationnel.services import (
+        EXERCICES_REGISTRE_AIB,
+        calcul_aib,
+        delete_pnb_annuel,
+        list_pnb_annuel,
+        upsert_pnb_annuel,
+    )
+
+    depart = sorted(a.annee for a in list_pnb_annuel())
+    assert depart, "l'essai suppose au moins un exercice AIB saisi"
+
+    ajoutees: list[int] = []
+    candidate = min(depart) - 1
+    try:
+        while len(list_pnb_annuel()) < EXERCICES_REGISTRE_AIB:
+            upsert_pnb_annuel(
+                candidate,
+                PnbAnnuelCreate(produit_brut_total=1000.0, source_document="essai"),
+            )
+            ajoutees.append(candidate)
+            candidate -= 1
+
+        assert len(list_pnb_annuel()) == EXERCICES_REGISTRE_AIB
+        # Le registre est plein : un exercice de plus est refuse.
+        with pytest.raises(ValueError, match="au plus"):
+            upsert_pnb_annuel(
+                candidate,
+                PnbAnnuelCreate(produit_brut_total=1000.0, source_document="essai"),
+            )
+        assert len(list_pnb_annuel()) == EXERCICES_REGISTRE_AIB
+
+        # Et la moyenne ne porte toujours que sur les trois derniers.
+        calcul = calcul_aib()
+        assert calcul.n <= 3
+        assert calcul.pnb_moyen == pytest.approx(
+            calcul.somme_pnb_positifs / calcul.n
+        )
+    finally:
+        for annee in ajoutees:
+            delete_pnb_annuel(annee)
+
+    assert sorted(a.annee for a in list_pnb_annuel()) == depart
+
+
 def test_l_ep23_ventile_les_huit_lignes_de_metier(methode):
     """Chaque ligne de metier porte son produit brut et son exigence.
 

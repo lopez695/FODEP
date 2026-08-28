@@ -10,6 +10,7 @@ import '../../../shared/utils/file_save.dart';
 import '../../reporting_global/services/fodep_pdf.dart';
 import '../../reporting_global/widgets/choix_format_fodep_dialog.dart';
 import '../models/report_models.dart';
+import '../widgets/analyse_indicateurs.dart';
 import 'analyse_declaration_page.dart';
 import 'saisies_fodep_page.dart';
 
@@ -60,9 +61,18 @@ class _FodepPageState extends State<FodepPage> {
   bool _analyseEnCours = false;
   bool _saisiesModifiees = false;
 
+  /// L'analyse de la declaration telle qu'elle partirait aujourd'hui.
+  ///
+  /// Elle vient avant les etapes, parce qu'elle dit ce que la declaration
+  /// affirmera : une norme franchie, un ratio sous son plancher, une reserve
+  /// qui attend un geste. Les decouvrir apres l'export, c'est les decouvrir
+  /// une fois le fichier transmis.
+  late Future<AnalyseDeclaration> _analyseCourante;
+
   @override
   void initState() {
     super.initState();
+    _analyseCourante = widget.api.fetchAnalyseFodepCourante();
     _saisies = widget.api.fetchSaisiesFodep();
     _dateArrete = widget.dateArrete;
   }
@@ -272,6 +282,12 @@ class _FodepPageState extends State<FodepPage> {
                         'reporting.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<AnalyseDeclaration>(
+                future: _analyseCourante,
+                builder: (context, instantane) =>
+                    AnalyseIndicateurs(instantane: instantane),
               ),
               const SizedBox(height: 20),
               // L'ordre est celui de la tâche : on renseigne, puis on exporte.

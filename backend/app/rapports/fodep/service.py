@@ -87,6 +87,7 @@ from app.risque_operationnel.services import (
 )
 from database.connection import database_manager
 from database.repositories.exposure_repository import exposure_repository
+from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 
 
 DEVISE_DECLARATION = "XOF"
@@ -208,7 +209,7 @@ def _ecrire_montant(feuille, ligne: int, colonne: int, montant_fcfa: float) -> N
 def _lire_fonds_propres() -> dict[str, float]:
     with database_manager.read_connection() as connexion:
         ligne = connexion.execute(
-            "SELECT * FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1"
+            REQUETE_FONDS_PROPRES_COURANTS
         ).fetchone()
     return dict(ligne) if ligne else {}
 

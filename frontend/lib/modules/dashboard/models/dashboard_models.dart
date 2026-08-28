@@ -213,6 +213,103 @@ class DashboardProjectionPoint {
   }
 }
 
+/// Un exercice de l'historique des fonds propres, poste par poste.
+///
+/// Les onze postes saisis autant que les agrégats : la page de détail les
+/// compare d'un exercice à l'autre, et un écart de total ne se lit que si on
+/// voit lequel des postes a bougé.
+class FondsPropresExercice {
+  const FondsPropresExercice({
+    required this.exercice,
+    this.capitalOrdinaire = 0.0,
+    this.reserves = 0.0,
+    this.resultatsReport = 0.0,
+    this.resultatEligible = 0.0,
+    this.deductionsPrudCet1 = 0.0,
+    required this.cet1,
+    this.instrumentsAt1 = 0.0,
+    this.primesEmissionAt1 = 0.0,
+    this.deductionsPrudAt1 = 0.0,
+    this.at1 = 0.0,
+    required this.tier1,
+    this.dettesSubordonneesT2 = 0.0,
+    this.provisionsGeneralesT2 = 0.0,
+    this.deductionsPrudT2 = 0.0,
+    this.tier2 = 0.0,
+    required this.totalFp,
+    this.modifieLe = '',
+  });
+
+  final int exercice;
+  final double capitalOrdinaire;
+  final double reserves;
+  final double resultatsReport;
+  final double resultatEligible;
+  final double deductionsPrudCet1;
+  final double cet1;
+  final double instrumentsAt1;
+  final double primesEmissionAt1;
+  final double deductionsPrudAt1;
+  final double at1;
+  final double tier1;
+  final double dettesSubordonneesT2;
+  final double provisionsGeneralesT2;
+  final double deductionsPrudT2;
+  final double tier2;
+  final double totalFp;
+  final String modifieLe;
+
+  static double _d(Object? v) => (v as num?)?.toDouble() ?? 0.0;
+
+  factory FondsPropresExercice.fromJson(Map<String, dynamic> json) =>
+      FondsPropresExercice(
+        exercice: (json['exercice'] as num).toInt(),
+        capitalOrdinaire: _d(json['capital_ordinaire']),
+        reserves: _d(json['reserves']),
+        resultatsReport: _d(json['resultats_report']),
+        resultatEligible: _d(json['resultat_eligible']),
+        deductionsPrudCet1: _d(json['deductions_prud_cet1']),
+        cet1: _d(json['cet1']),
+        instrumentsAt1: _d(json['instruments_at1']),
+        primesEmissionAt1: _d(json['primes_emission_at1']),
+        deductionsPrudAt1: _d(json['deductions_prud_at1']),
+        at1: _d(json['at1']),
+        tier1: _d(json['tier1']),
+        dettesSubordonneesT2: _d(json['dettes_subordonnees_t2']),
+        provisionsGeneralesT2: _d(json['provisions_generales_t2']),
+        deductionsPrudT2: _d(json['deductions_prud_t2']),
+        tier2: _d(json['tier2']),
+        totalFp: _d(json['total_fp']),
+        modifieLe: json['modifie_le'] as String? ?? '',
+      );
+
+  /// Reprend les fonds propres courants sous la forme d'un exercice.
+  ///
+  /// Un serveur antérieur à l'historique ne renvoie pas le relevé : la page de
+  /// détail retombe alors sur le seul millésime qu'il sait tenir, plutôt que
+  /// de s'ouvrir vide.
+  factory FondsPropresExercice.depuisDetail(FondsPropresDetail fp) =>
+      FondsPropresExercice(
+        exercice: fp.exercice ?? DateTime.now().year,
+        capitalOrdinaire: fp.capitalOrdinaire,
+        reserves: fp.reserves,
+        resultatsReport: fp.resultatsReport,
+        resultatEligible: fp.resultatEligible,
+        deductionsPrudCet1: fp.deductionsPrudCet1,
+        cet1: fp.cet1,
+        instrumentsAt1: fp.instrumentsAt1,
+        primesEmissionAt1: fp.primesEmissionAt1,
+        deductionsPrudAt1: fp.deductionsPrudAt1,
+        at1: fp.at1,
+        tier1: fp.tier1,
+        dettesSubordonneesT2: fp.dettesSubordonneesT2,
+        provisionsGeneralesT2: fp.provisionsGeneralesT2,
+        deductionsPrudT2: fp.deductionsPrudT2,
+        tier2: fp.tier2,
+        totalFp: fp.totalFp,
+      );
+}
+
 class FondsPropresDetail {
   const FondsPropresDetail({
     required this.capitalOrdinaire,
@@ -231,6 +328,8 @@ class FondsPropresDetail {
     required this.deductionsPrudT2,
     required this.tier2,
     required this.totalFp,
+    this.exercice,
+    this.historique = const [],
   });
 
   final double capitalOrdinaire;
@@ -250,6 +349,16 @@ class FondsPropresDetail {
   final double tier2;
   final double totalFp;
 
+  /// Exercice auquel se rattachent ces fonds propres.
+  final int? exercice;
+
+  /// Les exercices déjà saisis, du plus récent au plus ancien.
+  ///
+  /// Les limites des EP36 à EP38 se mesurent sur les fonds propres de
+  /// l'exercice PRÉCÉDENT : sans cet historique, l'export les rapporte à
+  /// l'exercice déclaré et le signale en réserve.
+  final List<FondsPropresExercice> historique;
+
   factory FondsPropresDetail.fromJson(Map<String, dynamic> json) {
     return FondsPropresDetail(
       capitalOrdinaire: (json['capital_ordinaire'] as num?)?.toDouble() ?? 0.0,
@@ -257,6 +366,10 @@ class FondsPropresDetail {
       resultatsReport: (json['resultats_report'] as num?)?.toDouble() ?? 0.0,
       resultatEligible: (json['resultat_eligible'] as num?)?.toDouble() ?? 0.0,
       deductionsPrudCet1: (json['deductions_prud_cet1'] as num?)?.toDouble() ?? 0.0,
+      exercice: (json['exercice'] as num?)?.toInt(),
+      historique: ((json['historique'] as List<dynamic>?) ?? const [])
+          .map((e) => FondsPropresExercice.fromJson(e as Map<String, dynamic>))
+          .toList(),
       cet1: (json['cet1'] as num?)?.toDouble() ?? 0.0,
       instrumentsAt1: (json['instruments_at1'] as num?)?.toDouble() ?? 0.0,
       primesEmissionAt1: (json['primes_emission_at1'] as num?)?.toDouble() ?? 0.0,
@@ -274,6 +387,7 @@ class FondsPropresDetail {
 
 class FondsPropresUpdate {
   const FondsPropresUpdate({
+    required this.exercice,
     required this.capitalOrdinaire,
     required this.reserves,
     required this.resultatsReport,
@@ -287,6 +401,10 @@ class FondsPropresUpdate {
     required this.deductionsPrudT2,
   });
 
+  /// Exercice visé par la saisie. Obligatoire : le serveur refuse une mise à
+  /// jour sans lui, plutôt que d'écraser l'exercice courant avec les chiffres
+  /// d'un autre.
+  final int exercice;
   final double capitalOrdinaire;
   final double reserves;
   final double resultatsReport;
@@ -301,6 +419,7 @@ class FondsPropresUpdate {
 
   Map<String, dynamic> toJson() {
     return {
+      'exercice': exercice,
       'capital_ordinaire': capitalOrdinaire,
       'reserves': reserves,
       'resultats_report': resultatsReport,

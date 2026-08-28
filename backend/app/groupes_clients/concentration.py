@@ -20,6 +20,7 @@ from app.core.bceao_calculations import calculate_fonds_propres
 from app.core.calculations import convert_currency_amount
 from database.connection import database_manager
 from database.repositories.exposure_repository import exposure_repository
+from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 
 DEVISE_DECLARATION = "XOF"
 
@@ -83,7 +84,7 @@ def _expositions_par_contrepartie() -> dict[str, float]:
 def _fonds_propres_t1() -> float:
     with database_manager.read_connection() as connexion:
         ligne = connexion.execute(
-            "SELECT * FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1"
+            REQUETE_FONDS_PROPRES_COURANTS
         ).fetchone()
     if ligne is None:
         return 0.0

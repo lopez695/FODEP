@@ -47,19 +47,26 @@ const _fpLabels = [
 Future<bool?> showFondsPropresImportDialog(
   BuildContext context, {
   required RwaApiService api,
+  int? exercice,
 }) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _FondsPropresImportDialog(api: api),
+    builder: (ctx) =>
+        _FondsPropresImportDialog(api: api, exercice: exercice),
   );
 }
 
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
 class _FondsPropresImportDialog extends StatefulWidget {
-  const _FondsPropresImportDialog({required this.api});
+  const _FondsPropresImportDialog({required this.api, this.exercice});
   final RwaApiService api;
+
+  /// L'exercice que l'import alimente. L'année en cours par défaut : le
+  /// serveur refuse désormais une mise à jour sans millésime, plutôt que
+  /// d'écraser l'exercice courant avec les chiffres d'un autre.
+  final int? exercice;
 
   @override
   State<_FondsPropresImportDialog> createState() => _FondsPropresImportDialogState();
@@ -354,6 +361,7 @@ class _FondsPropresImportDialogState extends State<_FondsPropresImportDialog> {
     });
     try {
       final update = FondsPropresUpdate(
+        exercice: widget.exercice ?? DateTime.now().year,
         capitalOrdinaire: _parse(0),
         reserves: _parse(1),
         resultatsReport: _parse(2),

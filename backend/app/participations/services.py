@@ -31,6 +31,7 @@ from app.participations.models import (
     SyntheseParticipationsDetaillee,
 )
 from database.connection import database_manager
+from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 
 
 def _horodatage() -> str:
@@ -203,7 +204,7 @@ def _fonds_propres() -> tuple[float, float, str | None]:
 
     with database_manager.read_connection() as connexion:
         ligne = connexion.execute(
-            "SELECT * FROM fonds_propres ORDER BY date_analyse DESC LIMIT 1"
+            REQUETE_FONDS_PROPRES_COURANTS
         ).fetchone()
     if ligne is None:
         return 0.0, 0.0, None

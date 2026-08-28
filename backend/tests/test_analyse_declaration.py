@@ -396,3 +396,55 @@ def test_la_route_refuse_un_fichier_illisible_sans_planter():
     )
     assert vide.status_code == 422
     assert vide.json()["detail"]["code"] == "FODEP_ANALYSE_FICHIER_VIDE"
+
+def test_l_analyse_de_la_declaration_en_cours_lit_les_memes_normes():
+    """L'analyse de ce qu'on s'apprete a transmettre, sans produire de fichier.
+
+    `analyser_declaration` porte sur un depot ; celle-ci sur le portefeuille en
+    base. Les deux passent par `analyser_classeur` : une norme doit se lire a
+    l'identique d'un chemin a l'autre, sans quoi la page des declarations et le
+    controle d'un fichier recu diraient deux choses du meme seuil.
+    """
+
+    from app.rapports.fodep.analyse import (
+        DEPASSEE,
+        RESPECTEE,
+        analyser_declaration_en_cours,
+    )
+
+    analyse = analyser_declaration_en_cours()
+
+    assert analyse.classeur is True
+    assert analyse.normes, "aucune norme lue dans l'EP01"
+    # Chaque norme mesuree porte son seuil et son niveau : c'est ce que la page
+    # affiche, et ce qui permet de dire de combien elle est franchie.
+    for norme in analyse.normes:
+        if norme.situation in (DEPASSEE, RESPECTEE):
+            assert norme.seuil is not None, norme.code
+            assert norme.observe is not None, norme.code
+
+    # Les reserves du remplissage voyagent avec : une norme franchie et la
+    # reserve qui l'explique se lisent au meme endroit.
+    assert analyse.reserves, "l'export formule toujours au moins une reserve"
+    assert all(r.message for r in analyse.reserves)
+
+
+def test_le_sens_de_chaque_norme_est_connu():
+    """Un plancher et un plafond ne se franchissent pas dans le meme sens.
+
+    Sans lui, l'ecran ne saurait pas si « 5,31 % pour 7,50 % » est un manque ou
+    un depassement -- et le ratio de solvabilite se lirait comme une limite de
+    division des risques.
+    """
+
+    from app.rapports.fodep.analyse import DEPASSEE, analyser_declaration_en_cours
+
+    analyse = analyser_declaration_en_cours()
+    for norme in analyse.normes:
+        if norme.situation != DEPASSEE:
+            continue
+        assert norme.minimum is not None, norme.code
+        if norme.minimum:
+            assert norme.observe < norme.seuil, norme.code
+        else:
+            assert norme.observe > norme.seuil, norme.code

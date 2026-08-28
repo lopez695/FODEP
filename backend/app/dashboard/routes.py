@@ -1,11 +1,12 @@
 """Routes API du module dashboard."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 
 from app.dashboard.models import DashboardSnapshot, FondsPropresUpdate
 from app.dashboard.services import (
     build_fonds_propres_import_template,
+    delete_fonds_propres_exercice,
     get_dashboard_snapshot,
     update_fonds_propres,
 )
@@ -23,6 +24,17 @@ def get_dashboard() -> DashboardSnapshot:
 def update_fp(data: FondsPropresUpdate) -> DashboardSnapshot:
     """Met a jour manuellement les fonds propres et retourne le nouveau dashboard."""
     return update_fonds_propres(data)
+
+
+@router.delete("/fonds-propres/{exercice}", response_model=DashboardSnapshot)
+def supprimer_exercice_fp(exercice: int) -> DashboardSnapshot:
+    """Retire un exercice de l'historique des fonds propres."""
+    try:
+        return delete_fonds_propres_exercice(exercice)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/fonds-propres/import/template")

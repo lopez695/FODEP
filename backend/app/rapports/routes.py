@@ -8,7 +8,11 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.rapports.fodep import construire_fodep, nom_fichier_fodep
-from app.rapports.fodep.analyse import AnalyseDeclaration, analyser_declaration
+from app.rapports.fodep.analyse import (
+    AnalyseDeclaration,
+    analyser_declaration,
+    analyser_declaration_en_cours,
+)
 from app.rapports.fodep.contenu import ContenuFodep, contenu_fodep
 from app.rapports.models import (
     ReportRequest,
@@ -67,6 +71,18 @@ def put_saisies_fodep(payload: SaisiesFodepEnregistrees) -> SaisiesFodepEnregist
         enregistrees=enregistrees,
         date_arrete=payload.date_arrete,
     )
+
+
+@router.get("/fodep/analyse-courante", response_model=AnalyseDeclaration)
+def analyser_declaration_courante() -> AnalyseDeclaration:
+    """Analyse la declaration que l'outil produirait aujourd'hui.
+
+    Le pendant de `POST /fodep/analyse`, qui porte sur un fichier depose :
+    ici c'est le portefeuille en base qui est lu, sans qu'aucun fichier
+    ne soit produit.
+    """
+
+    return analyser_declaration_en_cours()
 
 
 @router.post("/fodep/analyse", response_model=AnalyseDeclaration)

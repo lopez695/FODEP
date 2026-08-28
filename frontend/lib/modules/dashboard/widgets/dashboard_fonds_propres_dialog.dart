@@ -82,6 +82,11 @@ class _DashboardFondsPropresDialogState
   bool _isLoading = false;
   late String _selectedCurrency;
 
+  // L'exercice declare. Sans lui, chaque enregistrement visait la meme ligne
+  // et ecrasait le precedent : la table n'a jamais porte d'historique, et les
+  // limites des EP36 a EP38 n'ont jamais eu leur denominateur N-1.
+  late TextEditingController _exerciceCtrl;
+
   bool _initialized = false;
   @override
   void initState() {
@@ -95,6 +100,9 @@ class _DashboardFondsPropresDialogState
     if (!_initialized) {
       final fp = widget.fondsPropres;
 
+      _exerciceCtrl = TextEditingController(
+        text: '${fp?.exercice ?? DateTime.now().year}',
+      );
       _capOrdinaireCtrl = _ctrl(fp?.capitalOrdinaire);
       _reservesCtrl = _ctrl(fp?.reserves);
       _reportCtrl = _ctrl(fp?.resultatsReport);
@@ -216,6 +224,7 @@ class _DashboardFondsPropresDialogState
     _subordT2Ctrl.dispose();
     _provGenT2Ctrl.dispose();
     _deducT2Ctrl.dispose();
+    _exerciceCtrl.dispose();
     super.dispose();
   }
 
@@ -228,6 +237,10 @@ class _DashboardFondsPropresDialogState
 
     try {
       final update = FondsPropresUpdate(
+        // L'exercice en cours, et lui seul : ce formulaire ne sert pas aux
+        // millésimes antérieurs, qui ont le leur sur la page de détail.
+        exercice: int.tryParse(_exerciceCtrl.text.trim()) ??
+            DateTime.now().year,
         capitalOrdinaire: _parse(_capOrdinaireCtrl.text),
         reserves: _parse(_reservesCtrl.text),
         resultatsReport: _parse(_reportCtrl.text),
@@ -338,6 +351,58 @@ class _DashboardFondsPropresDialogState
             ],
           ),
           const SizedBox(height: 16),
+          // Ce formulaire ne touche QUE l'exercice en cours. Les millésimes
+          // antérieurs ont le leur, sur la page de détail : mêler les deux,
+          // c'était risquer d'écraser un exercice avec les chiffres d'un
+          // autre. L'année est donc rappelée, pas offerte à la saisie.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF13203A)
+                  : const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF1E3A5F)
+                    : const Color(0xFFC7D2FE),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.event_available_outlined,
+                    size: 15,
+                    color: isDark
+                        ? const Color(0xFF93C5FD)
+                        : Colors.indigo),
+                const SizedBox(width: 8),
+                Text(
+                  '${'Exercice en cours'.tr(context)} : '
+                  '${_exerciceCtrl.text}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF312E81),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Les exercices antérieurs se saisissent depuis « Voir le '
+                            'détail », dans leur propre formulaire.'
+                        .tr(context),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isDark
+                          ? const Color(0xFF64748B)
+                          : const Color(0xFF6366F1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Flexible(
             child: Form(
               key: _formKey,
