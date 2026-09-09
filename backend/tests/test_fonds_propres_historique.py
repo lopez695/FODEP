@@ -2,15 +2,15 @@
 
 `update_fonds_propres` relisait la ligne la plus recente et la reecrivait : la
 table n'a jamais porte plus d'un enregistrement, quel que soit le nombre de
-saisies. L'absence d'historique se paie sur la declaration -- les limites des
-EP36, EP37 et EP38 se mesurent, dit le formulaire, sur les fonds propres de
-l'EXERCICE PRECEDENT, et l'export doit aujourd'hui les rapporter a l'exercice
-declare faute de mieux.
+saisies. L'absence d'historique se payait sur la declaration -- les limites des
+EP35 a EP38 se mesurent, dit le formulaire, sur les fonds propres de l'EXERCICE
+PRECEDENT, et l'export les rapportait a l'exercice declare faute de mieux.
 
-C'est aussi ce qui bloque la deduction, au CET1, de l'excedent des limites
+C'est aussi ce qui bloquait la deduction, au CET1, de l'excedent des limites
 franchies : mesurer sur les fonds propres de l'annee en cours rendrait le
 calcul circulaire, la deduction baissant le CET1 qui releve le ratio qui
-augmente la deduction.
+augmente la deduction. Rapporte a un millesime clos, l'exces est un nombre
+fixe, et `app.core.limites_prudentielles` le pose en une passe.
 """
 
 from __future__ import annotations

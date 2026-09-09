@@ -61,7 +61,9 @@ class _CapitalReglementaireScreenState
   }
 
   void _recharger() {
-    setState(() => _future = widget.api.fetchIcaapCapitalReglementaire());
+    setState(() {
+      _future = widget.api.fetchIcaapCapitalReglementaire();
+    });
   }
 
   @override

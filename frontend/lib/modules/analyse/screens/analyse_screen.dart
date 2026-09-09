@@ -37,7 +37,9 @@ class _AnalyseScreenState extends State<AnalyseScreen> {
     _future = _service.fetchAnalyseData();
     _portfolioSubscription = widget.api.portfolioRefreshStream.listen((_) {
       if (!mounted) return;
-      setState(() => _future = _service.fetchAnalyseData());
+      setState(() {
+        _future = _service.fetchAnalyseData();
+      });
     });
   }
 

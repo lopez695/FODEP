@@ -54,7 +54,9 @@ class _RwaEngineScreenState extends State<RwaEngineScreen> {
     _future = _load();
     _refreshSubscription = widget.api.portfolioRefreshStream.listen((_) {
       if (!mounted) return;
-      setState(() => _future = _load());
+      setState(() {
+        _future = _load();
+      });
     });
   }
 

@@ -14,6 +14,7 @@ enum AppModule {
   garanties,
   defautsImpayes,
   concentrationCredit,
+  derives,
   reportingCredit,
   risqueMarche,
   risqueMarcheImport,
@@ -59,6 +60,8 @@ extension AppModuleLabel on AppModule {
         return 'Dashboard Crédit';
       case AppModule.expositions:
         return 'Risque de crédit';
+      case AppModule.derives:
+        return 'Instruments dérivés';
       case AppModule.rwaEngine:
         return 'Pilotage RWA Crédit';
       case AppModule.crm:
@@ -138,6 +141,9 @@ extension AppModuleLabel on AppModule {
         return 'Tableau de bord spécifique au pilotage du risque de crédit.';
       case AppModule.expositions:
         return 'Saisie, import, edition et suivi detaille des expositions du portefeuille.';
+      case AppModule.derives:
+        return 'Registre des swaps, changes à terme et autres contrats '
+            "dérivés, et le risque de contrepartie qu'ils portent (EP11).";
       case AppModule.rwaEngine:
         return 'Suivi des expositions pondérées et du capital réglementaire.';
       case AppModule.crm:
@@ -217,6 +223,8 @@ extension AppModuleLabel on AppModule {
         return Icons.dashboard_outlined;
       case AppModule.expositions:
         return Icons.credit_card_rounded;
+      case AppModule.derives:
+        return Icons.swap_horiz_rounded;
       case AppModule.rwaEngine:
         return Icons.account_balance_rounded;
       case AppModule.crm:

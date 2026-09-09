@@ -7,7 +7,10 @@ import logging
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
+from app.derives.models import SyntheseDerives
+from app.dispositions_transitoires.models import SyntheseEp04
 from app.rapports.fodep import construire_fodep, nom_fichier_fodep
+from app.rapports.fodep.service import synthese_ep04, synthese_ep11
 from app.rapports.fodep.analyse import (
     AnalyseDeclaration,
     analyser_declaration,
@@ -48,6 +51,35 @@ def post_report(payload: ReportRequest) -> ReportView:
     """Genere un nouveau rapport."""
 
     return generate_report(payload)
+
+
+@router.get("/fodep/ep04", response_model=SyntheseEp04)
+def get_synthese_ep04(exercice: int | None = None) -> SyntheseEp04:
+    """L'etat EP04 tel que les dispositions transitoires le declareront.
+
+    Il vit ici et non sous « /dispositions-transitoires » parce qu'il applique
+    le taux de retrait imprime par la BCEAO : c'est ce module qui relit le
+    formulaire, et une seconde lecture ailleurs finirait par en donner un autre.
+
+    `exercice` designe le millesime a rendre. A defaut, celui des fonds propres
+    courants -- ce qui coincide avec l'ecran tant qu'il edite l'exercice
+    courant, et cesse de coincider des qu'il en edite un autre. L'appelant a
+    tout interet a le nommer.
+    """
+
+    return synthese_ep04(exercice)
+
+
+@router.get("/fodep/ep11", response_model=SyntheseDerives)
+def get_synthese_ep11() -> SyntheseDerives:
+    """L'etat EP11 tel que le registre des derives le declarera.
+
+    Il vit ici et non sous « /derives » parce qu'il applique les ponderations
+    imprimees par la BCEAO : c'est ce module qui relit le formulaire, et une
+    seconde lecture ailleurs finirait par en donner d'autres.
+    """
+
+    return synthese_ep11()
 
 
 @router.get("/fodep/saisies", response_model=SaisiesFodep)

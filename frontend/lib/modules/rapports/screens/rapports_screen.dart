@@ -75,7 +75,9 @@ class _RapportsScreenState extends State<RapportsScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = widget.api.fetchReports());
+      setState(() {
+        _future = widget.api.fetchReports();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Rapport genere.')),
       );

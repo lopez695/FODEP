@@ -18,7 +18,7 @@ BASE_DE_DECLARATION = "individuelle"
 # Etats alimentes a partir des donnees de l'application.
 ETATS_ALIMENTES: frozenset[str] = frozenset(
     {
-        "EP01", "EP02", "EP03", "EP08", "EP09", "EP10",
+        "EP01", "EP02", "EP03", "EP04", "EP08", "EP09", "EP10", "EP11",
         "EP12", "EP13", "EP14", "EP15", "EP16", "EP17", "EP18", "EP19",
         "EP20", "EP21", "EP22", "EP29", "EP30", "EP31", "EP32", "EP33",
         "EP34", "EP35", "EP36", "EP37", "EP38", "EP39",
@@ -57,8 +57,6 @@ ETATS_EN_LISTE: frozenset[str] = frozenset(
 # (voir `saisies.py`) : une saisie prime toujours sur le zero automatique.
 #
 #   EP3M         poste pour memoire de l'EP03 (impots differes, participations)
-#   EP04         dispositions transitoires
-#   EP11         expositions au risque de contrepartie (derives)
 #   EP23, EP24   approche standard du risque operationnel, non retenue
 #   EP28         produits de base : l'etablissement n'en detient aucun
 #   EP25 a EP27  taux, actions et change : renseignes des que le module Risque
@@ -66,7 +64,7 @@ ETATS_EN_LISTE: frozenset[str] = frozenset(
 #                balayage n'ecrase jamais une valeur deja ecrite.
 ETATS_DECLARES_A_ZERO: frozenset[str] = frozenset(
     {
-        "EP3M", "EP04", "EP11", "EP23", "EP24",
+        "EP3M", "EP23", "EP24",
         "EP25", "EP26", "EP27", "EP28",
     }
 )

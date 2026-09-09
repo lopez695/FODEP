@@ -28,22 +28,55 @@ RWA_MULTIPLIER = 12.5
 FX_CAPITAL_CHARGE_RATE = 0.08
 
 
-def calculate_fonds_propres(fp_data: dict[str, float]) -> dict[str, float]:
+def calculate_fonds_propres(
+    fp_data: dict[str, float],
+    deduction_limites: float = 0.0,
+    transitoires: dict[str, float] | None = None,
+) -> dict[str, float]:
     """
     Calcule les Fonds Propres selon le Titre II du dispositif prudentiel BCEAO.
+
+    `deduction_limites` est l'exces des limites prudentielles franchies : les
+    participations dans des entites commerciales, les immobilisations hors
+    exploitation, le total des immobilisations et participations, et les
+    concours aux parties liees. Le dispositif ne se contente pas de constater
+    le franchissement, il en retranche l'exces des fonds propres de base —
+    l'EP03 y consacre les lignes PA149, IM006, IM010 et PR004.
+
+    Il arrive en parametre plutot que d'etre calcule ici : son assiette est
+    faite d'encours que ce module ne lit pas, et son denominateur est celui de
+    l'exercice PRECEDENT (voir `app.core.limites_prudentielles`). Le laisser a
+    zero rend le calcul d'avant, celui d'un etablissement qui ne franchit
+    aucune limite.
+
+    `transitoires` porte ce que les dispositions transitoires laissent encore
+    compter, sous les codes de l'EP03 : FPI07 s'ajoute au CET1, FPI25 a l'AT1,
+    FPI33 et FPI34 au T2. Bale III a rendu certains elements inadmissibles au
+    1er janvier 2018 et les retire par paliers ; tant que le palier n'est pas
+    atteint, ils font toujours partie des fonds propres. L'etat EP04 en tient
+    le calcul (voir `app.dispositions_transitoires`).
+
+    Ces deux termes sont la pour la meme raison : la declaration et le tableau
+    de bord doivent annoncer les memes fonds propres, et une addition faite
+    d'un seul cote les ferait diverger.
     """
+    transitoires = transitoires or {}
+
     cet1 = (
         fp_data.get("capital_ordinaire", 0.0) +
         fp_data.get("reserves", 0.0) +
         fp_data.get("resultats_report", 0.0) +
-        fp_data.get("resultat_eligible", 0.0) -
-        fp_data.get("deductions_prud_cet1", 0.0)
+        fp_data.get("resultat_eligible", 0.0) +
+        transitoires.get("FPI07", 0.0) -
+        fp_data.get("deductions_prud_cet1", 0.0) -
+        max(0.0, deduction_limites)
     )
     cet1 = max(0.0, cet1)
 
     at1 = (
         fp_data.get("instruments_at1", 0.0) +
-        fp_data.get("primes_emission_at1", 0.0) -
+        fp_data.get("primes_emission_at1", 0.0) +
+        transitoires.get("FPI25", 0.0) -
         fp_data.get("deductions_prud_at1", 0.0)
     )
     at1 = max(0.0, at1)
@@ -52,7 +85,9 @@ def calculate_fonds_propres(fp_data: dict[str, float]) -> dict[str, float]:
 
     t2 = (
         fp_data.get("dettes_subordonnees_t2", 0.0) +
-        fp_data.get("provisions_generales_t2", 0.0) -
+        fp_data.get("provisions_generales_t2", 0.0) +
+        transitoires.get("FPI33", 0.0) +
+        transitoires.get("FPI34", 0.0) -
         fp_data.get("deductions_prud_t2", 0.0)
     )
     t2 = max(0.0, t2)

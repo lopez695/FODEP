@@ -241,6 +241,11 @@ const List<_MenuEntry> _riskCreditChildren = [
     label: 'Portefeuille',
   ),
   _MenuEntry.leaf(
+    module: AppModule.derives,
+    icon: Icons.swap_horiz_rounded,
+    label: 'Dérivés',
+  ),
+  _MenuEntry.leaf(
     module: AppModule.rwaEngine,
     icon: Icons.functions_rounded,
     label: 'Pilotage RWA Crédit',

@@ -248,27 +248,6 @@ def test_le_catalogue_des_etats_sans_source_suit_le_formulaire():
                 assert case.libelle, f"{nom}!{case.cellule} sans libellé"
     finally:
         classeur.close()
-
-
-def test_l_ep11_distingue_ses_durees_par_nature_d_engagement():
-    """Cinq blocs, les memes trois durees : le libelle seul ne suffit pas.
-
-    L'EP11 nomme cinq fois « - Durée > 5 ans », sous cinq natures d'engagement.
-    Sans le titre du bloc, l'ecran proposerait cinq lignes indiscernables.
-    """
-
-    from app.rapports.fodep.saisies import catalogue_etat
-
-    libelles = {case.libelle for case in catalogue_etat("EP11")}
-    durees = [libelle for libelle in libelles if "Durée > 5 ans" in libelle]
-    assert len(durees) == 5, durees
-    assert all(" — " in libelle for libelle in durees)
-
-    # Et un poste dont le nom est deja unique n'est pas alourdi d'un titre.
-    ep28 = {case.libelle for case in catalogue_etat("EP28")}
-    assert "Métaux précieux (hormis l'or)" in ep28
-
-
 def test_une_case_saisie_sur_un_etat_sans_source_arrive_dans_la_declaration():
     """Le zero automatique ne recouvre pas ce que le declarant a porte.
 
@@ -307,75 +286,4 @@ def test_une_case_saisie_sur_un_etat_sans_source_arrive_dans_la_declaration():
                 {"etat": "EP28", "cellule": "C12", "valeur": None},
                 {"etat": "EP28", "cellule": "D12", "valeur": None},
             ]
-        )
-
-
-def test_l_ep11_calcule_ses_colonnes_ponderees_et_son_total():
-    """Le formulaire imprime « d=b x c » et « e= a + d », et attend le resultat.
-
-    « A l'exception de l'EP01, le formulaire ne contient aucune formule »
-    (notice, § 3.3) : ces trente-deux cases se calculent a la main, sur des
-    montants que le declarant vient de saisir. L'export les fait a sa place, a
-    partir de la ponderation que la BCEAO imprime dans la colonne (c).
-
-    RC051 porte « 1,5 % » : la lecture doit passer du pourcentage au taux.
-    """
-
-    from app.rapports.fodep.saisies import catalogue_etat, enregistrer_saisies
-
-    # Elles ne sont plus proposees a la saisie : les calculer et les demander
-    # serait s'exposer a deux reponses differentes a la meme question.
-    adresses = {case.cellule for case in catalogue_etat("EP11")}
-    assert "F14" not in adresses and "G14" not in adresses
-    assert not [case for case in catalogue_etat("EP11") if case.code == "RC064"]
-
-    saisies = [
-        {"etat": "EP11", "cellule": "C14", "valeur": 1_000.0},
-        {"etat": "EP11", "cellule": "D14", "valeur": 10_000.0},
-        {"etat": "EP11", "cellule": "H14", "valeur": 1_150.0},
-    ]
-    enregistrer_saisies(saisies)
-    try:
-        feuille = load_workbook(BytesIO(construire_fodep().contenu))["EP11"]
-        assert feuille["F14"].value == pytest.approx(150.0)  # 10 000 x 1,5 %
-        assert feuille["G14"].value == pytest.approx(1_150.0)  # 1 000 + 150
-
-        # La ligne de total somme les lignes qui la precedent, colonne par
-        # colonne : elle n'est pas saisie non plus.
-        assert feuille["C36"].value == pytest.approx(1_000.0)
-        assert feuille["F36"].value == pytest.approx(150.0)
-        assert feuille["G36"].value == pytest.approx(1_150.0)
-    finally:
-        enregistrer_saisies(
-            [{**saisie, "valeur": None} for saisie in saisies]
-        )
-
-
-def test_l_ep11_signale_une_ventilation_qui_ne_boucle_pas():
-    """La ventilation par categorie repartit l'exposition : elle doit la retrouver.
-
-    Sans ce controle, l'etat part avec une exposition d'un cote et une
-    ventilation d'un autre, et c'est le lecteur de la declaration qui le
-    decouvre.
-    """
-
-    from app.rapports.fodep.saisies import enregistrer_saisies
-
-    saisies = [
-        {"etat": "EP11", "cellule": "C14", "valeur": 1_000.0},
-        {"etat": "EP11", "cellule": "D14", "valeur": 10_000.0},
-        # 1 150 attendus, 400 declares.
-        {"etat": "EP11", "cellule": "H14", "valeur": 400.0},
-    ]
-    enregistrer_saisies(saisies)
-    try:
-        resultat = construire_fodep()
-        assert [
-            reserve
-            for reserve in resultat.anomalies
-            if "ventilation des expositions par catégorie" in reserve.message
-        ], "une ventilation qui ne boucle pas doit être signalée"
-    finally:
-        enregistrer_saisies(
-            [{**saisie, "valeur": None} for saisie in saisies]
         )

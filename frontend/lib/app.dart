@@ -38,6 +38,7 @@ import 'modules/rwa_engine/screens/rwa_engine_screen.dart';
 import 'modules/vue_ensemble/screens/vue_ensemble_screen.dart';
 import 'shared/widgets/app_shell.dart';
 import 'shared/widgets/backend_injoignable_screen.dart';
+import 'modules/derives/screens/derives_screen.dart';
 import 'shared/widgets/under_construction_screen.dart';
 
 /// Widget racine qui pilote le thème et la navigation principale.
@@ -362,6 +363,7 @@ class _RwaAppState extends State<RwaApp> {
           api: _api,
           view: OperationalRiskView.ccr3Uemoi,
         ),
+      AppModule.derives => DerivesScreen(api: _api),
       AppModule.analyse => AnalyseScreen(api: _api),
       AppModule.stressTest =>
         const UnderConstructionScreen(title: 'Stress Test'),

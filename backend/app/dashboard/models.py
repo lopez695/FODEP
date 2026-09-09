@@ -77,6 +77,20 @@ class FondsPropresDetail(BaseModel):
     resultats_report: float = 0.0
     resultat_eligible: float = 0.0
     deductions_prud_cet1: float = 0.0
+    # Exces des limites prudentielles franchies, retranche du CET1 ci-dessous.
+    # Ce n'est pas une saisie : il se mesure sur les participations, les
+    # immobilisations et les concours aux parties liees, rapportes aux fonds
+    # propres de l'exercice precedent. Le porter a part de
+    # `deductions_prud_cet1` evite de faire passer un calcul pour un montant
+    # saisi, et permet a l'ecran de dire d'ou vient la baisse.
+    deduction_limites: float = 0.0
+    # Les quatre lignes de l'EP03 qui composent la deduction ci-dessus, sous
+    # leur code DISPRU : PA149, IM006, IM010, PR004.
+    deduction_limites_detail: dict[str, float] = {}
+    # Exercice sur lequel les limites ont ete mesurees, ou None si aucun
+    # exercice anterieur n'est enregistre : la deduction est alors nulle faute
+    # de denominateur, ce qui n'est pas un respect constate.
+    exercice_limites: int | None = None
     cet1: float = 0.0
     instruments_at1: float = 0.0
     primes_emission_at1: float = 0.0
@@ -91,9 +105,8 @@ class FondsPropresDetail(BaseModel):
     # Exercice auquel se rattachent ces fonds propres.
     exercice: int | None = None
     # Les exercices deja saisis, du plus recent au plus ancien. Les limites des
-    # EP36 a EP38 se mesurent sur les fonds propres de l'exercice PRECEDENT :
-    # sans cet historique, l'export les rapporte a l'exercice declare et le
-    # signale en reserve.
+    # EP35 a EP38 se mesurent sur les fonds propres de l'exercice PRECEDENT :
+    # c'est cet historique qui fournit leur denominateur.
     historique: list["FondsPropresExercice"] = []
 
 
@@ -112,6 +125,11 @@ class FondsPropresExercice(BaseModel):
     resultats_report: float = 0.0
     resultat_eligible: float = 0.0
     deductions_prud_cet1: float = 0.0
+    # Exces des limites prudentielles franchies, retranche du CET1. Il n'est
+    # porte que sur l'exercice courant : l'assiette des limites -- les
+    # participations, les immobilisations, les concours aux parties liees --
+    # n'est pas conservee a la cloture des exercices anterieurs.
+    deduction_limites: float = 0.0
     cet1: float = 0.0
     # AT1
     instruments_at1: float = 0.0
