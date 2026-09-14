@@ -4458,14 +4458,9 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
                                       showTitles: true,
                                       reservedSize: 55,
                                       getTitlesWidget: (value, meta) {
-                                        String label = value.toInt().toString();
-                                        if (value >= 1000000000) {
-                                          label = '${(value / 1000000000).toStringAsFixed(1).replaceAll('.0', '')} Md';
-                                        } else if (value >= 1000000) {
-                                          label = '${(value / 1000000).toStringAsFixed(1).replaceAll('.0', '')} M';
-                                        } else if (value >= 1000) {
-                                          label = '${(value / 1000).toStringAsFixed(1).replaceAll('.0', '')} k';
-                                        }
+                                        final label = value.abs() < 1000
+                                            ? value.toInt().toString()
+                                            : AppFormatters.montant(value, maxDecimals: 1);
                                         return Text(label, style: TextStyle(fontSize: 10, color: textColor));
                                       },
                                     ),
@@ -4681,12 +4676,9 @@ class _ExpositionsScreenState extends State<ExpositionsScreen> {
                                   showTitles: true,
                                   reservedSize: 40,
                                   getTitlesWidget: (value, meta) {
-                                    String label = value.toInt().toString();
-                                    if (value >= 1000000) {
-                                      label = '${(value / 1000000).toStringAsFixed(1)} M';
-                                    } else if (value >= 1000) {
-                                      label = '${(value / 1000).toStringAsFixed(0)} k';
-                                    }
+                                    final label = value.abs() < 1000
+                                        ? value.toInt().toString()
+                                        : AppFormatters.montant(value, maxDecimals: 1);
                                     return Text(label, style: TextStyle(fontSize: 10, color: textColor));
                                   },
                                 ),

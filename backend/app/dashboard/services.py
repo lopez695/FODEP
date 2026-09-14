@@ -20,6 +20,7 @@ from app.core.bceao_calculations import (
 from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 from app.market.services import resolve_market_capital
 from app.rapports.fodep.service import (
+    apr_derives_courant,
     excedents_de_limites_courants,
     transitoires_courants,
 )
@@ -530,6 +531,9 @@ def socle_pilier1() -> SoclePilier1:
     gross_total = sum(float(row["gross_amount"]) for row in exposure_rows)
     ead_total = sum(float(row["ead"]) for row in exposure_rows)
     rwa_credit = sum(float(row["rwa"]) for row in exposure_rows)
+    # Les dérivés pèsent sur le même risque de crédit que les prêts : le
+    # formulaire les déclare sur les EP12 à EP16, et l'écran compte les mêmes.
+    rwa_credit += apr_derives_courant()
     
     # RWA Total = Crédit + Marché + Opérationnel
     rwa_total = rwa_credit + rwa_operationnel + rm_calc["rwa_marche"]

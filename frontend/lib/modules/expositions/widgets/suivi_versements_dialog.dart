@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/state/portfolio_amount_unit_scope.dart';
 import '../../../core/utils/currency_conversion.dart';
 import '../models/suivi_versements_models.dart';
+import '../../../core/utils/formatters.dart';
 
 String _formatDateStr(String dateStr) {
   if (dateStr.isEmpty) return '-';
@@ -972,12 +973,9 @@ class _SuiviVersementsDialogState extends State<SuiviVersementsDialog> {
     return (month >= 1 && month <= 12) ? _moisAbreges[month - 1] : parts[1];
   }
 
-  String _formatAmount(double amount) {
-    if (amount >= 1e9) return '${(amount / 1e9).toStringAsFixed(1).replaceAll('.0', '')}Md';
-    if (amount >= 1e6) return '${(amount / 1e6).toStringAsFixed(1).replaceAll('.0', '')}M';
-    if (amount >= 1e3) return '${(amount / 1e3).toStringAsFixed(1).replaceAll('.0', '')}k';
-    return amount.toStringAsFixed(0);
-  }
+  String _formatAmount(double amount) => amount.abs() < 1000
+      ? amount.toStringAsFixed(0)
+      : AppFormatters.montant(amount, maxDecimals: 1);
 
   Widget _buildMonthChip(String periode, SuiviVersement? entry) {
     final now = DateTime.now();

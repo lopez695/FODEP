@@ -4,6 +4,7 @@ import '../../../core/services/rwa_api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../dashboard/widgets/dashboard_design.dart';
+import '../../participations/widgets/tableau_maison.dart' show tableauEntete;
 import '../models/derive_models.dart';
 import '../widgets/derive_formulaire.dart';
 
@@ -28,10 +29,25 @@ class DerivesScreen extends StatefulWidget {
 }
 
 /// Les contrats et l'état qu'ils remplissent, chargés ensemble.
-typedef _Donnees = ({List<Derive> contrats, SyntheseEp11 synthese});
+typedef _Donnees = ({
+  List<Derive> contrats,
+  SyntheseEp11 synthese,
+  List<ContrepartieDerive> contreparties,
+  SousJacents sousJacents,
+});
 
 class _DerivesScreenState extends State<DerivesScreen> {
   late Future<_Donnees> _future;
+
+  /// Les tiers du portefeuille, que le formulaire propose au choix.
+  List<ContrepartieDerive> _contreparties = const [];
+
+  /// Les quinze lignes de l'EP11, avec la pondération imprimée par la
+  /// BCEAO : l'aperçu du formulaire l'applique au contrat en cours de saisie.
+  List<LigneEp11> _lignes = const [];
+
+  /// Les crédits, obligations et actions qu'un dérivé peut couvrir.
+  SousJacents _sousJacents = SousJacents.vide;
 
   @override
   void initState() {
@@ -40,10 +56,27 @@ class _DerivesScreenState extends State<DerivesScreen> {
   }
 
   Future<_Donnees> _charger() async {
-    // Les deux appels partent ensemble : ils ne dépendent pas l'un de l'autre.
+    // Les quatre appels partent ensemble : ils ne dépendent pas l'un de l'autre.
     final contrats = widget.api.fetchDerives();
     final synthese = widget.api.fetchSyntheseEp11();
-    return (contrats: await contrats, synthese: await synthese);
+    final contreparties = widget.api.fetchContrepartiesDerives();
+    final sousJacents = widget.api.fetchSousJacentsDerives();
+    // `Future.wait` les écoute tous d'emblée. Attendus l'un après l'autre, un
+    // échec du dernier survenu pendant l'attente du premier n'avait encore
+    // aucun destinataire : Dart le signalait comme erreur non traitée, en plus
+    // de l'afficher à l'écran.
+    await Future.wait<Object?>(
+        [contrats, synthese, contreparties, sousJacents]);
+    final donnees = (
+      contrats: await contrats,
+      synthese: await synthese,
+      contreparties: await contreparties,
+      sousJacents: await sousJacents,
+    );
+    _contreparties = donnees.contreparties;
+    _lignes = donnees.synthese.lignes;
+    _sousJacents = donnees.sousJacents;
+    return donnees;
   }
 
   void _recharger() {
@@ -55,7 +88,13 @@ class _DerivesScreenState extends State<DerivesScreen> {
   }
 
   Future<void> _editer([Derive? existant]) async {
-    final saisi = await DeriveFormulaire.show(context, existant);
+    final saisi = await DeriveFormulaire.show(
+      context,
+      _contreparties,
+      derive: existant,
+      lignes: _lignes,
+      sousJacents: _sousJacents,
+    );
     if (saisi == null) return;
     try {
       if (existant == null) {
@@ -108,13 +147,10 @@ class _DerivesScreenState extends State<DerivesScreen> {
     ));
   }
 
-  /// Les montants se lisent en millions de FCFA.
-  ///
-  /// C'est l'unité de la déclaration — « tous les montants doivent être
-  /// déclarés en millions de franc CFA » (notice, § 2.3) — et donc la forme
-  /// sous laquelle le déclarant les retrouvera sur le classeur transmis.
+  /// Les montants se lisent dans l'unité choisie en haut de l'écran. Le
+  /// classeur transmis, lui, les porte en millions (notice, § 2.3).
   String _montant(double valeur) =>
-      valeur == 0 ? '—' : AppFormatters.millions(valeur);
+      valeur == 0 ? '—' : AppFormatters.montant(valeur);
 
   @override
   Widget build(BuildContext context) {
@@ -224,7 +260,7 @@ class _DerivesScreenState extends State<DerivesScreen> {
               _tuile(c, 'CONTRATS', '${synthese.nombre}', null),
               _separateur(c),
               _tuile(c, '(b) NOTIONNEL',
-                  _montant(synthese.totalNotionnel), 'Millions de FCFA'),
+                  _montant(synthese.totalNotionnel), AppFormatters.libelleUnite()),
               _separateur(c),
               _tuile(c, '(a) COÛT DE REMPLACEMENT',
                   _montant(synthese.totalCoutRemplacement), 'Valeur de marché'),
@@ -297,22 +333,48 @@ class _DerivesScreenState extends State<DerivesScreen> {
 
     return DashPanel(
       title: 'CONTRATS ENREGISTRÉS',
-      unit: 'Montants en millions de FCFA',
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      unit: 'Montants en ${AppFormatters.libelleUnite().toLowerCase()}',
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      // Un vrai `Table` plutôt que des `Row` juxtaposées : chaque cellule
+      // porte ses propres filets, et une valeur trop longue agrandit sa
+      // ligne au lieu de déborder sur le panneau voisin ou de se faire
+      // couper par une ellipse invisible sans survol.
+      child: Table(
+        border: TableBorder(
+          top: BorderSide(color: c.border, width: Dash.hairline),
+          bottom: BorderSide(color: c.border, width: Dash.hairline),
+          left: BorderSide(color: c.border, width: Dash.hairline),
+          right: BorderSide(color: c.border, width: Dash.hairline),
+          horizontalInside: BorderSide(color: c.divider, width: Dash.hairline),
+          verticalInside: BorderSide(color: c.divider, width: Dash.hairline),
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(2.4),
+          1: FlexColumnWidth(1.7),
+          2: FlexColumnWidth(1.6),
+          3: FlexColumnWidth(0.95),
+          4: FlexColumnWidth(1.15),
+          5: FlexColumnWidth(1.05),
+          6: FlexColumnWidth(1.05),
+          7: FixedColumnWidth(88),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
-          _enteteColonnes(c, const [
-            (libelle: 'Contrepartie', largeur: 0, alignDroite: false),
-            (libelle: 'Catégorie', largeur: 190.0, alignDroite: false),
-            (libelle: 'Nature', largeur: 180.0, alignDroite: false),
-            (libelle: 'Échéance', largeur: 92.0, alignDroite: false),
-            (libelle: 'Durée résiduelle', largeur: 132.0, alignDroite: false),
-            (libelle: '(b) Notionnel', largeur: 112.0, alignDroite: true),
-            (libelle: '(a) Coût rempl.', largeur: 112.0, alignDroite: true),
-            (libelle: '', largeur: 80.0, alignDroite: false),
-          ]),
-          for (final contrat in contrats) _ligneContrat(c, contrat),
+          TableRow(
+            decoration: const BoxDecoration(color: tableauEntete),
+            children: [
+              _teteCelluleTable(c, 'Contrepartie'),
+              _teteCelluleTable(c, 'Catégorie'),
+              _teteCelluleTable(c, 'Nature'),
+              _teteCelluleTable(c, 'Échéance'),
+              _teteCelluleTable(c, 'Durée résiduelle'),
+              _teteCelluleTable(c, '(b) Notionnel', droite: true),
+              _teteCelluleTable(c, '(a) Coût rempl.', droite: true),
+              _teteCelluleTable(c, ''),
+            ],
+          ),
+          for (final (index, contrat) in contrats.indexed)
+            _ligneContrat(c, contrat, paire: index.isEven),
         ],
       ),
     );
@@ -350,54 +412,73 @@ class _DerivesScreenState extends State<DerivesScreen> {
     );
   }
 
-  Widget _ligneContrat(DashColors c, Derive contrat) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: c.divider, width: Dash.hairline)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(contrat.contrepartie,
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: c.ink)),
-                if (contrat.typeContrat != null)
-                  Text(contrat.typeContrat!, style: DashText.caption(c)),
-              ],
-            ),
+  TableRow _ligneContrat(DashColors c, Derive contrat, {required bool paire}) {
+    return TableRow(
+      decoration: BoxDecoration(color: paire ? null : c.surfaceAlt.withValues(alpha: 0.5)),
+      children: [
+        _celluleTable(
+          c,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(contrat.contrepartie,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: c.ink)),
+              // L'identifiant d'abord : c'est par lui que le contrat se
+              // relie à la fiche de la contrepartie.
+              if (contrat.contrepartieId != null ||
+                  contrat.typeContrat != null ||
+                  contrat.sousJacentLibelle != null)
+                Text(
+                  [
+                    if (contrat.contrepartieId != null)
+                      contrat.contrepartieId!,
+                    if (contrat.typeContrat != null) contrat.typeContrat!,
+                    // Ce que le contrat couvre, pour le reconnaître.
+                    if (contrat.sousJacentLibelle != null)
+                      'sur ${contrat.sousJacentLibelle!}',
+                  ].join(' · '),
+                  style: DashText.caption(c),
+                ),
+            ],
           ),
-          _cellule(c, 190, contrat.categorieContrepartie.label),
-          _cellule(c, 180, contrat.nature.label),
-          _cellule(c, 92, _jour(contrat.dateEcheance)),
-          SizedBox(
-            width: 132,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _puce(c, contrat.tranche.label),
-            ),
+        ),
+        _celluleTexteTable(
+            c,
+            contrat.horsEp11
+                ? '${contrat.categorieContrepartie.label} (repli)'
+                : contrat.categorieContrepartie.label),
+        _celluleTexteTable(c, contrat.nature.label),
+        _celluleTexteTable(c, _jour(contrat.dateEcheance)),
+        _celluleTable(
+          c,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _puce(c, contrat.tranche.label),
           ),
-          _celluleNombre(c, 112, contrat.montantNotionnel, contrat.devise),
-          _celluleNombre(c, 112, contrat.coutRemplacement, contrat.devise),
-          // Les deux boutons sont contraints : sans cela `IconButton` impose sa
-          // zone de clic de 40 pixels et la ligne déborde de sa colonne.
-          SizedBox(
-            width: 80,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
+        ),
+        _celluleMontantTable(c, contrat.montantNotionnel, contrat.devise),
+        _celluleMontantTable(c, contrat.coutRemplacement, contrat.devise),
+        _celluleTable(
+          c,
+          // Les deux boutons sont contraints : sans cela `IconButton` impose
+          // sa zone de clic de 40 pixels et la ligne déborde de sa colonne.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
               _action(c, Icons.edit_outlined, 'Modifier',
                   () => _editer(contrat)),
               _action(c, Icons.delete_outline_rounded, 'Retirer',
                   () => _supprimer(contrat)),
-            ]),
+            ],
           ),
-        ],
-      ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        ),
+      ],
     );
   }
 
@@ -419,20 +500,26 @@ class _DerivesScreenState extends State<DerivesScreen> {
         onPressed: action,
       );
 
-  Widget _cellule(DashColors c, double largeur, String texte) => SizedBox(
-        width: largeur,
-        child: Text(texte,
-            style: TextStyle(fontSize: 11.5, color: c.muted),
-            overflow: TextOverflow.ellipsis),
+  /// Cellule de `Table` générique : juste le rembourrage qui écarte le
+  /// contenu des filets de la grille.
+  Widget _celluleTable(DashColors c, Widget enfant,
+          {EdgeInsets padding =
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 9)}) =>
+      Padding(padding: padding, child: enfant);
+
+  /// Cellule de texte : pas d'ellipse ni d'info-bulle, le texte s'enroule
+  /// et agrandit sa ligne — rien n'est jamais caché.
+  Widget _celluleTexteTable(DashColors c, String texte) => _celluleTable(
+        c,
+        Text(texte, style: TextStyle(fontSize: 11.5, color: c.muted)),
       );
 
   /// Un montant, avec sa devise d'origine quand elle n'est pas celle du
   /// formulaire : le déclarant doit voir qu'une conversion a eu lieu.
-  Widget _celluleNombre(
-      DashColors c, double largeur, double valeur, String devise) {
-    return SizedBox(
-      width: largeur,
-      child: Column(
+  Widget _celluleMontantTable(DashColors c, double valeur, String devise) {
+    return _celluleTable(
+      c,
+      Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -442,6 +529,23 @@ class _DerivesScreenState extends State<DerivesScreen> {
       ),
     );
   }
+
+  /// En-tête de colonne pour la `Table` des contrats : bleu marine et texte
+  /// blanc, comme le bandeau des tableaux de l'onglet Portefeuille.
+  Widget _teteCelluleTable(DashColors c, String texte, {bool droite = false}) =>
+      _celluleTable(
+        c,
+        Text(
+          texte,
+          textAlign: droite ? TextAlign.right : TextAlign.left,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 11.5,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      );
 
   static String _jour(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/'
@@ -454,7 +558,7 @@ class _DerivesScreenState extends State<DerivesScreen> {
       title: 'EP11 — TEL QUE LA DÉCLARATION LE PORTERA',
       subtitle: 'La pondération (c) est imprimée par la BCEAO sur le '
           'formulaire ; (d) = b × c et (e) = a + d sont calculés.',
-      unit: 'Millions de FCFA',
+      unit: AppFormatters.libelleUnite(),
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -494,14 +598,20 @@ class _DerivesScreenState extends State<DerivesScreen> {
             child: _puce(c, ligne.code, teinte: porte ? c.accent : null),
           ),
           Expanded(
-            child: Text(
-              ligne.libelle,
-              style: TextStyle(
-                fontSize: 11.5,
-                color: porte ? c.ink : c.muted,
-                fontWeight: porte ? FontWeight.w600 : FontWeight.w400,
+            // Les libellés du formulaire sont longs et la colonne les coupe :
+            // le survol les rend en entier.
+            child: Tooltip(
+              message: ligne.libelle,
+              waitDuration: const Duration(milliseconds: 300),
+              child: Text(
+                ligne.libelle,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: porte ? c.ink : c.muted,
+                  fontWeight: porte ? FontWeight.w600 : FontWeight.w400,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           _nombre(c, 70, porte ? '${ligne.nombreContrats}' : '—', porte),
@@ -662,13 +772,19 @@ class _DerivesScreenState extends State<DerivesScreen> {
 
 /// Ce qu'il faut comprendre d'une erreur de chargement.
 ///
-/// « Not Found » ne dit rien à personne : c'est la réponse d'un serveur qui ne
-/// connaît pas la route, donc antérieur à son ajout. Le piège est que le script
-/// de lancement réutilise un backend déjà en écoute — relancer l'application ne
+/// « Not Found » (404) et « Method Not Allowed » (405) ne disent rien à
+/// personne : ce sont les réponses d'un serveur antérieur à la route. Le 404
+/// quand le chemin lui est inconnu ; le 405 quand il le confond avec un autre —
+/// un ancien backend prend « /derives/contreparties » pour la modification du
+/// contrat « contreparties », et refuse la lecture. Le piège est que le script
+/// de lancement réutilise un backend déjà en écoute : relancer l'application ne
 /// suffit pas, il faut arrêter le processus.
 String _messageDeChargement(Object? erreur, String quoi) {
   final texte = '${erreur ?? ''}';
-  final routeAbsente = texte.contains('Not Found') || texte.contains('404');
+  final routeAbsente = texte.contains('Not Found') ||
+      texte.contains('404') ||
+      texte.contains('Method Not Allowed') ||
+      texte.contains('405');
   if (routeAbsente) {
     return '$quoi : le serveur joint ne connaît pas cette route. Il date '
         "d'avant son ajout — arrêtez le backend puis relancez-le, le script "

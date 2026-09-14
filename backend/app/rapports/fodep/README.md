@@ -139,11 +139,41 @@ ainsi que l'établissement ne détient aucun dérivé.
 
 Le module `app.derives` remplace la saisie de cellules par la saisie de
 **contrats**. Un contrat porte ce que l'état réclame et rien de plus : sa
-nature, sa contrepartie et la catégorie de celle-ci, son notionnel, son coût de
-remplacement, son échéance. Quinze lignes se déduisent de deux dimensions —
-cinq natures de sous-jacent, trois tranches de durée — et les cinq colonnes de
-ventilation sont les cinq catégories d'expositions du formulaire, les mêmes
-lettres que pour les états EP12 à EP16.
+nature, sa contrepartie, son notionnel, son coût de remplacement, son échéance.
+Quinze lignes se déduisent de deux dimensions — cinq natures de sous-jacent,
+trois tranches de durée — et les cinq colonnes de ventilation sont les cinq
+catégories d'expositions du formulaire, les mêmes lettres que pour les états
+EP12 à EP16.
+
+La **contrepartie se choisit dans le portefeuille**, par son identifiant
+(`EXP-2026-…`) — migration 046. Son nom et sa catégorie ne se saisissent pas :
+ils se lisent sur la fiche, et la colonne de l'EP11 se déduit de la catégorie
+prudentielle par `resolve_category`, la fonction même du moteur de calcul. Un
+dérivé et un prêt sur le même tiers ne peuvent donc plus tomber dans deux
+catégories différentes, ni la même banque apparaître sous trois graphies. Un
+identifiant inconnu est refusé : un dérivé se rattache à un tiers que
+l'application connaît, ou ne s'enregistre pas.
+
+Les catégories sans colonne sur l'EP11 — clientèle de détail, immobilier,
+créances en souffrance, autres actifs — se rangent sous « Entreprises », le
+repli du formulaire, et l'écran comme l'export le signalent. Le nom et la
+colonne sont aussi recopiés sur le contrat à l'enregistrement : tant que la
+fiche existe, c'est elle qui fait foi ; si elle disparaît, le contrat reste
+lisible.
+
+**L'exposition ne s'arrête pas à l'EP11.** Elle entre dans les actifs
+pondérés par le bloc « risque de contrepartie » des EP12 à EP16 — les cinq
+états qui l'offrent, un par colonne de ventilation — et dans l'exposition du
+ratio de levier (EP33, ligne RL005). La pondération appliquée est celle de la
+contrepartie qui a signé, lue par `lookup_prudential_risk_weight`, la fonction
+même qui pondère ses prêts : un dérivé et un crédit sur le même tiers ne
+peuvent pas être pondérés différemment. Une pondération que l'état n'imprime
+pas — il n'en propose que cinq ou six — monte à la ligne supérieure plutôt que
+de disparaître.
+
+La durée résiduelle y est mesurée à la date d'arrêté, comme sur l'EP11 : celle
+que le registre affiche a été calculée le jour de la lecture, et un contrat à
+quatorze mois changerait de ligne d'un état à l'autre.
 
 Trois choix méritent d'être connus.
 
@@ -170,6 +200,51 @@ construction. Le contrôle est devenu un invariant, et le test qui le tenait
 
 Un registre vide déclare toujours zéro — mais c'est alors un zéro constaté, que
 l'export énonce comme tel.
+
+## L'EP21 se confronte au compte de résultat
+
+Le produit brut de l'approche indicateur de base se saisit exercice par
+exercice, dans un registre à part. Les états financiers du module Risque
+Opérationnel portent par ailleurs un produit net bancaire — c'est d'eux que
+l'écran CRR3 tire son propre comparatif « indicateur de base »
+(`ofr_bia = pnb_moyen x alpha`).
+
+Rien ne rapprochait les deux. Un registre resté à des montants d'essai
+déclarait un APR opérationnel de 3 millions quand le compte de résultat portait
+84 milliards de PNB — trois millièmes de pour cent de l'APR total, sans qu'une
+seule ligne de l'export ne le signale. L'EP21 compare désormais les deux
+exercice par exercice et nomme l'écart dès qu'il dépasse 10 %, marge laissée
+aux retraitements que l'article 301 prévoit et qu'il n'appartient pas à l'export
+de trancher.
+
+## Une contrepartie est un identifiant, pas un nom
+
+Les états EP29 à EP32 et l'EP38 agrègent les expositions par contrepartie.
+Cette agrégation se faisait par **nom** : sur le portefeuille de référence, 162
+noms sont portés par plusieurs contreparties distinctes, et deux clients
+homonymes devenaient un seul risque. La division des risques s'en trouvait
+déclarée à 27,4 % là où le plus gros risque réel en vaut 18,2 %, et l'EP38
+comptait deux fois les concours d'une partie liée homonyme d'une autre — 29,8
+Md déclarés pour 19,6 Md réels, avec la déduction de fonds propres
+correspondante.
+
+La clé est désormais l'identifiant (`counterparty_id`, exposé par le dépôt des
+expositions), le nom restant dans l'agrégat puisque c'est lui que le formulaire
+imprime. Le numéro Centrale des risques se lit de même par identifiant : deux
+homonymes gardent chacun le leur.
+
+## L'EP39 déclare des montants, pas des croix
+
+L'état ne recense pas toutes les parties liées : son titre fixe le seuil, 5 %
+des fonds propres effectifs. L'export y portait une croix par bénéficiaire,
+quel que soit son encours ; la colonne TOTAL partait donc à zéro, en
+contradiction avec les encours de l'EP38 déclarés deux feuilles plus tôt.
+
+Chaque ligne porte maintenant le montant du bénéficiaire dans la colonne de sa
+catégorie, et la ligne TOTAL les additionne. Les fonds propres retenus sont
+ceux de l'exercice précédent, comme pour la limite de l'EP38 : les deux états
+se lisent ensemble, et un même encours ne peut pas être rapporté à deux
+dénominateurs différents.
 
 ## Les limites prudentielles et les fonds propres
 
@@ -272,11 +347,13 @@ l'EP30 vaut « a » ou « b » (§ 11.2). L'application n'agrégeant pas les gro
 de clients liés dans l'EP29, la portée y est toujours « 1 » — ce que l'export
 signale.
 
-Le **numéro d'identification Centrale des risques** est porté par les trois
-états qui identifient une contrepartie : l'EP30 le lit sur le groupe, l'EP29 et
-l'EP32 sur la contrepartie (`contreparties.numero_centrale_risques`). Les
-lignes dont la fiche ne porte pas ce numéro laissent la colonne vide, et
-l'export les compte en réserve.
+Le **numéro d'identification Centrale des risques** est porté par les quatre
+états qui identifient une contrepartie : l'EP30 le lit sur le groupe, l'EP29,
+l'EP31 et l'EP32 sur la contrepartie (`contreparties.numero_centrale_risques`).
+L'EP31 le laissait vide — ses vingt lignes partaient sans identifiant, alors
+que le formulaire ouvre la colonne comme sur les autres. Les lignes dont la
+fiche ne porte pas ce numéro laissent la colonne vide, et l'export les compte
+en réserve.
 
 Conséquence à connaître sur l'**EP01** : sa colonne « Situation de
 l'établissement » est calculée par le formulaire, et un niveau observé nul y

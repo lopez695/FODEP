@@ -108,7 +108,7 @@ def main() -> int:
         f"{rapport['rejected_rows']} rejetee(s)"
     )
 
-    # ── 2. Postes BIC / CCR3 ───────────────────────────────────────────────
+    # ── 2. Postes BIC / CRR3 ───────────────────────────────────────────────
     correspondances = {
         "Intérêts perçus": "interets_percus",
         "Intérêts versés": "interets_verses",

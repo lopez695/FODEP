@@ -209,6 +209,10 @@ class _DispositionsTransitoiresDialogState
   Future<_Donnees> _charger() async {
     final saisie = widget.api.fetchDispositionsTransitoires(widget.exercice);
     final synthese = widget.api.fetchSyntheseEp04(widget.exercice);
+    // `Future.wait` écoute les deux d'emblée : attendus l'un après l'autre, un
+    // échec du second survenu pendant l'attente du premier n'avait aucun
+    // destinataire, et Dart le signalait comme erreur non traitée.
+    await Future.wait<Object?>([saisie, synthese]);
     final donnees = (saisie: await saisie, synthese: await synthese);
     _remplirLesChamps(donnees.saisie);
     _etat = donnees.synthese;
@@ -487,7 +491,7 @@ class _DispositionsTransitoiresDialogState
     ];
     return DashPanel(
       title: 'CE QUE L\'EP03 REPREND',
-      unit: 'En millions de FCFA',
+      unit: 'En ${AppFormatters.libelleUnite().toLowerCase()}',
       child: Row(
         children: [
           for (final (code, libelle, formule) in postes) ...[
@@ -760,15 +764,11 @@ class _DispositionsTransitoiresDialogState
     );
   }
 
-  /// Les montants se lisent en millions de FCFA.
-  ///
-  /// C'est l'unité de la déclaration — « tous les montants doivent être
-  /// déclarés en millions de franc CFA » (notice, § 2.3) — et c'est donc sous
-  /// cette forme que le déclarant les retrouvera sur le classeur transmis.
-  /// Onze chiffres alignés ne se lisent pas, et ne se comparent pas non plus à
-  /// ce que porte le formulaire.
+  /// Les montants se lisent dans l'unité choisie en haut de l'écran : onze
+  /// chiffres alignés ne se lisent pas. Le classeur transmis, lui, les porte
+  /// en millions (notice, § 2.3).
   String _montant(double valeur) =>
-      valeur == 0 ? '—' : AppFormatters.millions(valeur);
+      valeur == 0 ? '—' : AppFormatters.montant(valeur);
 
   // ── Pied ─────────────────────────────────────────────────────────────────
 
@@ -848,13 +848,18 @@ class _DispositionsTransitoiresDialogState
 
 /// Ce qu'il faut comprendre d'une erreur de chargement.
 ///
-/// « Not Found » ne dit rien à personne : c'est la réponse d'un serveur qui ne
-/// connaît pas la route, donc antérieur à son ajout. Le piège est que le script
-/// de lancement réutilise un backend déjà en écoute — relancer l'application ne
+/// « Not Found » (404) et « Method Not Allowed » (405) ne disent rien à
+/// personne : ce sont les réponses d'un serveur antérieur à la route. Le 404
+/// quand le chemin lui est inconnu ; le 405 quand il le confond avec un autre
+/// chemin qui n'accepte pas la même méthode. Le piège est que le script de
+/// lancement réutilise un backend déjà en écoute : relancer l'application ne
 /// suffit pas, il faut arrêter le processus.
 String _messageDeChargement(Object? erreur, String quoi) {
   final texte = '${erreur ?? ''}';
-  final routeAbsente = texte.contains('Not Found') || texte.contains('404');
+  final routeAbsente = texte.contains('Not Found') ||
+      texte.contains('404') ||
+      texte.contains('Method Not Allowed') ||
+      texte.contains('405');
   if (routeAbsente) {
     return '$quoi : le serveur joint ne connaît pas cette route. Il date '
         "d'avant son ajout — arrêtez le backend puis relancez-le, le script "

@@ -89,6 +89,12 @@ _CURRENCY_RATES_IN_XAF = {
     "USD": 600.0,
 }
 
+#: Les devises que l'outil sait ramener au franc CFA. Toute autre se convertit
+#: au taux de repli 1,0 de `convert_currency_amount`, c'est-a-dire comme si elle
+#: etait deja du franc : un montant en livres serait declare tel quel. Les
+#: saisies qui alimentent une declaration doivent donc s'y limiter.
+DEVISES_CONVERTIBLES: frozenset[str] = frozenset(_CURRENCY_RATES_IN_XAF)
+
 
 def _normalize_currency_code(currency: str) -> str:
     normalized = (currency or "XOF").strip().upper()

@@ -149,13 +149,13 @@ void main() {
     // L'état se déclare en millions de FCFA (notice, § 2.3) : c'est sous cette
     // forme que l'écran rend ses calculs, et le séparateur de milliers vient
     // de la locale — on le demande au formateur plutôt que de l'écrire ici.
-    expect(find.text(AppFormatters.millions(13e9)), findsOneWidget);
+    expect(find.text(AppFormatters.montant(13e9)), findsOneWidget);
 
     // On porte le capital non admissible de 10 à 20 Md : le total suit.
     final champ = find.byType(TextField).first;
     await tester.enterText(champ, '20000000000');
     await tester.pumpAndSettle();
-    expect(find.text(AppFormatters.millions(23e9)), findsOneWidget);
+    expect(find.text(AppFormatters.montant(23e9)), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

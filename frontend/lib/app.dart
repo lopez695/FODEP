@@ -359,9 +359,9 @@ class _RwaAppState extends State<RwaApp> {
           view: OperationalRiskView.historique,
         ),
       AppModule.risqueOperationnelReporting => ReportingGlobalScreen(api: _api),
-      AppModule.risqueOperationnelUemoiCcr3 => RisqueOperationnelScreen(
+      AppModule.risqueOperationnelUemoiCrr3 => RisqueOperationnelScreen(
           api: _api,
-          view: OperationalRiskView.ccr3Uemoi,
+          view: OperationalRiskView.crr3Uemoi,
         ),
       AppModule.derives => DerivesScreen(api: _api),
       AppModule.analyse => AnalyseScreen(api: _api),

@@ -333,9 +333,9 @@ class _Rappel extends StatelessWidget {
                 ),
               ),
               Text(
-                'Total net ${AppFormatters.millions(synthese.totalGeneral)} · '
+                'Total net ${AppFormatters.montant(synthese.totalGeneral)} · '
                 'fonds propres T1 '
-                '${AppFormatters.millions(synthese.fondsPropresT1)}',
+                '${AppFormatters.montant(synthese.fondsPropresT1)}',
                 style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.5),
               ),
             ],

@@ -192,7 +192,7 @@ def list_historique(limit: int = Query(default=200, le=1000)) -> list[Historique
 
 @router.get("/bic/inputs", response_model=list[OpRiskInput])
 def list_bic_inputs() -> list[OpRiskInput]:
-    """Toutes les années ayant des postes BIC/CCR3 enregistrés (saisie ou
+    """Toutes les années ayant des postes BIC/CRR3 enregistrés (saisie ou
     import Excel), sans se limiter à la fenêtre N-2/N-1/N par défaut."""
     return services.list_op_risk_inputs()
 
@@ -224,12 +224,12 @@ def calcul_bic(annee_n: int | None = Query(default=None)) -> OpRiskCalculResult:
 
 @router.get("/bic/import/template")
 def download_bic_import_template() -> Response:
-    """Télécharge le modèle Excel d'import des postes BIC/CCR3."""
+    """Télécharge le modèle Excel d'import des postes BIC/CRR3."""
     template_bytes = services.build_bic_import_template()
     return Response(
         content=template_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=modele_import_bic_ccr3.xlsx"},
+        headers={"Content-Disposition": "attachment; filename=modele_import_bic_crr3.xlsx"},
     )
 
 

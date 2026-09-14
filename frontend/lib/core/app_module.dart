@@ -30,7 +30,7 @@ enum AppModule {
   risqueOperationnelPertes,
   risqueOperationnelHistorique,
   risqueOperationnelReporting,
-  risqueOperationnelUemoiCcr3,
+  risqueOperationnelUemoiCrr3,
   analyse,
   stressTest,
   icap,
@@ -104,8 +104,8 @@ extension AppModuleLabel on AppModule {
         return 'Historique événements';
       case AppModule.risqueOperationnelReporting:
         return 'Reporting global';
-      case AppModule.risqueOperationnelUemoiCcr3:
-        return 'CCR3 / Dispositif UEMOA';
+      case AppModule.risqueOperationnelUemoiCrr3:
+        return 'CRR3 / Dispositif UEMOA';
       case AppModule.analyse:
         return 'Analyse';
       case AppModule.stressTest:
@@ -186,8 +186,8 @@ extension AppModuleLabel on AppModule {
         return 'Traçabilité complète de toutes les actions et modifications (Art. 314).';
       case AppModule.risqueOperationnelReporting:
         return 'Génération automatique du rapport réglementaire consolidé (Dashboard, Crédit, Marché, Opérationnel).';
-      case AppModule.risqueOperationnelUemoiCcr3:
-        return 'CCR3-COREP (BIC) et dispositif UEMOA : Indicateur de Base, Approche Standard et synthèse.';
+      case AppModule.risqueOperationnelUemoiCrr3:
+        return 'CRR3-COREP (BIC) et dispositif UEMOA : Indicateur de Base, Approche Standard et synthèse.';
       case AppModule.analyse:
         return 'Conseils et recommandations basés sur les expositions et les risques.';
       case AppModule.stressTest:
@@ -267,7 +267,7 @@ extension AppModuleLabel on AppModule {
         return Icons.schedule_rounded;
       case AppModule.risqueOperationnelReporting:
         return Icons.summarize_outlined;
-      case AppModule.risqueOperationnelUemoiCcr3:
+      case AppModule.risqueOperationnelUemoiCrr3:
         return Icons.policy_outlined;
       case AppModule.analyse:
         return Icons.analytics_rounded;

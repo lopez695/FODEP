@@ -253,7 +253,7 @@ const List<_MenuEntry> _riskCreditChildren = [
 ];
 
 // "Import données" et "Simulation de crise" ont été déplacés à l'intérieur
-// du hub "CCR3 / Dispositif UEMOA" (onglets supplémentaires) - ils ne sont
+// du hub "CRR3 / Dispositif UEMOA" (onglets supplémentaires) - ils ne sont
 // plus des entrées séparées de ce sous-menu.
 const List<_MenuEntry> _operationalRiskChildren = [
   _MenuEntry.leaf(
@@ -262,9 +262,9 @@ const List<_MenuEntry> _operationalRiskChildren = [
     label: 'Dashboard Opérationnel',
   ),
   _MenuEntry.leaf(
-    module: AppModule.risqueOperationnelUemoiCcr3,
+    module: AppModule.risqueOperationnelUemoiCrr3,
     icon: Icons.policy_outlined,
-    label: 'CCR3 / Dispositif UEMOA',
+    label: 'CRR3 / Dispositif UEMOA',
   ),
   _MenuEntry.leaf(
     module: AppModule.risqueOperationnelPertes,

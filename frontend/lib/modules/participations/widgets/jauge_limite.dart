@@ -87,13 +87,13 @@ class JaugeLimite extends StatelessWidget {
     return Tooltip(
       message: [
         limite.libelle,
-        '${limite.numerateurLibelle} : ${AppFormatters.millions(limite.numerateur)}',
+        '${limite.numerateurLibelle} : ${AppFormatters.montant(limite.numerateur)}',
         '${limite.denominateurLibelle} : '
-            '${limite.mesurable ? AppFormatters.millions(limite.denominateur) : "non renseigné"}',
+            '${limite.mesurable ? AppFormatters.montant(limite.denominateur) : "non renseigné"}',
         if (limite.mesurable && limite.respectee)
-          'Marge restante : ${AppFormatters.millions(marge)}',
+          'Marge restante : ${AppFormatters.montant(marge)}',
         if (limite.mesurable && !limite.respectee)
-          'Excédent à résorber : ${AppFormatters.millions(limite.excedent)}',
+          'Excédent à résorber : ${AppFormatters.montant(limite.excedent)}',
         'Norme ${limite.code}, déclarée à l\'état ${limite.etat}',
       ].join('\n'),
       child: Padding(

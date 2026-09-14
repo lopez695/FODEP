@@ -104,6 +104,21 @@ class _ApiBouchonnee extends RwaApiService {
       });
 
   @override
+  Future<SousJacents> fetchSousJacentsDerives() async => SousJacents.vide;
+
+  @override
+  Future<List<ContrepartieDerive>> fetchContrepartiesDerives() async =>
+      const [
+        ContrepartieDerive(
+          id: 'EXP-2026-00007',
+          nom: 'SOCIETE GENERALE',
+          categoriePrudentielle: 'Institutions financières',
+          categorieEp11: CategorieContrepartieDerive.institutionsFinancieres,
+          notation: 'A',
+        ),
+      ];
+
+  @override
   Future<void> deleteDerive(int id) async {
     supprime = id;
   }
@@ -145,12 +160,23 @@ void main() {
     expect(find.text('RC061'), findsOneWidget);
   });
 
+  testWidgets('le survol rend le libellé du poste en entier', (tester) async {
+    // La colonne coupe les libellés du formulaire : le texte complet doit
+    // rester lisible au survol.
+    await _ouvrir(tester);
+    expect(
+      find.byTooltip("Engagements sur instruments de taux d'intérêt "
+          '— Durée > 5 ans'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('les montants se lisent en millions de FCFA', (tester) async {
     // C'est l'unité de la déclaration (notice, § 2.3) : onze chiffres alignés
     // ne se comparent pas à ce que porte le classeur transmis.
     await _ouvrir(tester);
-    expect(find.text(AppFormatters.millions(12000000000)), findsWidgets);
-    expect(find.text(AppFormatters.millions(1450000000)), findsWidgets);
+    expect(find.text(AppFormatters.montant(12000000000)), findsWidgets);
+    expect(find.text(AppFormatters.montant(1450000000)), findsWidgets);
   });
 
   testWidgets('la ventilation retombe sur l\'exposition déclarée',
@@ -158,8 +184,8 @@ void main() {
     await _ouvrir(tester);
     // 1 150 M chez les institutions financières, 200 M chez les BMD,
     // 1 450 M au total : la somme boucle par construction.
-    expect(find.text(AppFormatters.millions(1150000000)), findsWidgets);
-    expect(find.text(AppFormatters.millions(200000000)), findsWidgets);
+    expect(find.text(AppFormatters.montant(1150000000)), findsWidgets);
+    expect(find.text(AppFormatters.montant(200000000)), findsWidgets);
   });
 
   testWidgets('le bouton d\'ajout ouvre le formulaire', (tester) async {
@@ -191,4 +217,31 @@ void main() {
     expect(find.text('Aucun contrat enregistré'), findsOneWidget);
     expect(find.textContaining('registre est vide'), findsOneWidget);
   });
+
+  testWidgets('un backend trop ancien est nommé, pas le code HTTP',
+      (tester) async {
+    // C'est arrivé : un serveur lancé avant l'ajout de la route des
+    // contreparties la confondait avec la modification d'un contrat, et
+    // répondait 405. L'écran affichait « Method Not Allowed », qui ne dit à
+    // personne qu'il suffit de relancer le backend.
+    tester.view.physicalSize = const Size(1600, 950);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: DerivesScreen(api: _ApiAncienne()))));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('ne connaît pas cette route'), findsOneWidget);
+    expect(find.textContaining('Method Not Allowed'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+/// Un backend antérieur à la route des contreparties : il la confond avec la
+/// modification d'un contrat, et refuse la lecture.
+class _ApiAncienne extends _ApiBouchonnee {
+  @override
+  Future<List<ContrepartieDerive>> fetchContrepartiesDerives() async =>
+      throw Exception('Method Not Allowed');
 }

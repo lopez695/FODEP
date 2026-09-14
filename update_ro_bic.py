@@ -33,7 +33,7 @@ new_header = r'''Widget _buildHeader() => Row(
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Importation BIC / CCR3',
+              'Importation BIC / CRR3',
               style: TextStyle(color: _text, fontSize: 19, fontWeight: FontWeight.w500, letterSpacing: -0.2),
             ),
           ),

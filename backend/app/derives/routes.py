@@ -2,10 +2,18 @@
 
 from fastapi import APIRouter, status
 
-from app.derives.models import DeriveCreate, DeriveUpdate, DeriveView
+from app.derives.models import (
+    ContrepartieDerive,
+    DeriveCreate,
+    DeriveUpdate,
+    DeriveView,
+    SousJacents,
+)
 from app.derives.services import (
     creer_derive,
+    lister_contreparties_derives,
     lister_derives,
+    lister_sous_jacents,
     modifier_derive,
     supprimer_derive,
 )
@@ -23,6 +31,29 @@ def get_derives() -> list[DeriveView]:
     """
 
     return lister_derives()
+
+
+@router.get("/contreparties", response_model=list[ContrepartieDerive])
+def get_contreparties_derives() -> list[ContrepartieDerive]:
+    """Les contreparties du portefeuille auxquelles un derive peut se rattacher.
+
+    Avec leur identifiant, leur categorie prudentielle, la colonne EP11 qu'en
+    tirerait un contrat, et leur notation.
+    """
+
+    return lister_contreparties_derives()
+
+
+@router.get("/sous-jacents", response_model=SousJacents)
+def get_sous_jacents_derives() -> SousJacents:
+    """Ce qu'un derive peut couvrir : credits, obligations et actions detenus.
+
+    Les obligations et les actions sont celles du portefeuille de marche, lues
+    par le module VaR. Un portefeuille illisible devient une alerte plutot
+    qu'une erreur : les credits restent proposes.
+    """
+
+    return lister_sous_jacents()
 
 
 @router.post("", response_model=DeriveView, status_code=status.HTTP_201_CREATED)

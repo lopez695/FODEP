@@ -38,6 +38,7 @@ from app.rapports.fodep.service import (
     CHEMIN_MODELE,
     CODES_EP22,
     COLONNES_PARTIES_LIEES,
+    COLONNE_TOTAL_EP39,
     ETATS_ALIMENTES,
     ETATS_DECLARES_A_ZERO,
     ETATS_EN_LISTE,
@@ -95,22 +96,35 @@ def exercice_precedent():
     donnees = dict(courant)
     donnees.pop("id", None)
     precedent = int(donnees["exercice"]) - 1
-    donnees["exercice"] = precedent
 
-    colonnes = ", ".join(donnees)
-    parametres = ", ".join("?" * len(donnees))
-    with database_manager.transaction() as connexion:
-        connexion.execute(
-            f"INSERT INTO fonds_propres({colonnes}) VALUES ({parametres})",
-            list(donnees.values()),
-        )
+    # Le millesime peut deja exister : l'utilisateur l'a saisi, ou la graine le
+    # porte. On l'emploie alors tel quel. L'inserer quand meme heurtait l'index
+    # unique et faisait tomber le module entier -- c'est-a-dire que l'essai
+    # dependait, dans l'autre sens, de ce que contient la base.
+    with database_manager.read_connection() as connexion:
+        existe = connexion.execute(
+            "SELECT 1 FROM fonds_propres WHERE exercice = ?", (precedent,)
+        ).fetchone() is not None
+
+    if not existe:
+        donnees["exercice"] = precedent
+        colonnes = ", ".join(donnees)
+        parametres = ", ".join("?" * len(donnees))
+        with database_manager.transaction() as connexion:
+            connexion.execute(
+                f"INSERT INTO fonds_propres({colonnes}) VALUES ({parametres})",
+                list(donnees.values()),
+            )
 
     yield precedent
 
-    with database_manager.transaction() as connexion:
-        connexion.execute(
-            "DELETE FROM fonds_propres WHERE exercice = ?", (precedent,)
-        )
+    # On ne retire que ce qu'on a ajoute : un millesime saisi par
+    # l'utilisateur reste ou il etait.
+    if not existe:
+        with database_manager.transaction() as connexion:
+            connexion.execute(
+                "DELETE FROM fonds_propres WHERE exercice = ?", (precedent,)
+            )
 
 
 @pytest.fixture(scope="module")
@@ -752,10 +766,24 @@ def classeur_avec_positions_marche():
     return load_workbook(BytesIO(resultat.contenu))
 
 
+# L'agrégation par contrepartie est indexée par identifiant : deux homonymes
+# sont deux risques. Les essais suivent la même convention.
 PARTIES_LIEES_D_ESSAI = [
-    {"nom": "Actionnaire de référence", "categorie": "actionnaire"},
-    {"nom": "Directeur général", "categorie": "organe_executif"},
-    {"nom": "Agent de guichet", "categorie": "personnel_execution"},
+    {
+        "identifiant": "EXP-ESSAI-001",
+        "nom": "Actionnaire de référence",
+        "categorie": "actionnaire",
+    },
+    {
+        "identifiant": "EXP-ESSAI-002",
+        "nom": "Directeur général",
+        "categorie": "organe_executif",
+    },
+    {
+        "identifiant": "EXP-ESSAI-003",
+        "nom": "Agent de guichet",
+        "categorie": "personnel_execution",
+    },
 ]
 
 IMMOBILISATIONS_D_ESSAI = SyntheseImmobilisations(
@@ -770,7 +798,7 @@ IMMOBILISATIONS_D_ESSAI = SyntheseImmobilisations(
 def classeur_avec_encours():
     """Export produit avec des immobilisations et des parties liées."""
 
-    def agrege(bilan: float, hors_bilan: float) -> dict:
+    def agrege(partie: dict, bilan: float, hors_bilan: float) -> dict:
         """Reproduit la forme complète d'un agrégat par contrepartie.
 
         Les états EP29 à EP32 consomment les mêmes agrégats : leur fournir une
@@ -778,6 +806,8 @@ def classeur_avec_encours():
         """
 
         return {
+            "nom": partie["nom"],
+            "identifiant": partie["identifiant"],
             "pays": "Côte d'Ivoire",
             "secteur": "Administration",
             "bilan": bilan,
@@ -791,10 +821,11 @@ def classeur_avec_encours():
             "contrepartie": False,
         }
 
+    actionnaire, directeur, guichetier = PARTIES_LIEES_D_ESSAI
     groupes = {
-        "Actionnaire de référence": agrege(2.0e9, 0.5e9),
-        "Directeur général": agrege(0.4e9, 0.0),
-        "Agent de guichet": agrege(0.1e9, 0.0),
+        actionnaire["identifiant"]: agrege(actionnaire, 2.0e9, 0.5e9),
+        directeur["identifiant"]: agrege(directeur, 0.4e9, 0.0),
+        guichetier["identifiant"]: agrege(guichetier, 0.1e9, 0.0),
     }
     reel = construire_fodep.__globals__["_agreger_par_contrepartie"]
 
@@ -821,6 +852,8 @@ def _membre(groupe: str, nom: str) -> dict:
     return {
         "numero_groupe": f"GR-{groupe}",
         "nom_groupe": groupe,
+        # L'agrégat est indexé par identifiant : ici le nom en tient lieu.
+        "identifiant": nom,
         "numero_contrepartie": f"CR-{nom}",
         "categorie_lien": "controle_de_droit",
         "nom": nom,
@@ -943,6 +976,7 @@ def test_l_ep30_declare_aussi_le_hors_bilan():
         {
             "numero_groupe": "GR-01",
             "nom_groupe": "Groupe Alpha",
+            "identifiant": "SOCIETE ALPHA",
             "numero_contrepartie": "CR-100",
             "categorie_lien": "controle_de_droit",
             "nom": "SOCIETE ALPHA",
@@ -1021,21 +1055,38 @@ def test_l_ep38_ventile_les_concours_par_categorie_de_beneficiaire(
     assert (feuille.cell(row=lignes["PR002"], column=3).value or 0) == en_millions(0.5e9)
 
 
-def test_l_ep39_coche_la_colonne_du_beneficiaire(classeur_avec_encours):
-    """Un nom sans colonne cochée ne dirait pas à quel titre il figure."""
+def test_l_ep39_declare_des_montants_et_non_des_croix(classeur_avec_encours):
+    """Une croix ne s'additionne pas.
+
+    L'export cochait la colonne du bénéficiaire : la ligne TOTAL de l'état
+    partait donc à zéro, en contradiction avec les encours que l'EP38 déclare
+    deux feuilles plus tôt. Le seuil des 5 % de fonds propres dépend du
+    portefeuille du jour ; ce que cet essai tient, c'est l'invariant — ce qui
+    est déclaré porte un montant, et le total retombe sur ses lignes.
+    """
 
     feuille = classeur_avec_encours["EP39"]
     lignes = indexer_codes_dispru(feuille)
     codes = sorted(code for code in lignes if code.startswith("PR"))
-    colonnes = dict(COLONNES_PARTIES_LIEES)
+    declarees = [
+        lignes[code]
+        for code in codes[:-1]
+        if feuille.cell(row=lignes[code], column=2).value
+    ]
 
-    for code, partie in zip(codes, PARTIES_LIEES_D_ESSAI):
-        ligne = lignes[code]
-        assert feuille.cell(row=ligne, column=2).value == partie["nom"]
-        colonne = colonnes[partie["categorie"]]
-        assert feuille.cell(row=ligne, column=colonne).value == "X", (
-            f"EP39 {code} : la colonne « {partie['categorie']} » doit être cochée."
-        )
+    montants = [
+        feuille.cell(row=ligne, column=COLONNE_TOTAL_EP39).value or 0
+        for ligne in declarees
+    ]
+    assert all(montant > 0 for montant in montants), (
+        "une ligne déclarée sans montant ne dit rien de l'encours du bénéficiaire"
+    )
+    total = feuille.cell(row=lignes[codes[-1]], column=COLONNE_TOTAL_EP39).value or 0
+    assert abs(total - sum(montants)) <= TOLERANCE_ARRONDI
+
+    for ligne in declarees:
+        for _, colonne in COLONNES_PARTIES_LIEES:
+            assert feuille.cell(row=ligne, column=colonne).value != "X"
 
 
 def test_l_ep01_mesure_les_limites_sur_encours(classeur_avec_encours):

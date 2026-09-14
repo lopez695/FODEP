@@ -971,8 +971,8 @@ const Map<String, String> _englishTranslations = {
   'Risque de Marché': 'Market Risk',
   'Données risque de marché chargées avec succès':
       'Market risk data loaded successfully',
-  'Données BIC / CCR3 chargées avec succès':
-      'BIC / CCR3 data loaded successfully',
+  'Données BIC / CRR3 chargées avec succès':
+      'BIC / CRR3 data loaded successfully',
   'Données risque opérationnel chargées avec succès':
       'Operational risk data loaded successfully',
   'Fonds Propres': 'Own Funds',
@@ -985,7 +985,7 @@ const Map<String, String> _englishTranslations = {
       'Prudential base (losses / incidents)',
   'Registre des incidents et pertes opérationnelles, ligne par ligne.':
       'Register of operational incidents and losses, line by line.',
-  'BIC / CCR3': 'BIC / CCR3',
+  'BIC / CRR3': 'BIC / CRR3',
   'Formulaire de saisie de l\'indicateur d\'activité - un onglet Excel par exercice.':
       'Business indicator input form - one Excel tab per fiscal year.',
 

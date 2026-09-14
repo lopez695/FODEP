@@ -43,10 +43,18 @@ final NumberFormat _formatEntier = NumberFormat('#,##0', 'fr_FR');
 /// portefeuille (actions de quelques centaines de millions) ne soit pas réduit
 /// à « 0,0 Md ». La même unité est appliquée aux cartes KPI et à l'axe du
 /// graphique pour rester cohérente.
-PortfolioAmountUnit _uniteEchelleVar(double portefeuilleMd) =>
-    portefeuilleMd.abs() >= 1.0
-        ? PortfolioAmountUnit.billion
-        : PortfolioAmountUnit.million;
+///
+/// L'unité de départ est celle choisie en haut de l'écran ; elle ne descend
+/// d'un cran que si le portefeuille n'atteint pas une unité entière.
+PortfolioAmountUnit _uniteEchelleVar(double portefeuilleMd) {
+  final portefeuilleFcfa = portefeuilleMd.abs() * 1e9;
+  var unite = PortfolioAmountUnitPreference.current;
+  while (unite != PortfolioAmountUnit.thousand &&
+      portefeuilleFcfa < unite.divisor) {
+    unite = PortfolioAmountUnit.values[unite.index - 1];
+  }
+  return unite;
+}
 
 (String, String) _mdFormat(num valeur, {PortfolioAmountUnit? unit}) {
   if (unit != null) {

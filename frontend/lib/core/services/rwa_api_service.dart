@@ -357,6 +357,22 @@ class RwaApiService {
 
   // ─── Dérivés (EP11, risque de contrepartie) ──────────────────────────────
 
+  /// Les contreparties du portefeuille auxquelles un dérivé peut se
+  /// rattacher, avec leur identifiant, leur catégorie et leur notation.
+  /// Ce qu'un dérivé peut couvrir : crédits, obligations et actions détenus.
+  Future<SousJacents> fetchSousJacentsDerives() async {
+    final json = await _client.get('/derives/sous-jacents');
+    return SousJacents.fromJson(Map<String, dynamic>.from(json as Map));
+  }
+
+  Future<List<ContrepartieDerive>> fetchContrepartiesDerives() async {
+    final json = await _client.get('/derives/contreparties') as List<dynamic>;
+    return json
+        .map((item) =>
+            ContrepartieDerive.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<Derive>> fetchDerives() async {
     final json = await _client.get('/derives') as List<dynamic>;
     return json
@@ -1223,7 +1239,7 @@ class RwaApiService {
     return OpRiskParametres.fromJson(json);
   }
 
-  /// Toutes les années ayant des postes BIC/CCR3 enregistrés (saisie ou
+  /// Toutes les années ayant des postes BIC/CRR3 enregistrés (saisie ou
   /// import Excel), sans se limiter à la fenêtre N-2/N-1/N par défaut de
   /// [calculeOpRiskBic]. Utilisé par l'onglet "Données importées" pour
   /// retrouver un exercice importé même hors des 3 derniers exercices.
@@ -1243,7 +1259,7 @@ class RwaApiService {
       Map<String, dynamic> data) async {
     final json = await _client.put('/risque-operationnel/bic/parametres', data)
         as Map<String, dynamic>;
-    // Mêmes raisons que dans upsertBicInput() : les paramètres BIC/CCR3
+    // Mêmes raisons que dans upsertBicInput() : les paramètres BIC/CRR3
     // (seuils, coefficients) affectent aussi le RWA Opérationnel du dashboard.
     _dashboardFuture = null;
     return OpRiskParametres.fromJson(json);
