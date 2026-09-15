@@ -1,4 +1,4 @@
-// Dialog d'import Excel pour le formulaire BIC / CCR3 (Risque Opérationnel).
+// Dialog d'import Excel pour le formulaire BIC / CRR3 (Risque Opérationnel).
 //
 // Format attendu : UN ONGLET (feuille) PAR EXERCICE. Le nom de l'onglet est
 // l'année concernée (ex : "2024"), et chaque feuille contient deux colonnes,
@@ -32,7 +32,7 @@ import '../../../shared/utils/file_save.dart';
 import '../../../shared/widgets/import/shared_import_layout.dart';
 
 // ─── Les 13 postes attendus (doit rester synchronisé avec _kFields/_kLabels
-// dans risque_operationnel_screen.dart, classe _Ccr3TabViewState) ────────────
+// dans risque_operationnel_screen.dart, classe _Crr3TabViewState) ────────────
 
 const _bicFields = [
   'interets_percus', 'interets_verses', 'dividendes_percus',
@@ -158,7 +158,7 @@ class _RoImportBicDialogState extends State<_RoImportBicDialog> {
       final bytes = await widget.api.downloadBicImportTemplate();
       if (!mounted) return;
       final location = await getSaveLocation(
-        suggestedName: 'modele_import_bic_ccr3.xlsx',
+        suggestedName: 'modele_import_bic_crr3.xlsx',
         acceptedTypeGroups: const [
           XTypeGroup(label: 'Excel', extensions: ['xlsx']),
         ],
@@ -168,7 +168,7 @@ class _RoImportBicDialogState extends State<_RoImportBicDialog> {
         location,
         bytes,
         requiredExtension: '.xlsx',
-        suggestedName: 'modele_import_bic_ccr3.xlsx',
+        suggestedName: 'modele_import_bic_crr3.xlsx',
       );
       if (mounted) _showMsg('Modèle enregistré.');
     } on PathAccessException {
@@ -516,7 +516,7 @@ class _RoImportBicDialogState extends State<_RoImportBicDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SharedImportHeader(
-            title: 'Importation BIC / CCR3',
+            title: 'Importation BIC / CRR3',
             isImporting: _isImporting,
             onClose: () => Navigator.pop(context, false),
           ),

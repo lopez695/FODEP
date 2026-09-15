@@ -12,6 +12,8 @@ import '../../modules/expositions/models/suivi_versements_models.dart';
 import '../../modules/hors_bilan/models/hors_bilan_models.dart';
 import '../../modules/icaap/models/icaap_models.dart';
 import '../../modules/rapports/models/report_models.dart';
+import '../../modules/derives/models/derive_models.dart';
+import '../../modules/dispositions_transitoires/models/dispositions_transitoires_models.dart';
 import '../../modules/participations/models/participation_models.dart';
 import '../../modules/referentiels/models/referentiels_models.dart';
 import '../../modules/risque_operationnel/models/ro_models.dart';
@@ -309,6 +311,95 @@ class RwaApiService {
 
   Future<void> deleteParticipation(int id) async {
     await _client.delete('/participations/$id');
+  }
+
+  // ─── Dispositions transitoires (EP04, fonds propres) ─────────────────────
+
+  /// Les dispositions d'un exercice, ou du plus récent à défaut.
+  ///
+  /// Rend `null` quand rien n'a été saisi : « rien n'a été déclaré » et « tout
+  /// vaut zéro » ne se lisent pas de la même façon.
+  Future<DispositionsTransitoires?> fetchDispositionsTransitoires([
+    int? exercice,
+  ]) async {
+    final chemin = exercice == null
+        ? '/dispositions-transitoires'
+        : '/dispositions-transitoires?exercice=$exercice';
+    final json = await _client.get(chemin);
+    if (json == null) return null;
+    return DispositionsTransitoires.fromJson(
+      Map<String, dynamic>.from(json as Map),
+    );
+  }
+
+  /// L'état EP04 tel que les dispositions le déclareront.
+  ///
+  /// Servi par le module de reporting : il applique le taux de retrait imprimé
+  /// par la BCEAO, que seul ce module relit dans le formulaire.
+  /// L'état EP04 tel que les dispositions transitoires le déclareront.
+  ///
+  /// L'exercice se nomme : le serveur retomberait sinon sur celui des fonds
+  /// propres courants, ce qui ne coïncide avec l'écran que tant qu'il édite
+  /// l'exercice courant.
+  Future<SyntheseEp04> fetchSyntheseEp04([int? exercice]) async {
+    final requete = exercice == null
+        ? '/rapports/fodep/ep04'
+        : '/rapports/fodep/ep04?exercice=$exercice';
+    final json = await _client.get(requete);
+    return SyntheseEp04.fromJson(Map<String, dynamic>.from(json as Map));
+  }
+
+  Future<void> saveDispositionsTransitoires(
+    DispositionsTransitoires dispositions,
+  ) async {
+    await _client.put('/dispositions-transitoires', dispositions.toPayload());
+  }
+
+  // ─── Dérivés (EP11, risque de contrepartie) ──────────────────────────────
+
+  /// Les contreparties du portefeuille auxquelles un dérivé peut se
+  /// rattacher, avec leur identifiant, leur catégorie et leur notation.
+  /// Ce qu'un dérivé peut couvrir : crédits, obligations et actions détenus.
+  Future<SousJacents> fetchSousJacentsDerives() async {
+    final json = await _client.get('/derives/sous-jacents');
+    return SousJacents.fromJson(Map<String, dynamic>.from(json as Map));
+  }
+
+  Future<List<ContrepartieDerive>> fetchContrepartiesDerives() async {
+    final json = await _client.get('/derives/contreparties') as List<dynamic>;
+    return json
+        .map((item) =>
+            ContrepartieDerive.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Derive>> fetchDerives() async {
+    final json = await _client.get('/derives') as List<dynamic>;
+    return json
+        .map((item) => Derive.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// L'état EP11 tel que le registre le déclarera, ligne par ligne.
+  ///
+  /// Servi par le module de reporting et non par « /derives » : il applique
+  /// les pondérations imprimées par la BCEAO, que seul ce module relit dans le
+  /// formulaire.
+  Future<SyntheseEp11> fetchSyntheseEp11() async {
+    final json = await _client.get('/rapports/fodep/ep11');
+    return SyntheseEp11.fromJson(Map<String, dynamic>.from(json as Map));
+  }
+
+  Future<void> createDerive(Derive derive) async {
+    await _client.post('/derives', derive.toPayload());
+  }
+
+  Future<void> updateDerive(Derive derive) async {
+    await _client.put('/derives/${derive.id}', derive.toPayload());
+  }
+
+  Future<void> deleteDerive(int id) async {
+    await _client.delete('/derives/$id');
   }
 
   // ─── Groupes de clients liés (EP30, division des risques) ────────────────
@@ -1148,7 +1239,7 @@ class RwaApiService {
     return OpRiskParametres.fromJson(json);
   }
 
-  /// Toutes les années ayant des postes BIC/CCR3 enregistrés (saisie ou
+  /// Toutes les années ayant des postes BIC/CRR3 enregistrés (saisie ou
   /// import Excel), sans se limiter à la fenêtre N-2/N-1/N par défaut de
   /// [calculeOpRiskBic]. Utilisé par l'onglet "Données importées" pour
   /// retrouver un exercice importé même hors des 3 derniers exercices.
@@ -1168,7 +1259,7 @@ class RwaApiService {
       Map<String, dynamic> data) async {
     final json = await _client.put('/risque-operationnel/bic/parametres', data)
         as Map<String, dynamic>;
-    // Mêmes raisons que dans upsertBicInput() : les paramètres BIC/CCR3
+    // Mêmes raisons que dans upsertBicInput() : les paramètres BIC/CRR3
     // (seuils, coefficients) affectent aussi le RWA Opérationnel du dashboard.
     _dashboardFuture = null;
     return OpRiskParametres.fromJson(json);

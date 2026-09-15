@@ -38,6 +38,7 @@ from app.rapports.fodep.service import (
     CHEMIN_MODELE,
     CODES_EP22,
     COLONNES_PARTIES_LIEES,
+    COLONNE_TOTAL_EP39,
     ETATS_ALIMENTES,
     ETATS_DECLARES_A_ZERO,
     ETATS_EN_LISTE,
@@ -46,6 +47,7 @@ from app.rapports.fodep.service import (
     _exercice_declare,
     _remplir_ep08,
     _remplir_ep22,
+    _groupes_retenus_ep30,
     _remplir_ep30,
     en_millions,
     repartir_en_millions,
@@ -62,6 +64,67 @@ COLONNE_APR = 10
 # Les montants sont déclarés en millions de FCFA : la somme d'un état et le
 # total qu'il affiche peuvent différer d'un million par ligne arrondie.
 TOLERANCE_ARRONDI = 10
+
+
+@pytest.fixture(scope="module", autouse=True)
+def exercice_precedent():
+    """Donne au module un exercice anterieur de fonds propres.
+
+    Quatre etats -- EP35 a EP38 -- rapportent leurs limites aux fonds propres
+    « de l'exercice precedent ». Sans millesime anterieur, ces limites ne sont
+    pas mesurables : leurs pourcentages restent a zero, et l'export le signale
+    plutot que de les declarer conformes.
+
+    La graine en portait un, et les essais s'en contentaient. C'etait tester le
+    contenu du fichier de base plutot que le comportement de l'export : le jour
+    ou ce millesime a ete retire -- il tenait des chiffres de saisie d'essai --
+    deux essais sont tombes sans qu'aucun code n'ait bouge.
+
+    La portee est celle du module, et la fixture est automatique : les
+    classeurs y sont construits une fois et partages, et un exercice qui
+    apparaitrait au milieu ferait dependre leur contenu de l'ordre des essais.
+    """
+
+    from database.connection import database_manager
+
+    with database_manager.read_connection() as connexion:
+        courant = connexion.execute(
+            "SELECT * FROM fonds_propres ORDER BY exercice DESC LIMIT 1"
+        ).fetchone()
+    assert courant is not None, "aucun exercice de fonds propres dans la base"
+
+    donnees = dict(courant)
+    donnees.pop("id", None)
+    precedent = int(donnees["exercice"]) - 1
+
+    # Le millesime peut deja exister : l'utilisateur l'a saisi, ou la graine le
+    # porte. On l'emploie alors tel quel. L'inserer quand meme heurtait l'index
+    # unique et faisait tomber le module entier -- c'est-a-dire que l'essai
+    # dependait, dans l'autre sens, de ce que contient la base.
+    with database_manager.read_connection() as connexion:
+        existe = connexion.execute(
+            "SELECT 1 FROM fonds_propres WHERE exercice = ?", (precedent,)
+        ).fetchone() is not None
+
+    if not existe:
+        donnees["exercice"] = precedent
+        colonnes = ", ".join(donnees)
+        parametres = ", ".join("?" * len(donnees))
+        with database_manager.transaction() as connexion:
+            connexion.execute(
+                f"INSERT INTO fonds_propres({colonnes}) VALUES ({parametres})",
+                list(donnees.values()),
+            )
+
+    yield precedent
+
+    # On ne retire que ce qu'on a ajoute : un millesime saisi par
+    # l'utilisateur reste ou il etait.
+    if not existe:
+        with database_manager.transaction() as connexion:
+            connexion.execute(
+                "DELETE FROM fonds_propres WHERE exercice = ?", (precedent,)
+            )
 
 
 @pytest.fixture(scope="module")
@@ -703,10 +766,24 @@ def classeur_avec_positions_marche():
     return load_workbook(BytesIO(resultat.contenu))
 
 
+# L'agrégation par contrepartie est indexée par identifiant : deux homonymes
+# sont deux risques. Les essais suivent la même convention.
 PARTIES_LIEES_D_ESSAI = [
-    {"nom": "Actionnaire de référence", "categorie": "actionnaire"},
-    {"nom": "Directeur général", "categorie": "organe_executif"},
-    {"nom": "Agent de guichet", "categorie": "personnel_execution"},
+    {
+        "identifiant": "EXP-ESSAI-001",
+        "nom": "Actionnaire de référence",
+        "categorie": "actionnaire",
+    },
+    {
+        "identifiant": "EXP-ESSAI-002",
+        "nom": "Directeur général",
+        "categorie": "organe_executif",
+    },
+    {
+        "identifiant": "EXP-ESSAI-003",
+        "nom": "Agent de guichet",
+        "categorie": "personnel_execution",
+    },
 ]
 
 IMMOBILISATIONS_D_ESSAI = SyntheseImmobilisations(
@@ -721,7 +798,7 @@ IMMOBILISATIONS_D_ESSAI = SyntheseImmobilisations(
 def classeur_avec_encours():
     """Export produit avec des immobilisations et des parties liées."""
 
-    def agrege(bilan: float, hors_bilan: float) -> dict:
+    def agrege(partie: dict, bilan: float, hors_bilan: float) -> dict:
         """Reproduit la forme complète d'un agrégat par contrepartie.
 
         Les états EP29 à EP32 consomment les mêmes agrégats : leur fournir une
@@ -729,6 +806,8 @@ def classeur_avec_encours():
         """
 
         return {
+            "nom": partie["nom"],
+            "identifiant": partie["identifiant"],
             "pays": "Côte d'Ivoire",
             "secteur": "Administration",
             "bilan": bilan,
@@ -742,10 +821,11 @@ def classeur_avec_encours():
             "contrepartie": False,
         }
 
+    actionnaire, directeur, guichetier = PARTIES_LIEES_D_ESSAI
     groupes = {
-        "Actionnaire de référence": agrege(2.0e9, 0.5e9),
-        "Directeur général": agrege(0.4e9, 0.0),
-        "Agent de guichet": agrege(0.1e9, 0.0),
+        actionnaire["identifiant"]: agrege(actionnaire, 2.0e9, 0.5e9),
+        directeur["identifiant"]: agrege(directeur, 0.4e9, 0.0),
+        guichetier["identifiant"]: agrege(guichetier, 0.1e9, 0.0),
     }
     reel = construire_fodep.__globals__["_agreger_par_contrepartie"]
 
@@ -768,6 +848,122 @@ def classeur_avec_encours():
     return load_workbook(BytesIO(resultat.contenu))
 
 
+def _membre(groupe: str, nom: str) -> dict:
+    return {
+        "numero_groupe": f"GR-{groupe}",
+        "nom_groupe": groupe,
+        # L'agrégat est indexé par identifiant : ici le nom en tient lieu.
+        "identifiant": nom,
+        "numero_contrepartie": f"CR-{nom}",
+        "categorie_lien": "controle_de_droit",
+        "nom": nom,
+        "pays": "Cote d'Ivoire",
+        "secteur": "Agro-industrie",
+    }
+
+
+def _agrege(exposition: float) -> dict:
+    return {
+        "bilan": exposition,
+        "hors_bilan": 0.0,
+        "souffrance": 0.0,
+        "provisions": 0.0,
+        "encours_brut": exposition,
+        "apr": 0.0,
+        "echeances": defaultdict(float),
+        "pays": "Cote d'Ivoire",
+        "secteur": "Agro-industrie",
+        "hors_division": False,
+        "contrepartie": True,
+    }
+
+
+def test_l_ep30_ecarte_les_groupes_les_moins_exposes_et_jamais_a_moitie():
+    """Une grille trop courte doit couter le moins possible a la declaration.
+
+    L'EP30 offre une centaine de lignes ; un portefeuille en compte parfois
+    davantage. Le tri de lecture -- par nom de groupe, puis par nom de client --
+    ecartait alors la queue de l'alphabet : sur le portefeuille de reference,
+    cela revenait a ne declarer qu'un quart de l'exposition des groupes.
+
+    Deux regles le remplacent, et ce test les tient : les groupes les plus
+    exposes passent devant, et un groupe entre entier ou pas du tout -- un
+    groupe declare a moitie montrerait a l'EP29 une somme qui ne retombe pas.
+    """
+
+    # Trois groupes pour quatre lignes : le plus expose (6) tient, le suivant
+    # (5) non -- il compte trois clients pour deux lignes restantes -- et le
+    # troisieme (1) tient dans ce qui reste.
+    membres = [
+        _membre("Gros", "GROS A"),
+        _membre("Gros", "GROS B"),
+        _membre("Moyen", "MOYEN A"),
+        _membre("Moyen", "MOYEN B"),
+        _membre("Moyen", "MOYEN C"),
+        _membre("Petit", "PETIT A"),
+        _membre("Petit", "PETIT B"),
+    ]
+    groupes = {
+        "GROS A": _agrege(4e9), "GROS B": _agrege(2e9),
+        "MOYEN A": _agrege(3e9), "MOYEN B": _agrege(1e9), "MOYEN C": _agrege(1e9),
+        "PETIT A": _agrege(0.4e9), "PETIT B": _agrege(0.1e9),
+    }
+
+    retenus, ecartes, tronque = _groupes_retenus_ep30(membres, groupes, 4)
+
+    assert not tronque
+    assert [m["nom"] for m in retenus] == [
+        "GROS A", "GROS B", "PETIT A", "PETIT B",
+    ], "les groupes passent du plus expose au moins expose, chacun entier"
+    assert ecartes == [("Moyen", 3)], (
+        "un groupe qui ne tient pas dans les lignes restantes est ecarte "
+        "entier, pas tronque"
+    )
+
+    # Et aucun groupe n'est coupe : les clients declares d'un groupe sont
+    # tous ceux du groupe.
+    declares = {m["nom_groupe"] for m in retenus}
+    for groupe in declares:
+        attendus = {m["nom"] for m in membres if m["nom_groupe"] == groupe}
+        assert {m["nom"] for m in retenus if m["nom_groupe"] == groupe} == attendus
+
+
+def test_l_ep30_ne_change_pas_d_ordre_selon_qu_elle_deborde():
+    """La disposition ne doit pas dependre du nombre de lignes restantes.
+
+    Un etat dont l'ordre bascule d'alphabetique a « par exposition » le jour ou
+    un client de plus entre ne se compare pas d'un arrete a l'autre.
+    """
+
+    membres = [_membre("Gros", "GROS A"), _membre("Petit", "PETIT A")]
+    groupes = {"GROS A": _agrege(9e9), "PETIT A": _agrege(1e9)}
+
+    au_large, ecartes, _ = _groupes_retenus_ep30(membres, groupes, 50)
+    assert not ecartes
+    assert [m["nom"] for m in au_large] == ["GROS A", "PETIT A"]
+
+
+def test_l_ep30_signale_un_groupe_plus_grand_que_sa_grille():
+    """Aucune regle ne sauve un groupe qui deborde la grille a lui seul.
+
+    Il est alors tronque de ses plus petits clients -- et l'export doit le dire
+    autrement, parce que la somme du groupe ne retombera pas sur l'EP29.
+    """
+
+    membres = [_membre("Enorme", f"CLIENT {rang}") for rang in range(5)]
+    groupes = {
+        f"CLIENT {rang}": _agrege((5 - rang) * 1e9) for rang in range(5)
+    }
+
+    retenus, ecartes, tronque = _groupes_retenus_ep30(membres, groupes, 3)
+
+    assert tronque, "un groupe tronque doit se signaler"
+    assert not ecartes
+    assert [m["nom"] for m in retenus] == ["CLIENT 0", "CLIENT 1", "CLIENT 2"], (
+        "ce sont les plus petits clients qui sautent"
+    )
+
+
 def test_l_ep30_declare_aussi_le_hors_bilan():
     """Une contrepartie sans hors-bilan contredirait les EP29, EP31 et EP32.
 
@@ -780,6 +976,7 @@ def test_l_ep30_declare_aussi_le_hors_bilan():
         {
             "numero_groupe": "GR-01",
             "nom_groupe": "Groupe Alpha",
+            "identifiant": "SOCIETE ALPHA",
             "numero_contrepartie": "CR-100",
             "categorie_lien": "controle_de_droit",
             "nom": "SOCIETE ALPHA",
@@ -858,21 +1055,38 @@ def test_l_ep38_ventile_les_concours_par_categorie_de_beneficiaire(
     assert (feuille.cell(row=lignes["PR002"], column=3).value or 0) == en_millions(0.5e9)
 
 
-def test_l_ep39_coche_la_colonne_du_beneficiaire(classeur_avec_encours):
-    """Un nom sans colonne cochée ne dirait pas à quel titre il figure."""
+def test_l_ep39_declare_des_montants_et_non_des_croix(classeur_avec_encours):
+    """Une croix ne s'additionne pas.
+
+    L'export cochait la colonne du bénéficiaire : la ligne TOTAL de l'état
+    partait donc à zéro, en contradiction avec les encours que l'EP38 déclare
+    deux feuilles plus tôt. Le seuil des 5 % de fonds propres dépend du
+    portefeuille du jour ; ce que cet essai tient, c'est l'invariant — ce qui
+    est déclaré porte un montant, et le total retombe sur ses lignes.
+    """
 
     feuille = classeur_avec_encours["EP39"]
     lignes = indexer_codes_dispru(feuille)
     codes = sorted(code for code in lignes if code.startswith("PR"))
-    colonnes = dict(COLONNES_PARTIES_LIEES)
+    declarees = [
+        lignes[code]
+        for code in codes[:-1]
+        if feuille.cell(row=lignes[code], column=2).value
+    ]
 
-    for code, partie in zip(codes, PARTIES_LIEES_D_ESSAI):
-        ligne = lignes[code]
-        assert feuille.cell(row=ligne, column=2).value == partie["nom"]
-        colonne = colonnes[partie["categorie"]]
-        assert feuille.cell(row=ligne, column=colonne).value == "X", (
-            f"EP39 {code} : la colonne « {partie['categorie']} » doit être cochée."
-        )
+    montants = [
+        feuille.cell(row=ligne, column=COLONNE_TOTAL_EP39).value or 0
+        for ligne in declarees
+    ]
+    assert all(montant > 0 for montant in montants), (
+        "une ligne déclarée sans montant ne dit rien de l'encours du bénéficiaire"
+    )
+    total = feuille.cell(row=lignes[codes[-1]], column=COLONNE_TOTAL_EP39).value or 0
+    assert abs(total - sum(montants)) <= TOLERANCE_ARRONDI
+
+    for ligne in declarees:
+        for _, colonne in COLONNES_PARTIES_LIEES:
+            assert feuille.cell(row=ligne, column=colonne).value != "X"
 
 
 def test_l_ep01_mesure_les_limites_sur_encours(classeur_avec_encours):
@@ -1412,18 +1626,18 @@ def test_l_ep20_offre_une_ligne_pour_chacun_de_ses_paliers(classeur):
     assert PALIERS_EP20 == tuple(sorted(LIGNES_EP20_PAR_PONDERATION))
 
 
-def test_un_depassement_de_limite_est_signale_comme_non_deduit():
+def test_un_depassement_de_limite_est_deduit_des_fonds_propres():
     """Franchir une norme de l'EP01 doit s'entendre sur les fonds propres.
 
     L'EP03 porte une ligne de deduction par limite prudentielle -- PA149 pour
     les participations, IM006 et IM010 pour les immobilisations, PR004 pour les
-    prets aux parties liees. L'export renseigne les etats qui *mesurent* ces
-    limites (EP35 a EP38) mais ne reporte pas leur excedent sur les fonds
-    propres : au premier depassement, le CET1 declare serait surestime, et les
-    trois ratios de solvabilite avec lui, sans que rien ne le dise.
+    prets aux parties liees. Les etats qui *mesurent* ces limites (EP35 a EP38)
+    en calculent l'excedent, et l'EP03 le retranche du CET1 : sans cela le CET1
+    declare serait surestime, et les trois ratios de solvabilite avec lui.
 
-    Tant que le report n'est pas cable, l'export doit au moins refuser de
-    laisser passer le depassement en silence.
+    Le test porte sur la ligne PA149 et sur son effet : le montant declare doit
+    etre negatif, et le CET1 doit avoir baisse d'autant par rapport a la meme
+    declaration sans depassement.
     """
 
     # Sucrivoire portee a 30 % du capital de son emetteur : au-dela des 25 %
@@ -1450,59 +1664,85 @@ def test_un_depassement_de_limite_est_signale_comme_non_deduit():
             au_dela, start=1
         )
     ]
-    with mock.patch(
-        "app.rapports.fodep.service.lister_participations", return_value=participations
-    ):
-        resultat = construire_fodep()
+    def declaration(participations_declarees):
+        with mock.patch(
+            "app.rapports.fodep.service.lister_participations",
+            return_value=participations_declarees,
+        ):
+            resultat = construire_fodep()
+        return resultat, load_workbook(BytesIO(resultat.contenu))
 
-    def signalement(anomalies) -> str:
-        signalees = [
-            reserve.message
-            for reserve in anomalies
-            if "n'est pas déduit des fonds propres" in reserve.message
-        ]
-        return signalees[0] if signalees else ""
+    def montant_ep03(livre, code: str) -> float:
+        feuille = livre["EP03"]
+        lignes = indexer_codes_dispru(feuille)
+        return float(feuille.cell(row=lignes[code], column=3).value or 0)
 
-    # La norme visee est la limite individuelle sur les participations dans
-    # les entites commerciales (RA006), celle que la fixture fait franchir.
-    NORME_VISEE = "Limite individuelle sur les participations"
+    resultat, livre = declaration(participations)
 
-    message = signalement(resultat.anomalies)
-    assert message, (
-        "une limite franchie doit etre signalee comme non deduite des fonds "
-        "propres ; reserves emises : "
-        + " | ".join(reserve.message[:60] for reserve in resultat.anomalies)
+    # La ligne de deduction porte l'excedent, en negatif comme les autres
+    # deductions de l'EP03.
+    excedent_declare = montant_ep03(livre, "PA149")
+    assert excedent_declare < 0, (
+        "PA149 doit porter l'excedent de la limite franchie, en negatif ; "
+        f"la ligne declare {excedent_declare}."
     )
-    assert "PA149" in message
-    assert NORME_VISEE in message
 
-    # Et le silence reste la regle quand aucune limite n'est franchie.
-    with mock.patch(
-        "app.rapports.fodep.service.lister_participations",
-        return_value=[
-            ParticipationView(
-                id=index,
-                denomination=denomination,
-                categorie=categorie,
-                capital_entreprise=capital,
-                montant_brut=brut,
-                montant_net=net,
-                commentaire=None,
-                cree_le="2026-01-01",
-                modifie_le="2026-01-01",
-            )
-            for index, (denomination, categorie, capital, brut, net) in enumerate(
-                PARTICIPATIONS_D_ESSAI, start=1
-            )
-        ],
-    ):
-        sans_depassement = construire_fodep()
-    # Le contrôle porte sur cette norme-là, pas sur la réserve entière : les
-    # cinq autres limites de l'EP01 dépendent du portefeuille chargé, et l'une
-    # d'elles peut être franchie sans que les participations y soient pour
-    # quoi que ce soit. Assurer le silence complet ferait échouer le test au
-    # premier jeu de données où une immobilisation dépasse son plafond.
-    assert NORME_VISEE not in signalement(sans_depassement.anomalies)
+    # L'EP35 mesure ce que l'EP03 deduit : les deux etats doivent dire le meme
+    # montant, sans quoi la declaration se contredit elle-meme.
+    ep35 = livre["EP35"]
+    a_deduire = float(
+        ep35.cell(
+            row=indexer_codes_dispru(ep35, colonne=9)["PA149"], column=8
+        ).value
+        or 0
+    )
+    assert a_deduire == pytest.approx(-excedent_declare, abs=1)
+
+    # Et l'effet sur les fonds propres : le CET1 baisse de l'excedent, pas
+    # d'autre chose.
+    sans_depassement, livre_sans = declaration([
+        ParticipationView(
+            id=index,
+            denomination=denomination,
+            categorie=categorie,
+            capital_entreprise=capital,
+            montant_brut=brut,
+            montant_net=net,
+            commentaire=None,
+            cree_le="2026-01-01",
+            modifie_le="2026-01-01",
+        )
+        for index, (denomination, categorie, capital, brut, net) in enumerate(
+            PARTICIPATIONS_D_ESSAI, start=1
+        )
+    ])
+    ecart_cet1 = montant_ep03(livre_sans, "FPI22") - montant_ep03(livre, "FPI22")
+    ecart_deduction = montant_ep03(livre_sans, "PA149") - excedent_declare
+    assert ecart_cet1 == pytest.approx(ecart_deduction, abs=1), (
+        "le CET1 doit baisser exactement de l'excedent porte sur PA149."
+    )
+
+    # Porter une participation au-dela des 25 % du capital de son emetteur
+    # creuse la deduction : c'est la mesure, et non le libelle de la reserve,
+    # qui dit que la norme a mordu. Le libelle ne suffirait pas — la limite
+    # rapportee aux fonds propres (RA007) porte presque le meme intitule, et se
+    # trouve franchie dans les deux cas.
+    assert -excedent_declare > -montant_ep03(livre_sans, "PA149"), (
+        "une participation portee au-dela de la limite individuelle doit "
+        "augmenter l'excedent deduit des fonds propres."
+    )
+
+    # Le franchissement se dit encore, mais comme un constat sur les encours,
+    # non comme une correction a faire a la main.
+    franchissements = [
+        reserve.message
+        for reserve in resultat.anomalies
+        if "les normes suivantes sont franchies" in reserve.message
+    ]
+    assert franchissements, "un franchissement de norme doit rester signale"
+    assert "PA149" in franchissements[0], (
+        "la reserve doit nommer les lignes de l'EP03 ou l'excedent est deduit."
+    )
 
 
 def test_les_etats_declares_a_zero_sont_nommes(classeur):

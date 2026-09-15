@@ -6,6 +6,7 @@ import '../../../core/utils/formatters.dart';
 import '../models/participation_models.dart';
 import 'jauge_limite.dart';
 import 'tableau_maison.dart';
+import '../../../core/utils/currency_conversion.dart';
 
 /// Nombre de membres retenus dans chaque analyse de groupe.
 ///
@@ -14,12 +15,12 @@ import 'tableau_maison.dart';
 /// reste consultable dans le détail du groupe.
 const int _tailleDuTop = 5;
 
-/// Unité d'affichage des montants : le million de francs.
+/// Diviseur des montants : l'unité choisie en haut de l'écran.
 ///
 /// Tous les montants de la page sont exprimés dans cette unité, axes des
 /// graphiques compris. Une page qui mélangerait les unités ferait comparer des
 /// chiffres qui ne se comparent pas.
-const double _million = 1000000;
+double get _diviseur => PortfolioAmountUnitPreference.current.divisor;
 
 /// Membres portant réellement une exposition, du plus lourd au plus léger.
 ///
@@ -235,7 +236,7 @@ class _ConcentrationGroupesPageState extends State<ConcentrationGroupesPage> {
                     titre: 'Top $_tailleDuTop des membres',
                     sousTitre:
                         'Les $_tailleDuTop membres les plus exposés du groupe '
-                        'choisi, en millions de FCFA.',
+                        'choisi, en ${AppFormatters.libelleUnite().toLowerCase()}.',
                     // Un groupe à la fois, choisi ici comme à la section 3.
                     // Empiler une carte par groupe faisait grandir la page avec
                     // le portefeuille, alors qu'un seul classement se lit à la
@@ -374,19 +375,19 @@ class _Perimetre extends StatelessWidget {
       children: [
         _Indicateur(
           libelle: 'Fonds propres de base T1',
-          valeur: AppFormatters.millions(donnees.fondsPropresT1),
+          valeur: AppFormatters.montant(donnees.fondsPropresT1),
           precision: 'référence de la division des risques',
         ),
         _Indicateur(
           libelle: 'Exposition groupée',
-          valeur: AppFormatters.millions(totalGroupes),
+          valeur: AppFormatters.montant(totalGroupes),
           precision: 'bilan et hors bilan après CCF',
         ),
         _Indicateur(
           libelle: 'Couverture du portefeuille',
           valeur: '${(couverture * 100).toStringAsFixed(1)} %',
           precision:
-              'sur ${AppFormatters.millions(donnees.expositionPortefeuille)} au total',
+              'sur ${AppFormatters.montant(donnees.expositionPortefeuille)} au total',
         ),
         _Indicateur(
           libelle: 'Groupes constitués',
@@ -615,7 +616,7 @@ class _LigneDuGroupe extends StatelessWidget {
                   ..._cellule(
                     flex: 3,
                     enfant: Text(
-                      AppFormatters.millions(groupe.expositionTotale),
+                      AppFormatters.montant(groupe.expositionTotale),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: _entete,
                         fontWeight: FontWeight.w700,
@@ -645,8 +646,8 @@ class _LigneDuGroupe extends StatelessWidget {
                     flex: 3,
                     enfant: Text(
                       marge >= 0
-                          ? AppFormatters.millions(marge)
-                          : '− ${AppFormatters.millions(marge.abs())}',
+                          ? AppFormatters.montant(marge)
+                          : '− ${AppFormatters.montant(marge.abs())}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: marge >= 0 ? _texteFort : theme.colorScheme.error,
                         fontWeight: FontWeight.w600,
@@ -806,7 +807,7 @@ class _DetailGroupe extends StatelessWidget {
           children: [
             _Indicateur(
               libelle: 'Exposition du groupe',
-              valeur: AppFormatters.millions(groupe.expositionTotale),
+              valeur: AppFormatters.montant(groupe.expositionTotale),
               precision: 'FCFA, bilan et hors bilan',
             ),
             _Indicateur(
@@ -982,7 +983,7 @@ class _Repartition extends StatelessWidget {
                 SizedBox(
                   width: 104,
                   child: Text(
-                    AppFormatters.millions(part.montant),
+                    AppFormatters.montant(part.montant),
                     textAlign: TextAlign.right,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: _entete,
@@ -1056,7 +1057,7 @@ class _TableauMembres extends StatelessWidget {
         _LigneMembre(
           rang: '${i + 1}'.padLeft(2, '0'),
           nom: porteurs[i].nom,
-          montant: AppFormatters.millions(porteurs[i].exposition),
+          montant: AppFormatters.montant(porteurs[i].exposition),
           part: '${(porteurs[i].partDuGroupe * 100).toStringAsFixed(1)} %',
           cumul: '${(cumul * 100).toStringAsFixed(1)} %',
           dansLeTop: i < _tailleDuTop,
@@ -1293,7 +1294,7 @@ class _CarteTopGroupe extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      '${AppFormatters.millions(groupe.expositionTotale)} · '
+                      '${AppFormatters.montant(groupe.expositionTotale)} · '
                       '${porteurs.length} membre(s) exposé(s) · '
                       'Herfindahl ${groupe.herfindahl.toStringAsFixed(2)}',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -1377,7 +1378,7 @@ class _HistogrammeTop extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = _palette(theme);
-    final montants = top.map((membre) => membre.exposition / _million).toList();
+    final montants = top.map((membre) => membre.exposition / _diviseur).toList();
     final maximum = montants.reduce((a, b) => a > b ? a : b);
     // Marge au-dessus de la plus haute barre : sans elle, la barre touche le
     // bord et l'échelle paraît tronquée.
@@ -1387,7 +1388,7 @@ class _HistogrammeTop extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Exposition en millions de FCFA',
+          'Exposition en ${AppFormatters.libelleUnite().toLowerCase()}',
           style: theme.textTheme.labelSmall,
         ),
         const SizedBox(height: 8),
@@ -1412,7 +1413,7 @@ class _HistogrammeTop extends StatelessWidget {
                           const TextStyle(),
                       children: [
                         TextSpan(
-                          text: '${AppFormatters.millions(membre.exposition)} · '
+                          text: '${AppFormatters.montant(membre.exposition)} · '
                               '${(membre.partDuGroupe * 100).toStringAsFixed(1)} % du groupe',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onInverseSurface,
@@ -1572,7 +1573,7 @@ class _LegendeTop extends StatelessWidget {
                     ..._cellule(
                       flex: 3,
                       enfant: Text(
-                        AppFormatters.millions(top[i].exposition),
+                        AppFormatters.montant(top[i].exposition),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: _entete,
                           fontWeight: FontWeight.w700,
@@ -1747,7 +1748,7 @@ class _Analyse extends StatelessWidget {
       constats.add((
         ton: _Ton.fait,
         titre: 'Le groupe le plus exposé est « ${plusLourd.nom} »',
-        detail: '${AppFormatters.millions(plusLourd.expositionTotale)} FCFA, '
+        detail: '${AppFormatters.montant(plusLourd.expositionTotale)} FCFA, '
             'soit ${(plusLourd.partFondsPropres * 100).toStringAsFixed(2)} % '
             'des fonds propres de base, pour un plafond de $seuil %.',
       ));

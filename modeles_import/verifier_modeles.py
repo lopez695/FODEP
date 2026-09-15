@@ -259,7 +259,7 @@ def verifier_operationnel() -> None:
         for numero, erreurs in invalides[:5]:
             print(f"        - ligne {numero} : {', '.join(erreurs)}")
 
-        # ── b) import BIC / CCR3 ───────────────────────────────────────────
+        # ── b) import BIC / CRR3 ───────────────────────────────────────────
         annees = []
         for nom in classeur.sheetnames:
             trouve = re.search(r"(19|20)\d{2}", nom.strip())

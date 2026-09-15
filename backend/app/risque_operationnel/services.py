@@ -411,7 +411,7 @@ def build_ro_import_template() -> bytes:
     return buf.getvalue()
 
 
-# Libellés des 13 postes du formulaire de saisie BIC/CCR3, dans l'ordre attendu
+# Libellés des 13 postes du formulaire de saisie BIC/CRR3, dans l'ordre attendu
 # par le formulaire (ILDC, SC, FC, BIA). Doit rester synchronisé avec _kFields /
 # _kLabels côté frontend (risque_operationnel_screen.dart).
 BIC_INPUT_FIELDS: tuple[tuple[str, str], ...] = (
@@ -433,7 +433,7 @@ BIC_INPUT_FIELDS: tuple[tuple[str, str], ...] = (
 
 
 def build_bic_import_template() -> bytes:
-    """Génère un classeur Excel de modèle pour l'import des postes BIC/CCR3.
+    """Génère un classeur Excel de modèle pour l'import des postes BIC/CRR3.
 
     Format « un onglet par exercice » : chaque feuille du classeur porte comme
     nom l'année concernée (ex : "2024") et contient deux colonnes, « Poste »
@@ -478,7 +478,7 @@ def build_bic_import_template() -> bytes:
         ws.row_dimensions[1].height = 30
         ws.merge_cells("A1:B1")
         title_cell = ws["A1"]
-        title_cell.value = f"Exercice {annee} — Indicateur d'activité BIC / CCR3"
+        title_cell.value = f"Exercice {annee} — Indicateur d'activité BIC / CRR3"
         title_cell.font = Font(bold=True, size=12, color="FFFFFF")
         title_cell.fill = fill(BLUE_DARK)
         title_cell.alignment = center()
@@ -517,7 +517,7 @@ def build_bic_import_template() -> bytes:
 
     ws_instr.column_dimensions["A"].width = 80
     ws_instr.merge_cells("A1:A1")
-    ws_instr["A1"].value = "Instructions — Import des postes BIC / CCR3"
+    ws_instr["A1"].value = "Instructions — Import des postes BIC / CRR3"
     ws_instr["A1"].font = Font(bold=True, size=13, color="FFFFFF")
     ws_instr["A1"].fill = fill(BLUE_DARK)
     ws_instr["A1"].alignment = center()
@@ -1080,7 +1080,7 @@ def get_op_risk_input(annee: int) -> OpRiskInput:
 
 
 def list_op_risk_inputs() -> list[OpRiskInput]:
-    """Renvoie TOUTES les années pour lesquelles des postes BIC/CCR3 ont été
+    """Renvoie TOUTES les années pour lesquelles des postes BIC/CRR3 ont été
     enregistrés (saisie manuelle ou import Excel), triées par année — sans se
     limiter à la fenêtre glissante N-2/N-1/N utilisée par calcul_bic(). Permet
     à l'onglet "Données importées" de retrouver un exercice importé même s'il

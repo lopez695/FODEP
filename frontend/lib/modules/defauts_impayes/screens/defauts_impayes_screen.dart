@@ -43,7 +43,9 @@ class _DefautsImpayesScreenState extends State<DefautsImpayesScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchDefaultsModule());
+      setState(() {
+        _future = _service.fetchDefaultsModule();
+      });
     });
   }
 

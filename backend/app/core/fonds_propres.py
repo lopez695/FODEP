@@ -22,3 +22,19 @@ from __future__ import annotations
 REQUETE_FONDS_PROPRES_COURANTS = (
     "SELECT * FROM fonds_propres ORDER BY exercice DESC, date_analyse DESC LIMIT 1"
 )
+
+#: Le millesime clos qui precede immediatement celui qu'on declare.
+#:
+#: Quatre etats du FODEP -- EP35, EP36, EP37 et EP38 -- rapportent leurs
+#: limites aux fonds propres « de l'exercice precedent », et le disent en note
+#: de pied. Le parametre est l'exercice DECLARE, pas l'annee courante : une
+#: declaration reprise deux ans plus tard doit retrouver le meme denominateur
+#: qu'a l'epoque, sans quoi les pourcentages declares changeraient tout seuls.
+#:
+#: « L'exercice immediatement inferieur » et non « l'exercice moins un » : un
+#: millesime manquant ne doit pas rendre la limite non mesurable alors que
+#: l'etablissement a saisi l'annee d'avant.
+REQUETE_FONDS_PROPRES_EXERCICE_PRECEDENT = (
+    "SELECT * FROM fonds_propres WHERE exercice IS NOT NULL AND exercice < ? "
+    "ORDER BY exercice DESC LIMIT 1"
+)

@@ -14,6 +14,7 @@ enum AppModule {
   garanties,
   defautsImpayes,
   concentrationCredit,
+  derives,
   reportingCredit,
   risqueMarche,
   risqueMarcheImport,
@@ -29,7 +30,7 @@ enum AppModule {
   risqueOperationnelPertes,
   risqueOperationnelHistorique,
   risqueOperationnelReporting,
-  risqueOperationnelUemoiCcr3,
+  risqueOperationnelUemoiCrr3,
   analyse,
   stressTest,
   icap,
@@ -59,6 +60,8 @@ extension AppModuleLabel on AppModule {
         return 'Dashboard Crédit';
       case AppModule.expositions:
         return 'Risque de crédit';
+      case AppModule.derives:
+        return 'Instruments dérivés';
       case AppModule.rwaEngine:
         return 'Pilotage RWA Crédit';
       case AppModule.crm:
@@ -101,8 +104,8 @@ extension AppModuleLabel on AppModule {
         return 'Historique événements';
       case AppModule.risqueOperationnelReporting:
         return 'Reporting global';
-      case AppModule.risqueOperationnelUemoiCcr3:
-        return 'CCR3 / Dispositif UEMOA';
+      case AppModule.risqueOperationnelUemoiCrr3:
+        return 'CRR3 / Dispositif UEMOA';
       case AppModule.analyse:
         return 'Analyse';
       case AppModule.stressTest:
@@ -138,6 +141,9 @@ extension AppModuleLabel on AppModule {
         return 'Tableau de bord spécifique au pilotage du risque de crédit.';
       case AppModule.expositions:
         return 'Saisie, import, edition et suivi detaille des expositions du portefeuille.';
+      case AppModule.derives:
+        return 'Registre des swaps, changes à terme et autres contrats '
+            "dérivés, et le risque de contrepartie qu'ils portent (EP11).";
       case AppModule.rwaEngine:
         return 'Suivi des expositions pondérées et du capital réglementaire.';
       case AppModule.crm:
@@ -180,8 +186,8 @@ extension AppModuleLabel on AppModule {
         return 'Traçabilité complète de toutes les actions et modifications (Art. 314).';
       case AppModule.risqueOperationnelReporting:
         return 'Génération automatique du rapport réglementaire consolidé (Dashboard, Crédit, Marché, Opérationnel).';
-      case AppModule.risqueOperationnelUemoiCcr3:
-        return 'CCR3-COREP (BIC) et dispositif UEMOA : Indicateur de Base, Approche Standard et synthèse.';
+      case AppModule.risqueOperationnelUemoiCrr3:
+        return 'CRR3-COREP (BIC) et dispositif UEMOA : Indicateur de Base, Approche Standard et synthèse.';
       case AppModule.analyse:
         return 'Conseils et recommandations basés sur les expositions et les risques.';
       case AppModule.stressTest:
@@ -217,6 +223,8 @@ extension AppModuleLabel on AppModule {
         return Icons.dashboard_outlined;
       case AppModule.expositions:
         return Icons.credit_card_rounded;
+      case AppModule.derives:
+        return Icons.swap_horiz_rounded;
       case AppModule.rwaEngine:
         return Icons.account_balance_rounded;
       case AppModule.crm:
@@ -259,7 +267,7 @@ extension AppModuleLabel on AppModule {
         return Icons.schedule_rounded;
       case AppModule.risqueOperationnelReporting:
         return Icons.summarize_outlined;
-      case AppModule.risqueOperationnelUemoiCcr3:
+      case AppModule.risqueOperationnelUemoiCrr3:
         return Icons.policy_outlined;
       case AppModule.analyse:
         return Icons.analytics_rounded;

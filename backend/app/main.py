@@ -18,6 +18,8 @@ from app.expositions.routes import router as expositions_router
 from app.hors_bilan.routes import router as hors_bilan_router
 from app.groupes_clients.routes import router as groupes_clients_router
 from app.market.routes import router as market_router
+from app.derives.routes import router as derives_router
+from app.dispositions_transitoires.routes import router as dispositions_transitoires_router
 from app.participations.routes import router as participations_router
 from app.rapports.routes import router as rapports_router
 from app.referentiels.routes import router as referentiels_router
@@ -141,6 +143,8 @@ app.include_router(hors_bilan_router)
 app.include_router(crm_router)
 app.include_router(referentiels_router)
 app.include_router(participations_router)
+app.include_router(derives_router)
+app.include_router(dispositions_transitoires_router)
 app.include_router(groupes_clients_router)
 app.include_router(rapports_router)
 app.include_router(market_router)

@@ -182,7 +182,7 @@ class _ImportationsScreenState extends State<ImportationsScreen> {
                                             if (!context.mounted) return;
                                             if (choice == null) return;
 
-                                            if (choice == 'ccr3') {
+                                            if (choice == 'crr3') {
                                               if (!context.mounted) return;
                                               final imported =
                                                   await showRoImportBicDialog(
@@ -192,7 +192,7 @@ class _ImportationsScreenState extends State<ImportationsScreen> {
                                               if (!mounted) return;
                                               if (imported == true) {
                                                 setState(() {
-                                                  successMessage = 'Données BIC / CCR3 chargées avec succès'
+                                                  successMessage = 'Données BIC / CRR3 chargées avec succès'
                                                       .tr(context);
                                                 });
                                               }
@@ -291,7 +291,7 @@ class _ImportationsScreenState extends State<ImportationsScreen> {
 
   /// Demande à l'utilisateur quel type de fichier "Risque Opérationnel" il
   /// souhaite importer : le registre des pertes (base prudentielle) ou le
-  /// formulaire d'activité BIC/CCR3. Retourne 'prudentielle', 'ccr3' ou null
+  /// formulaire d'activité BIC/CRR3. Retourne 'prudentielle', 'crr3' ou null
   /// si l'utilisateur annule.
   Future<String?> _chooseRoImportType(BuildContext context) {
     return showDialog<String>(
@@ -371,11 +371,11 @@ class _ImportationsScreenState extends State<ImportationsScreen> {
                 const SizedBox(height: 10),
                 option(
                   icon: Icons.account_balance_outlined,
-                  title: 'BIC / CCR3',
+                  title: 'BIC / CRR3',
                   subtitle:
                       'Formulaire de saisie de l\'indicateur d\'activité - un onglet Excel par exercice.',
                   color: AppTheme.accent,
-                  value: 'ccr3',
+                  value: 'crr3',
                 ),
               ],
             ),

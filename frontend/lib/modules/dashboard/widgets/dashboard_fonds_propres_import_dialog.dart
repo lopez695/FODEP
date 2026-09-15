@@ -1,6 +1,6 @@
 // Dialog d'import Excel pour les Fonds Propres Réglementaires (CET1/AT1/Tier2).
 //
-// Contrairement à l'import BIC/CCR3, il n'y a pas de dimension "année" ici :
+// Contrairement à l'import BIC/CRR3, il n'y a pas de dimension "année" ici :
 // le modèle représente UNE seule photo des fonds propres, et l'import
 // remplace entièrement les valeurs actuellement enregistrées - exactement
 // comme le fait le formulaire "Mettre à jour" (DashboardFondsPropresDialog).
@@ -24,6 +24,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/utils/file_save.dart';
 import '../../../shared/widgets/import/shared_import_layout.dart';
 import '../models/dashboard_models.dart';
+import '../../../core/utils/formatters.dart';
 
 // ─── Les 11 postes attendus (doit rester synchronisé avec
 // FONDS_PROPRES_INPUT_FIELDS côté backend) ──────────────────────────────────
@@ -1027,7 +1028,7 @@ class _FondsPropresImportDialogState extends State<_FondsPropresImportDialog> {
             style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: _muted)),
         const SizedBox(height: 4),
         Text(
-          '${(val / 1e9).toStringAsFixed(3)} Md',
+          AppFormatters.montant(val, maxDecimals: 3),
           style: TextStyle(fontSize: isTotal ? 15 : 13, fontWeight: FontWeight.w800, color: isTotal ? color : _text),
         ),
       ],

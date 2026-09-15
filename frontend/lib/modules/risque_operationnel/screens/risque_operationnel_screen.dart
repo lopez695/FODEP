@@ -46,7 +46,7 @@ enum OperationalRiskView {
   workflow,
   plans,
   historique,
-  ccr3Uemoi,
+  crr3Uemoi,
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ class RisqueOperationnelScreen extends StatelessWidget {
           artRef: 'Art. 313.c',
           child: _PlansView(api: api),
         ),
-        OperationalRiskView.ccr3Uemoi     => _Ccr3UemoiHubView(api: api),
+        OperationalRiskView.crr3Uemoi     => _Crr3UemoiHubView(api: api),
       },
     );
   }
@@ -859,7 +859,7 @@ class _DashboardViewState extends State<_DashboardView> {
             )
                 : Padding(
                     padding: const EdgeInsets.all(16),
-                    child: _Ccr3TabView(api: widget.api, isDark: isDark, onlyAnalyseRapide: true),
+                    child: _Crr3TabView(api: widget.api, isDark: isDark, onlyAnalyseRapide: true),
                   ),
           ),
         ],
@@ -1210,7 +1210,7 @@ class _SimulationCriseView extends StatefulWidget {
   const _SimulationCriseView({required this.api, this.embedded = false});
   final RwaApiService api;
   /// Quand true, masque le titre de page (déjà porté par l'onglet parent,
-  /// ex : le hub "CCR3 / Dispositif UEMOA") - utilisé quand ce widget est
+  /// ex : le hub "CRR3 / Dispositif UEMOA") - utilisé quand ce widget est
   /// intégré comme onglet plutôt qu'affiché comme écran autonome.
   final bool embedded;
   @override
@@ -5678,7 +5678,7 @@ class _RegistreView extends StatefulWidget {
   final RwaApiService api;
   /// Quand true, remplace le grand titre de page par une simple barre
   /// d'actions (Import/Export) - utilisé quand ce widget est intégré comme
-  /// onglet du hub "CCR3 / Dispositif UEMOA" plutôt qu'affiché en écran
+  /// onglet du hub "CRR3 / Dispositif UEMOA" plutôt qu'affiché en écran
   /// autonome depuis le menu.
   final bool embedded;
   @override
@@ -6409,12 +6409,9 @@ class _RegistreViewState extends State<_RegistreView> {
     final totalApr   = totalKro  * kMultiplicateurRwaReglementaire;
     final nbSignif   = items.where((i) => i.significatif).length;
 
-    String fmt(double v) {
-      if (v >= 1e9)  return '${(v / 1e9).toStringAsFixed(1)} Md';
-      if (v >= 1e6)  return '${(v / 1e6).toStringAsFixed(1)} M';
-      if (v >= 1e3)  return '${(v / 1e3).toStringAsFixed(0)} K';
-      return v.toStringAsFixed(0);
-    }
+    String fmt(double v) => v.abs() < 1000
+        ? v.toStringAsFixed(0)
+        : AppFormatters.montant(v, maxDecimals: 1);
 
     // ── Helpers de widgets ───────────────────────────────────────────────
     pw.Widget sectionBanner(String text) => pw.Container(
@@ -7512,24 +7509,24 @@ class _RegistreViewState extends State<_RegistreView> {
 
 }
 
-// ─── CCR3 / Dispositif UEMOA - hub à onglets (ancien "Import de données",
+// ─── CRR3 / Dispositif UEMOA - hub à onglets (ancien "Import de données",
 // extrait pour que le registre des pertes redevienne l'écran direct de
 // l'entrée "Import données" du menu) ──────────────────────────────────────
 
-class _Ccr3UemoiHubView extends StatefulWidget {
-  const _Ccr3UemoiHubView({required this.api});
+class _Crr3UemoiHubView extends StatefulWidget {
+  const _Crr3UemoiHubView({required this.api});
   final RwaApiService api;
   @override
-  State<_Ccr3UemoiHubView> createState() => _Ccr3UemoiHubViewState();
+  State<_Crr3UemoiHubView> createState() => _Crr3UemoiHubViewState();
 }
 
-class _Ccr3UemoiHubViewState extends State<_Ccr3UemoiHubView> {
+class _Crr3UemoiHubViewState extends State<_Crr3UemoiHubView> {
   int _selectedTab    = 0;
   int _uemoiSubTab    = 0;
 
   static const _tabDefs = [
     'Dispositif UEMOA',
-    'CCR3',
+    'CRR3',
   ];
 
   // Onglets de premier niveau temporairement désactivés (non fonctionnels).
@@ -7554,7 +7551,7 @@ class _Ccr3UemoiHubViewState extends State<_Ccr3UemoiHubView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PageHeader(
-            title: 'CCR3 / Dispositif UEMOA',
+            title: 'CRR3 / Dispositif UEMOA',
             titleFontSize: 26,
           ),
           const SizedBox(height: 14),
@@ -7606,7 +7603,7 @@ class _Ccr3UemoiHubViewState extends State<_Ccr3UemoiHubView> {
   Widget _buildCurrentTab(bool isDark) {
     switch (_selectedTab) {
       case 0: return _buildDispositifUemoiContent(isDark);
-      case 1: return _buildCcr3Content(isDark);
+      case 1: return _buildCrr3Content(isDark);
       default: return const SizedBox.shrink();
     }
   }
@@ -7665,8 +7662,8 @@ class _Ccr3UemoiHubViewState extends State<_Ccr3UemoiHubView> {
     }
   }
 
-  Widget _buildCcr3Content(bool isDark) =>
-      _Ccr3TabView(api: widget.api, isDark: isDark, hideAnalyseRapideTab: true);
+  Widget _buildCrr3Content(bool isDark) =>
+      _Crr3TabView(api: widget.api, isDark: isDark, hideAnalyseRapideTab: true);
 }
 
 // ─── CRR3-COREP - Onglet BIC avec saisie directe du PNB ──────────────────────
@@ -7683,7 +7680,7 @@ class _CorepTabView extends StatefulWidget {
 class _CorepTabViewState extends State<_CorepTabView> {
   // Seule la vue "Décision" (pilotage) reste accessible depuis cet onglet -
   // Saisie/Résultats/Analyse rapide/Paramètres sont déjà proposés à
-  // l'identique sous l'onglet de premier niveau "CCR3".
+  // l'identique sous l'onglet de premier niveau "CRR3".
   int _view = 4;
   bool _loading = true;
   String? _error;
@@ -7842,14 +7839,9 @@ class _CorepTabViewState extends State<_CorepTabView> {
   static const _kGreen  = Color(0xFF14A44D);
   static const _kRed    = Color(0xFFDC2626);
 
-  String _fcfa(double v) {
-    if (v == 0) return '0 FCFA';
-    final abs = v.abs();
-    final sign = v < 0 ? '−' : '';
-    if (abs >= 1e9) return '$sign${(abs / 1e9).toStringAsFixed(3)} Md FCFA';
-    if (abs >= 1e6) return '$sign${(abs / 1e6).toStringAsFixed(3)} M FCFA';
-    return '$sign${abs.toStringAsFixed(2)} FCFA';
-  }
+  String _fcfa(double v) => v.abs() < 1000
+      ? '${v.toStringAsFixed(0)} FCFA'
+      : '${AppFormatters.montant(v, maxDecimals: 3)} FCFA';
 
   @override
   Widget build(BuildContext context) {
@@ -8031,7 +8023,7 @@ class _CorepTabViewState extends State<_CorepTabView> {
               child: Text(
                 'Entrez le PNB (Produit Net Bancaire) pour chacune des 3 années. '
                 'Le système appliquera les règles CRR3 (ILDC, SC, FC, BI, BIC) et la méthode BIA (15 % × PNB moyen). '
-                'Pour saisir le détail des composantes, utilisez l\'onglet CCR3.',
+                'Pour saisir le détail des composantes, utilisez l\'onglet CRR3.',
                 style: TextStyle(fontSize: 11, color: const Color(0xFF0891B2).withValues(alpha: 1.0)),
               ),
             ),
@@ -8058,7 +8050,7 @@ class _CorepTabViewState extends State<_CorepTabView> {
     );
   }
 
-  // ── Vue Résultats (identique à CCR3) ─────────────────────────────────────────
+  // ── Vue Résultats (identique à CRR3) ─────────────────────────────────────────
 
   Widget _buildResultsView() {
     final r = _result;
@@ -8215,7 +8207,7 @@ class _CorepTabViewState extends State<_CorepTabView> {
     );
   }
 
-  // ── Vue Analyse rapide (identique à CCR3) ─────────────────────────────────────
+  // ── Vue Analyse rapide (identique à CRR3) ─────────────────────────────────────
 
   Widget _buildAnalyseRapideView() {
     final r = _result;
@@ -8410,7 +8402,7 @@ class _CorepTabViewState extends State<_CorepTabView> {
     );
   }
 
-  // ── Vue Paramètres (identique à CCR3) ─────────────────────────────────────────
+  // ── Vue Paramètres (identique à CRR3) ─────────────────────────────────────────
 
   Widget _buildParamsView() {
     return SingleChildScrollView(
@@ -8487,10 +8479,10 @@ class _CorepTabViewState extends State<_CorepTabView> {
 }
 
 
-// ─── CCR3 - Onglet BIC CRR3 ──────────────────────────────────────────────────
+// ─── CRR3 - Onglet BIC CRR3 ──────────────────────────────────────────────────
 
-class _Ccr3TabView extends StatefulWidget {
-  const _Ccr3TabView({
+class _Crr3TabView extends StatefulWidget {
+  const _Crr3TabView({
     required this.api,
     required this.isDark,
     this.onlyAnalyseRapide = false,
@@ -8506,10 +8498,10 @@ class _Ccr3TabView extends StatefulWidget {
   final bool hideAnalyseRapideTab;
 
   @override
-  State<_Ccr3TabView> createState() => _Ccr3TabViewState();
+  State<_Crr3TabView> createState() => _Crr3TabViewState();
 }
 
-class _Ccr3TabViewState extends State<_Ccr3TabView> {
+class _Crr3TabViewState extends State<_Crr3TabView> {
   // Vues internes : 0 = Analyse rapide (par défaut), 1 = Résultats, 2 = Saisie, 3 = Paramètres
   int _view = 0;
   bool _loading = true;
@@ -8521,7 +8513,7 @@ class _Ccr3TabViewState extends State<_Ccr3TabView> {
 
   OpRiskCalculResult? _result;
 
-  // Toutes les années ayant des postes BIC/CCR3 enregistrés en base (saisie
+  // Toutes les années ayant des postes BIC/CRR3 enregistrés en base (saisie
   // ou import Excel), sans se limiter à la fenêtre N-2/N-1/N de _result -
   // alimente l'onglet "Données importées" pour qu'un exercice importé hors
   // de cette fenêtre reste malgré tout consultable.
@@ -8729,14 +8721,9 @@ class _Ccr3TabViewState extends State<_Ccr3TabView> {
   static const _kGreen  = Color(0xFF14A44D);
   static const _kRed    = Color(0xFFDC2626);
 
-  String _fcfa(double v) {
-    if (v == 0) return '0 FCFA';
-    final abs = v.abs();
-    final sign = v < 0 ? '−' : '';
-    if (abs >= 1e9) return '$sign${(abs / 1e9).toStringAsFixed(3)} Md FCFA';
-    if (abs >= 1e6) return '$sign${(abs / 1e6).toStringAsFixed(3)} M FCFA';
-    return '$sign${abs.toStringAsFixed(2)} FCFA';
-  }
+  String _fcfa(double v) => v.abs() < 1000
+      ? '${v.toStringAsFixed(0)} FCFA'
+      : '${AppFormatters.montant(v, maxDecimals: 3)} FCFA';
 
   // ── Build ─────────────────────────────────────────────────────────────────────
 
@@ -9087,7 +9074,7 @@ class _Ccr3TabViewState extends State<_Ccr3TabView> {
 
   // ── Vue Données importées (lecture seule) ─────────────────────────────────────
   //
-  // Affiche les 14 postes BIC/CCR3 tels qu'actuellement enregistrés en base
+  // Affiche les 14 postes BIC/CRR3 tels qu'actuellement enregistrés en base
   // (dernière saisie manuelle OU dernier import Excel réussi), sans les
   // risques d'édition en cours propres à l'onglet "Saisie".
 
@@ -9158,7 +9145,7 @@ class _Ccr3TabViewState extends State<_Ccr3TabView> {
               Expanded(
                 child: Text(
                   displayInputs.isEmpty
-                      ? 'Aucun exercice BIC/CCR3 enregistré pour le moment - '
+                      ? 'Aucun exercice BIC/CRR3 enregistré pour le moment - '
                         'importez un fichier Excel ou saisissez les postes dans l\'onglet Saisie.'
                       : 'Tous les exercices enregistrés (saisie manuelle ou import Excel) : '
                         '${years.join(' · ')}. En bleu : les exercices utilisés par le calcul '
@@ -9198,7 +9185,7 @@ class _Ccr3TabViewState extends State<_Ccr3TabView> {
                   Text('Rien à afficher pour l\'instant',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _txt)),
                   const SizedBox(height: 4),
-                  Text('Importez un fichier Excel BIC/CCR3 pour voir les données ici.',
+                  Text('Importez un fichier Excel BIC/CRR3 pour voir les données ici.',
                       style: TextStyle(fontSize: 11.5, color: _muted)),
                 ],
               ),
@@ -10210,14 +10197,9 @@ class _BicBarPainter extends CustomPainter {
     tp.paint(canvas, offset);
   }
 
-  String _shortNum(double v) {
-    final abs = v.abs();
-    final sign = v < 0 ? '-' : '';
-    if (abs >= 1e9)  return '$sign${(abs / 1e9).toStringAsFixed(1)} Md';
-    if (abs >= 1e6)  return '$sign${(abs / 1e6).toStringAsFixed(1)} M';
-    if (abs >= 1e3)  return '$sign${(abs / 1e3).toStringAsFixed(1)} k';
-    return '$sign${abs.toStringAsFixed(0)}';
-  }
+  String _shortNum(double v) => v.abs() < 1000
+      ? v.toStringAsFixed(0)
+      : AppFormatters.montant(v, maxDecimals: 1);
 
   @override
   bool shouldRepaint(covariant _BicBarPainter old) =>
@@ -11225,18 +11207,9 @@ String _formatRoExact(num value) {
   return '${value < 0 ? '-' : ''}$formatted FCFA';
 }
 
-String _formatRoCompact(num value) {
-  final absVal = value.abs();
-  final sign = value < 0 ? '-' : '';
-  if (absVal >= 1000000000) {
-    return '$sign${(absVal / 1000000000).toStringAsFixed(2)} Md';
-  } else if (absVal >= 1000000) {
-    return '$sign${(absVal / 1000000).toStringAsFixed(1)} M';
-  } else if (absVal >= 1000) {
-    return '$sign${(absVal / 1000).toStringAsFixed(0)} k';
-  }
-  return '$sign${absVal.toStringAsFixed(0)}';
-}
+String _formatRoCompact(num value) => value.abs() < 1000
+    ? value.toStringAsFixed(0)
+    : AppFormatters.montant(value);
 
 class _RoPieChart extends StatelessWidget {
   const _RoPieChart({required this.items});
@@ -11451,11 +11424,9 @@ class _RoLineChartPainter extends CustomPainter {
       final y = padT + h - (i / gridLines) * h;
       canvas.drawLine(Offset(padL, y), Offset(padL + w, y), gridPaint);
       final val = (maxV * i / gridLines).round();
-      final lbl = val >= 1000000000
-          ? '${(val / 1000000000).toStringAsFixed(1)}Md'
-          : val >= 1000000
-              ? '${(val / 1000000).toStringAsFixed(1)}M'
-              : '$val';
+      final lbl = val.abs() < 1000
+          ? '$val'
+          : AppFormatters.montant(val, maxDecimals: 1);
       textPainter.text = TextSpan(
         text: lbl,
         style: const TextStyle(color: _kMuted, fontSize: 8),

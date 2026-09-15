@@ -4472,7 +4472,7 @@ class _EquityIndicatorContentBoardState
     row++;
     final distHeaders = [
       'Libellé',
-      'Montant (Md FCFA)',
+      'Montant ($_uniteExportMarche FCFA)',
       'Part (%)',
       'Nb titres'
     ];
@@ -4505,7 +4505,7 @@ class _EquityIndicatorContentBoardState
               .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
               .value =
           DoubleCellValue(
-              double.parse((entry.amount / 1e9).toStringAsFixed(2)));
+              double.parse((entry.amount / _diviseurExportMarche).toStringAsFixed(2)));
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -4525,10 +4525,10 @@ class _EquityIndicatorContentBoardState
       ..value = TextCellValue('TOP 5 POSITIONS')
       ..cellStyle = sectionStyle;
     row++;
-    for (final h in ['Émetteur', 'Exposition (Md FCFA)', 'Poids (%)']) {
+    for (final h in ['Émetteur', 'Exposition ($_uniteExportMarche FCFA)', 'Poids (%)']) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex:
-              ['Émetteur', 'Exposition (Md FCFA)', 'Poids (%)'].indexOf(h),
+              ['Émetteur', 'Exposition ($_uniteExportMarche FCFA)', 'Poids (%)'].indexOf(h),
           rowIndex: row))
         ..value = TextCellValue(h)
         ..cellStyle = headerStyle;
@@ -4544,7 +4544,7 @@ class _EquityIndicatorContentBoardState
               .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
               .value =
           DoubleCellValue(
-              double.parse((record.exposureAmount / 1e9).toStringAsFixed(2)));
+              double.parse((record.exposureAmount / _diviseurExportMarche).toStringAsFixed(2)));
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -4619,11 +4619,11 @@ class _EquityIndicatorContentBoardState
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: r))
               .value =
-          DoubleCellValue(double.parse((mtm / 1e9).toStringAsFixed(4)));
+          DoubleCellValue(double.parse((mtm / _diviseurExportMarche).toStringAsFixed(4)));
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: r))
               .value =
-          DoubleCellValue(double.parse((exposure / 1e9).toStringAsFixed(4)));
+          DoubleCellValue(double.parse((exposure / _diviseurExportMarche).toStringAsFixed(4)));
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: r))
               .value =
@@ -9183,10 +9183,10 @@ class _BondIndicatorContentBoardState
       ..value = TextCellValue('RÉPARTITION PAR ZONE MONÉTAIRE')
       ..cellStyle = sectionStyle;
     row++;
-    for (final h in ['Zone', 'Montant (Md FCFA)', 'Part (%)', 'Nb titres']) {
+    for (final h in ['Zone', 'Montant ($_uniteExportMarche FCFA)', 'Part (%)', 'Nb titres']) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex:
-              ['Zone', 'Montant (Md FCFA)', 'Part (%)', 'Nb titres'].indexOf(h),
+              ['Zone', 'Montant ($_uniteExportMarche FCFA)', 'Part (%)', 'Nb titres'].indexOf(h),
           rowIndex: row))
         ..value = TextCellValue(h)
         ..cellStyle = headerStyle;
@@ -9198,7 +9198,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(entry.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(entry.amount / 1e9);
+          .value = DoubleCellValue(entry.amount / _diviseurExportMarche);
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -9217,14 +9217,14 @@ class _BondIndicatorContentBoardState
     row++;
     for (final h in [
       'Notation',
-      'Montant (Md FCFA)',
+      'Montant ($_uniteExportMarche FCFA)',
       'Part (%)',
       'Nb titres'
     ]) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex: [
             'Notation',
-            'Montant (Md FCFA)',
+            'Montant ($_uniteExportMarche FCFA)',
             'Part (%)',
             'Nb titres'
           ].indexOf(h),
@@ -9239,7 +9239,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(entry.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(entry.amount / 1e9);
+          .value = DoubleCellValue(entry.amount / _diviseurExportMarche);
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -9256,10 +9256,10 @@ class _BondIndicatorContentBoardState
       ..value = TextCellValue('RÉPARTITION PAR PAYS')
       ..cellStyle = sectionStyle;
     row++;
-    for (final h in ['Pays', 'Montant (Md FCFA)', 'Part (%)', 'Nb titres']) {
+    for (final h in ['Pays', 'Montant ($_uniteExportMarche FCFA)', 'Part (%)', 'Nb titres']) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex:
-              ['Pays', 'Montant (Md FCFA)', 'Part (%)', 'Nb titres'].indexOf(h),
+              ['Pays', 'Montant ($_uniteExportMarche FCFA)', 'Part (%)', 'Nb titres'].indexOf(h),
           rowIndex: row))
         ..value = TextCellValue(h)
         ..cellStyle = headerStyle;
@@ -9271,7 +9271,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(entry.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(entry.amount / 1e9);
+          .value = DoubleCellValue(entry.amount / _diviseurExportMarche);
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -9290,14 +9290,14 @@ class _BondIndicatorContentBoardState
     row++;
     for (final h in [
       'Émetteur',
-      'Montant (Md FCFA)',
+      'Montant ($_uniteExportMarche FCFA)',
       'Part (%)',
       'Nb titres'
     ]) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex: [
             'Émetteur',
-            'Montant (Md FCFA)',
+            'Montant ($_uniteExportMarche FCFA)',
             'Part (%)',
             'Nb titres'
           ].indexOf(h),
@@ -9312,7 +9312,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(entry.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(entry.amount / 1e9);
+          .value = DoubleCellValue(entry.amount / _diviseurExportMarche);
       sheetKpi
               .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
               .value =
@@ -9329,9 +9329,9 @@ class _BondIndicatorContentBoardState
       ..value = TextCellValue('DISTRIBUTION PAR MATURITÉ')
       ..cellStyle = sectionStyle;
     row++;
-    for (final h in ['Tranche', 'Montant (Md FCFA)', 'Nb titres']) {
+    for (final h in ['Tranche', 'Montant ($_uniteExportMarche FCFA)', 'Nb titres']) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
-          columnIndex: ['Tranche', 'Montant (Md FCFA)', 'Nb titres'].indexOf(h),
+          columnIndex: ['Tranche', 'Montant ($_uniteExportMarche FCFA)', 'Nb titres'].indexOf(h),
           rowIndex: row))
         ..value = TextCellValue(h)
         ..cellStyle = headerStyle;
@@ -9343,7 +9343,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(bucket.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(bucket.amount / 1e9);
+          .value = DoubleCellValue(bucket.amount / _diviseurExportMarche);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
           .value = IntCellValue(bucket.titleCount);
@@ -9358,14 +9358,14 @@ class _BondIndicatorContentBoardState
     row++;
     for (final h in [
       'Tranche',
-      'Montant (Md FCFA)',
+      'Montant ($_uniteExportMarche FCFA)',
       'Nb titres',
       'Coupon moyen (%)'
     ]) {
       sheetKpi.cell(CellIndex.indexByColumnRow(
           columnIndex: [
             'Tranche',
-            'Montant (Md FCFA)',
+            'Montant ($_uniteExportMarche FCFA)',
             'Nb titres',
             'Coupon moyen (%)'
           ].indexOf(h),
@@ -9380,7 +9380,7 @@ class _BondIndicatorContentBoardState
           .value = TextCellValue(bucket.label);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value = DoubleCellValue(bucket.amount / 1e9);
+          .value = DoubleCellValue(bucket.amount / _diviseurExportMarche);
       sheetKpi
           .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
           .value = IntCellValue(bucket.titleCount);
@@ -9401,7 +9401,7 @@ class _BondIndicatorContentBoardState
       row++;
       final zmHeaders = [
         'Zone',
-        'Capital (Md FCFA)',
+        'Capital ($_uniteExportMarche FCFA)',
         'Part (%)',
         'YTM (%)',
         'Duration (ans)',
@@ -9422,7 +9422,7 @@ class _BondIndicatorContentBoardState
             .value = TextCellValue(zr.zone);
         sheetKpi
             .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-            .value = DoubleCellValue(zr.capital / 1e9);
+            .value = DoubleCellValue(zr.capital / _diviseurExportMarche);
         sheetKpi
                 .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
                 .value =
@@ -9525,12 +9525,12 @@ class _BondIndicatorContentBoardState
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: r))
               .value =
-          DoubleCellValue(double.parse((tr.capital / 1e9).toStringAsFixed(2)));
+          DoubleCellValue(double.parse((tr.capital / _diviseurExportMarche).toStringAsFixed(2)));
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: r))
               .value =
           DoubleCellValue(
-              double.parse((tr.presentValue / 1e9).toStringAsFixed(2)));
+              double.parse((tr.presentValue / _diviseurExportMarche).toStringAsFixed(2)));
       sheetTitres
               .cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: r))
               .value =
@@ -31589,22 +31589,9 @@ class _TauxRiskScreenState extends State<_TauxRiskScreen> {
     );
   }
 
-  String _formatAxisAmount(double value) {
-    String compact(double scaled) {
-      var text =
-          scaled >= 100 ? scaled.toStringAsFixed(0) : scaled.toStringAsFixed(1);
-      if (text.endsWith('.0')) {
-        text = text.substring(0, text.length - 2);
-      }
-      return text.replaceAll('.', ',');
-    }
-
-    final absolute = value.abs();
-    if (absolute >= 1e9) return '${compact(value / 1e9)} Mds';
-    if (absolute >= 1e6) return '${compact(value / 1e6)} M';
-    if (absolute >= 1e3) return '${compact(value / 1e3)} k';
-    return value.toStringAsFixed(0);
-  }
+  String _formatAxisAmount(double value) => value.abs() < 1000
+      ? value.toStringAsFixed(0)
+      : AppFormatters.montant(value, maxDecimals: 1);
 
   Widget _buildMainCard(
     BuildContext context,
@@ -34093,20 +34080,11 @@ String _fcfa(double v) {
 /// Pourcentage à une décimale (ex. « 12,5 % »).
 String _pct(double v) => '${formatDecimal(v, 1)} %';
 
-/// Montant compact pour les libellés de graphique (« 1 672 Mds », « 28,8 M »).
-String _compactFcfa(double v) {
-  String f(double s) {
-    var t = s.abs() >= 100 ? s.toStringAsFixed(0) : s.toStringAsFixed(1);
-    if (t.endsWith('.0')) t = t.substring(0, t.length - 2);
-    return t.replaceAll('.', ',');
-  }
-
-  final abs = v.abs();
-  if (abs >= 1e9) return '${f(v / 1e9)} Mds';
-  if (abs >= 1e6) return '${f(v / 1e6)} M';
-  if (abs >= 1e3) return '${f(v / 1e3)} k';
-  return f(v);
-}
+/// Montant compact pour les libellés de graphique, dans l'unité choisie en
+/// haut de l'écran (« 1 672 Md », « 28,8 M »).
+String _compactFcfa(double v) => v.abs() < 1000
+    ? v.toStringAsFixed(0)
+    : AppFormatters.montant(v, maxDecimals: 1);
 
 List<MarketPortfolioRecord> _marketRecordsOf(MarketPortfolioType type) =>
     MarketDataImportStore.instance.snapshotNotifier.value
@@ -34434,15 +34412,8 @@ RWA Actions = Exigence FP Actions × 12,5 (DISPRUD UMOA, Art. 395-401)''',
                       getTitlesWidget: (double value, TitleMeta meta) {
                         if (value == 0) return const SizedBox.shrink();
                         String text;
-                        if (value >= 1000000000) {
-                          text =
-                              '${(value / 1000000000).toStringAsFixed(1).replaceAll('.0', '')} Md';
-                        } else if (value >= 1000000) {
-                          text =
-                              '${(value / 1000000).toStringAsFixed(1).replaceAll('.0', '')} M';
-                        } else if (value >= 1000) {
-                          text =
-                              '${(value / 1000).toStringAsFixed(1).replaceAll('.0', '')} k';
+                        if (value >= 1000) {
+                          text = AppFormatters.montant(value, maxDecimals: 1);
                         } else {
                           text = value.toStringAsFixed(0);
                         }
@@ -35887,14 +35858,9 @@ class _MarketCapitalRequirementPanel extends StatelessWidget {
     );
   }
 
-  static String _montant(double valeur) {
-    if (valeur == 0) return '0';
-    final absolue = valeur.abs();
-    if (absolue >= 1e9) return '${(valeur / 1e9).toStringAsFixed(2)} Md';
-    if (absolue >= 1e6) return '${(valeur / 1e6).toStringAsFixed(1)} M';
-    if (absolue >= 1e3) return '${(valeur / 1e3).toStringAsFixed(1)} k';
-    return valeur.toStringAsFixed(0);
-  }
+  static String _montant(double valeur) => valeur.abs() < 1000
+      ? valeur.toStringAsFixed(0)
+      : AppFormatters.montant(valeur);
 
   static String _pourcent(double ratio) {
     final valeur = ratio * 100;
@@ -36284,3 +36250,9 @@ class FlDotTrianglePainter extends FlDotPainter {
         strokeColor,
       ];
 }
+
+/// Unité des montants exportés vers Excel : celle choisie en haut de l'écran.
+String get _uniteExportMarche => PortfolioAmountUnitPreference.current.label;
+
+double get _diviseurExportMarche =>
+    PortfolioAmountUnitPreference.current.divisor;

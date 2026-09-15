@@ -13,7 +13,7 @@ Le quatrième fichier est calibré sur les RWA effectivement produits par les
 trois premiers : le RWA de crédit est obtenu en faisant tourner le moteur de
 calcul prudentiel du backend sur les 1 000 expositions générées, le RWA de
 marché par le portage Python des règles de l'écran Risque de marché, et le
-RWA opérationnel par la formule BIC / CCR3 du backend.
+RWA opérationnel par la formule BIC / CRR3 du backend.
 """
 
 from __future__ import annotations

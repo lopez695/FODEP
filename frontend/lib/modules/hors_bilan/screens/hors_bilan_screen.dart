@@ -227,7 +227,9 @@ class _HorsBilanScreenState extends State<HorsBilanScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = widget.api.fetchHorsBilanModule());
+      setState(() {
+        _future = widget.api.fetchHorsBilanModule();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Engagement hors bilan ajoute.')),
       );

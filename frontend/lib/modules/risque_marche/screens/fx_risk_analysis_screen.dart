@@ -1143,11 +1143,8 @@ class _FxShockChartState extends State<_FxShockChart> {
   String _signed(double v) => '${v >= 0 ? '+' : '−'}${_compact(v.abs())}';
 
   String _compact(double v) {
-    final a = v.abs();
-    if (a >= 1e9) return '${(v / 1e9).toStringAsFixed(1)} Md';
-    if (a >= 1e6) return '${(v / 1e6).toStringAsFixed(0)} M';
-    if (a >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} k';
-    return v.toStringAsFixed(0);
+    if (v.abs() < 1000) return v.toStringAsFixed(0);
+    return AppFormatters.montant(v, maxDecimals: 1);
   }
 }
 
@@ -1314,11 +1311,8 @@ class _FxShockPainter extends CustomPainter {
   }
 
   String _compact(double v) {
-    final a = v.abs();
-    if (a >= 1e9) return '${(v / 1e9).toStringAsFixed(1)} Md';
-    if (a >= 1e6) return '${(v / 1e6).toStringAsFixed(0)} M';
-    if (a >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} k';
-    return v.toStringAsFixed(0);
+    if (v.abs() < 1000) return v.toStringAsFixed(0);
+    return AppFormatters.montant(v, maxDecimals: 1);
   }
 
   @override

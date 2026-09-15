@@ -4,7 +4,7 @@
 Un seul classeur alimente les deux imports du module :
   • Incidents  — 1 000 pertes opérationnelles (import « Pertes »)
   • 2023 / 2024 / 2025 — un onglet par exercice, colonnes Poste / Valeur
-    (import « BIC / CCR3 »)
+    (import « BIC / CRR3 »)
   • Notice — feuille d'aide, ignorée par les deux imports
 
 Les deux dialogues d'import ignorent les feuilles qui ne les concernent pas :
@@ -181,7 +181,7 @@ def construire_incidents(graine: int = 20260630):
     return lignes
 
 
-# ── Postes BIC / CCR3 par exercice (FCFA) ───────────────────────────────────
+# ── Postes BIC / CRR3 par exercice (FCFA) ───────────────────────────────────
 # Trajectoire d'une banque universelle de l'UMOA d'environ 1 200 Md de total
 # de bilan, en croissance régulière.
 BIC_PAR_ANNEE = {
@@ -292,7 +292,7 @@ def _feuille_bic(wb, annee: int) -> None:
     ws = wb.create_sheet(str(annee))
     ws.column_dimensions["A"].width = 44
     ws.column_dimensions["B"].width = 22
-    titre_bandeau(ws, f"Exercice {annee} — Indicateur d'activité BIC / CCR3", 2)
+    titre_bandeau(ws, f"Exercice {annee} — Indicateur d'activité BIC / CRR3", 2)
 
     ws.row_dimensions[2].height = 20
     for col_index, label in ((1, "Poste"), (2, "Valeur (FCFA)")):
@@ -348,7 +348,7 @@ def construire_classeur(chemin, incidents):
         [
             ("Deux imports, un seul fichier",
              "La feuille « Incidents » alimente l'import des pertes ; les onglets "
-             "2023, 2024 et 2025 alimentent l'import BIC / CCR3. Chaque dialogue "
+             "2023, 2024 et 2025 alimentent l'import BIC / CRR3. Chaque dialogue "
              "ignore les feuilles qui ne le concernent pas."),
             ("Incidents",
              f"{len(incidents)} pertes du {DEBUT.isoformat()} au {FIN.isoformat()} — "

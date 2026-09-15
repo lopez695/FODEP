@@ -249,18 +249,18 @@ class _Assiettes extends StatelessWidget {
       children: [
         tuile(
           'Total des participations',
-          AppFormatters.millions(synthese.totalGeneral),
+          AppFormatters.montant(synthese.totalGeneral),
           'toutes catégories confondues',
         ),
         tuile(
           'Entités commerciales',
-          AppFormatters.millions(synthese.totalEntitesCommerciales),
+          AppFormatters.montant(synthese.totalEntitesCommerciales),
           '${synthese.nombreEntitesCommerciales} ligne(s) · assiette de RA008',
         ),
         tuile(
           'Fonds propres de base T1',
           synthese.fondsPropresT1 > 0
-              ? AppFormatters.millions(synthese.fondsPropresT1)
+              ? AppFormatters.montant(synthese.fondsPropresT1)
               : 'non saisis',
           date == null
               ? 'dénominateur de RA007 et RA009'
@@ -269,13 +269,13 @@ class _Assiettes extends StatelessWidget {
         tuile(
           'Fonds propres effectifs',
           synthese.fondsPropresEffectifs > 0
-              ? AppFormatters.millions(synthese.fondsPropresEffectifs)
+              ? AppFormatters.montant(synthese.fondsPropresEffectifs)
               : 'non saisis',
           'dénominateur de RA008 et RA010',
         ),
         tuile(
           'Immobilisations nettes',
-          AppFormatters.millions(synthese.immobilisationsNettes),
+          AppFormatters.montant(synthese.immobilisationsNettes),
           'ajoutées aux participations dans RA009 et RA010',
         ),
       ],
@@ -565,13 +565,13 @@ class _Encadre extends StatelessWidget {
         children: [
           _LigneDeCalcul(
             intitule: limite.numerateurLibelle,
-            valeur: AppFormatters.millions(limite.numerateur),
+            valeur: AppFormatters.montant(limite.numerateur),
           ),
           _LigneDeCalcul(
             signe: '÷',
             intitule: limite.denominateurLibelle,
             valeur: limite.mesurable
-                ? AppFormatters.millions(limite.denominateur)
+                ? AppFormatters.montant(limite.denominateur)
                 : 'non renseigné',
             alerte: !limite.mesurable,
           ),
@@ -599,7 +599,7 @@ class _Encadre extends StatelessWidget {
                       : 'Excédent à résorber')
                   : 'Sans dénominateur, la limite est inconnue',
               valeur: limite.mesurable
-                  ? AppFormatters.millions(
+                  ? AppFormatters.montant(
                       limite.respectee ? marge : limite.excedent,
                     )
                   : '—',

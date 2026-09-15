@@ -226,6 +226,7 @@ class FondsPropresExercice {
     this.resultatsReport = 0.0,
     this.resultatEligible = 0.0,
     this.deductionsPrudCet1 = 0.0,
+    this.deductionLimites = 0.0,
     required this.cet1,
     this.instrumentsAt1 = 0.0,
     this.primesEmissionAt1 = 0.0,
@@ -246,6 +247,14 @@ class FondsPropresExercice {
   final double resultatsReport;
   final double resultatEligible;
   final double deductionsPrudCet1;
+
+  /// Excédent des limites prudentielles franchies, déjà retranché du [cet1].
+  ///
+  /// Il n'est porté que sur l'exercice courant : l'assiette des limites — les
+  /// participations, les immobilisations, les concours aux parties liées —
+  /// n'est pas conservée à la clôture des exercices antérieurs.
+  final double deductionLimites;
+
   final double cet1;
   final double instrumentsAt1;
   final double primesEmissionAt1;
@@ -269,6 +278,7 @@ class FondsPropresExercice {
         resultatsReport: _d(json['resultats_report']),
         resultatEligible: _d(json['resultat_eligible']),
         deductionsPrudCet1: _d(json['deductions_prud_cet1']),
+        deductionLimites: _d(json['deduction_limites']),
         cet1: _d(json['cet1']),
         instrumentsAt1: _d(json['instruments_at1']),
         primesEmissionAt1: _d(json['primes_emission_at1']),
@@ -296,6 +306,7 @@ class FondsPropresExercice {
         resultatsReport: fp.resultatsReport,
         resultatEligible: fp.resultatEligible,
         deductionsPrudCet1: fp.deductionsPrudCet1,
+        deductionLimites: fp.deductionLimites,
         cet1: fp.cet1,
         instrumentsAt1: fp.instrumentsAt1,
         primesEmissionAt1: fp.primesEmissionAt1,
@@ -317,6 +328,9 @@ class FondsPropresDetail {
     required this.resultatsReport,
     required this.resultatEligible,
     required this.deductionsPrudCet1,
+    this.deductionLimites = 0.0,
+    this.deductionLimitesDetail = const {},
+    this.exerciceLimites,
     required this.cet1,
     required this.instrumentsAt1,
     required this.primesEmissionAt1,
@@ -337,6 +351,24 @@ class FondsPropresDetail {
   final double resultatsReport;
   final double resultatEligible;
   final double deductionsPrudCet1;
+
+  /// Excédent des limites prudentielles franchies, déjà retranché du [cet1].
+  ///
+  /// Ce n'est pas une saisie : il se mesure sur les participations, les
+  /// immobilisations et les concours aux parties liées, rapportés aux fonds
+  /// propres de l'exercice précédent. L'écran le porte sur sa propre ligne,
+  /// faute de quoi le CET1 semblerait ne pas boucler avec les postes saisis.
+  final double deductionLimites;
+
+  /// Les quatre lignes de l'EP03 qui composent [deductionLimites], sous leur
+  /// code DISPRU : PA149, IM006, IM010, PR004.
+  final Map<String, double> deductionLimitesDetail;
+
+  /// Exercice sur lequel les limites ont été mesurées, ou `null` si aucun
+  /// exercice antérieur n'est enregistré — la déduction est alors nulle faute
+  /// de dénominateur, ce qui n'est pas un respect constaté.
+  final int? exerciceLimites;
+
   final double cet1;
   final double instrumentsAt1;
   final double primesEmissionAt1;
@@ -354,9 +386,9 @@ class FondsPropresDetail {
 
   /// Les exercices déjà saisis, du plus récent au plus ancien.
   ///
-  /// Les limites des EP36 à EP38 se mesurent sur les fonds propres de
-  /// l'exercice PRÉCÉDENT : sans cet historique, l'export les rapporte à
-  /// l'exercice déclaré et le signale en réserve.
+  /// Les limites des EP35 à EP38 se mesurent sur les fonds propres de
+  /// l'exercice PRÉCÉDENT : c'est cet historique qui leur fournit leur
+  /// dénominateur, et donc le montant de [deductionLimites].
   final List<FondsPropresExercice> historique;
 
   factory FondsPropresDetail.fromJson(Map<String, dynamic> json) {
@@ -366,6 +398,15 @@ class FondsPropresDetail {
       resultatsReport: (json['resultats_report'] as num?)?.toDouble() ?? 0.0,
       resultatEligible: (json['resultat_eligible'] as num?)?.toDouble() ?? 0.0,
       deductionsPrudCet1: (json['deductions_prud_cet1'] as num?)?.toDouble() ?? 0.0,
+      deductionLimites: (json['deduction_limites'] as num?)?.toDouble() ?? 0.0,
+      deductionLimitesDetail:
+          ((json['deduction_limites_detail'] as Map<dynamic, dynamic>?) ??
+                  const {})
+              .map((cle, valeur) => MapEntry(
+                    cle.toString(),
+                    (valeur as num?)?.toDouble() ?? 0.0,
+                  )),
+      exerciceLimites: (json['exercice_limites'] as num?)?.toInt(),
       exercice: (json['exercice'] as num?)?.toInt(),
       historique: ((json['historique'] as List<dynamic>?) ?? const [])
           .map((e) => FondsPropresExercice.fromJson(e as Map<String, dynamic>))

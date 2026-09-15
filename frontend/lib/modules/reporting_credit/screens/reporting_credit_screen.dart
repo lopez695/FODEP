@@ -51,7 +51,9 @@ class _ReportingCreditScreenState extends State<ReportingCreditScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchReportingModule());
+      setState(() {
+        _future = _service.fetchReportingModule();
+      });
     });
   }
 
@@ -389,7 +391,9 @@ class _ReportingCreditScreenState extends State<ReportingCreditScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchReportingModule());
+      setState(() {
+        _future = _service.fetchReportingModule();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppTheme.success,

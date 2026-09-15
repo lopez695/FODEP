@@ -6,6 +6,7 @@ import '../../../core/state/portfolio_amount_unit_scope.dart';
 import '../../../core/utils/currency_conversion.dart';
 import '../../../core/utils/formatters.dart';
 import '../../rapports/models/report_models.dart';
+import '../../dispositions_transitoires/widgets/dispositions_transitoires_dialog.dart';
 import '../models/dashboard_models.dart';
 import '../widgets/dashboard_design.dart';
 import 'fonds_propres_exercice_dialog.dart';
@@ -118,6 +119,23 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
     );
   }
 
+  /// Ouvre la saisie des dispositions transitoires de l'exercice affiché.
+  ///
+  /// Elle vit ici parce que c'est ici que le montant se déclare : quatre lignes
+  /// de l'EP04 retombent dans l'EP03 — FPI07 en CET1, FPI25 en AT1, FPI33 et
+  /// FPI34 en T2 — et changent donc les fonds propres que cette page montre.
+  Future<void> _dispositionsTransitoires() async {
+    final api = widget.api;
+    final exercice = fondsPropres.exercice;
+    if (api == null || exercice == null) return;
+    final modifie = await DispositionsTransitoiresDialog.show(
+      context,
+      api,
+      exercice,
+    );
+    if (modifie) await _recharger();
+  }
+
   Future<void> _retirer(FondsPropresExercice exercice) async {
     final api = widget.api;
     if (api == null) return;
@@ -186,6 +204,24 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
         ),
         iconTheme: IconThemeData(color: c.ink),
         actions: [
+          if (widget.api != null && fondsPropres.exercice != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.history_toggle_off_rounded, size: 16),
+                label: Text('Dispositions transitoires'.tr(context)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: c.ink,
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: _dispositionsTransitoires,
+              ),
+            ),
           if (widget.api != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -502,9 +538,10 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
   /// Les codes EP01 des limites qui se mesurent SUR les fonds propres.
   ///
   /// Elles ont leur place ici et pas ailleurs : leur dénominateur est le
-  /// montant que cette page déclare. Un franchissement s'y déduit du CET1
-  /// (lignes PA149, IM006, IM010 et PR004 de l'EP03), ce que l'application ne
-  /// fait pas encore — d'où la consigne portée sous le relevé.
+  /// montant que cette page déclare — celui de l'exercice précédent, comme le
+  /// prescrivent les états EP35 à EP38. Un franchissement se déduit du CET1
+  /// (lignes PA149, IM006, IM010 et PR004 de l'EP03) ; le relevé porte cette
+  /// déduction sur sa propre ligne, et la consigne en donne le montant.
   static const _codesLimites = [
     'RA006',
     'RA007',
@@ -612,13 +649,33 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
     );
   }
 
-  /// Ce qu'un franchissement appelle, en clair.
+  /// Ce qu'un franchissement a coûté, en clair.
   ///
-  /// L'excedent d'une limite se deduit des fonds propres de base : l'EP03
-  /// porte une ligne par limite. L'application ne les alimente pas encore, et
-  /// le CET1 declare est donc surestime d'autant — le dire ici, ou le montant
-  /// se declare, plutot que dans une reserve lue apres l'export.
+  /// L'excédent d'une limite se déduit des fonds propres de base : l'EP03 le
+  /// porte sur les lignes PA149, IM006, IM010 et PR004, et le CET1 affiché
+  /// au-dessus en est déjà net. Le dire ici, où le montant se déclare, plutôt
+  /// que de laisser le lecteur chercher pourquoi la somme des postes saisis ne
+  /// retombe pas sur le CET1.
+  ///
+  /// Faute d'exercice antérieur, la limite n'a pas de dénominateur : rien
+  /// n'est déduit, et c'est un geste à faire, pas un constat à lire.
   Widget _consigneDeduction(BuildContext context, DashColors c, int nombre) {
+    final detail = widget.fondsPropres;
+    final unite = PortfolioAmountUnitScope.maybeOf(context);
+    final mesuree = detail.exerciceLimites != null;
+    final message = mesuree
+        ? '$nombre limite(s) franchie(s). Leur excédent — '
+            '${_montant(detail.deductionLimites, unite)} — est déduit des '
+            'fonds propres de base, sur les lignes PA149, IM006, IM010 et '
+            'PR004 de l\'EP03. Le CET1 ci-dessus en est net, et les trois '
+            'ratios avec lui. Les limites sont mesurées sur les fonds propres '
+            'de l\'exercice ${detail.exerciceLimites}, comme le formulaire le '
+            'prescrit.'
+        : '$nombre limite(s) franchie(s), mais aucun exercice antérieur n\'est '
+            'enregistré : leur excédent se mesure sur les fonds propres de '
+            'l\'exercice précédent, et reste donc à zéro. Saisissez cet '
+            'exercice pour que la déduction s\'applique — sans lui, le CET1 '
+            'déclaré est surestimé.';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -635,11 +692,7 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '$nombre limite(s) franchie(s). Leur excédent se déduit des '
-              'fonds propres de base : l\'EP03 le porte sur les lignes PA149, '
-              'IM006, IM010 et PR004. L\'application ne les alimente pas '
-              'encore — le CET1 déclaré, et les trois ratios ci-dessus, sont '
-              'surestimés d\'autant. À corriger à la main avant transmission.',
+              message,
               style: const TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w500,
@@ -760,6 +813,10 @@ class _FondsPropresDetailPageState extends State<FondsPropresDetailPage> {
       _LignePoste('Résultats en report', (e) => e.resultatsReport),
       _LignePoste('Résultat éligible', (e) => e.resultatEligible),
       _LignePoste('Réduction prudentielle', (e) => -e.deductionsPrudCet1.abs()),
+      // Sans cette ligne, la colonne ne bouclerait pas : le CET1 est net de
+      // l'excédent des limites franchies, et rien au-dessus ne le dirait.
+      _LignePoste('Excédent de limites déduit',
+          (e) => -e.deductionLimites.abs()),
       _LignePoste('Total CET1', (e) => e.cet1, total: true),
       const _LignePoste.groupe('AT1 — Fonds propres additionnels'),
       _LignePoste('Instruments additionnels', (e) => e.instrumentsAt1),

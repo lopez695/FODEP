@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../models/ro_models.dart' show kMultiplicateurRwaReglementaire;
 import '../../../shared/utils/file_save.dart';
 import '../../../shared/widgets/import/shared_import_layout.dart';
+import '../../../core/utils/formatters.dart';
 
 // ─── Colonnes et valeurs attendues ────────────────────────────────────────────
 
@@ -1897,11 +1898,6 @@ Widget _buildFooter() {
         ),
       );
 
-  String _fmtCurrency(double v) {
-    if (v == 0) return '0';
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} G';
-    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(2)} M';
-    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} K';
-    return v.toStringAsFixed(0);
-  }
+  String _fmtCurrency(double v) =>
+      v.abs() < 1000 ? v.toStringAsFixed(0) : AppFormatters.montant(v);
 }

@@ -11,11 +11,18 @@ avant le balayage final. L'ordre compte : une case saisie n'est jamais
 recouverte par un zero automatique, `completer_etat_a_zero` ne touchant que
 les cases restees vides.
 
-Trois etats prudentiels s'y ajoutent : l'EP04, l'EP11 et l'EP28. Ils ne sont pas
-la par oubli de cablage — l'application n'a aucune source pour eux, et n'en aura
-pas tant qu'elle ne suivra ni derives, ni produits de base, ni instruments de
-fonds propres en retrait progressif. Ils partaient donc a zero, et le formulaire
-affirmait en silence que l'etablissement n'en detenait aucun.
+L'ecran ne propose que l'attestation, et rien d'autre : `ETATS_A_SAISIR` est
+vide. Le catalogue de l'EP28 subsiste ci-dessous, pret a etre reouvert, mais il
+n'est pas expose -- le module Risque de Marche renseigne cet etat des que des
+positions lui sont transmises, et le declare a zero sinon, ce que l'export
+enonce comme un constat.
+
+L'EP11 et l'EP04 y figuraient aussi. Le premier se renseigne desormais depuis
+le registre des derives (`app.derives`), ou chaque contrat est decrit une fois
+plutot que reparti a la main sur quinze lignes ; le second depuis les
+dispositions transitoires (`app.dispositions_transitoires`), qui tiennent les
+quatorze montants du retrait progressif et laissent l'export appliquer les
+formules du formulaire.
 
 Les autres etats non alimentes n'y figurent pas, et c'est delibere : leur source
 existe ailleurs dans l'outil — coefficients beta, produit brut par ligne de
@@ -197,23 +204,6 @@ UNITE_DE_DECLARATION = (
 
 ETATS_FACULTATIFS_CATALOGUE: tuple[tuple[str, str, str], ...] = (
     (
-        "EP04",
-        "Dispositions transitoires : reclassement et retrait progressif des "
-        "éléments de fonds propres non admissibles",
-        UNITE_DE_DECLARATION,
-    ),
-    (
-        "EP11",
-        "Expositions au risque de contrepartie : engagements sur instruments "
-        "de taux, de change, de propriété et produits de base",
-        UNITE_DE_DECLARATION
-        + " Le montant notionnel pondéré (d = b × c) et l'exposition "
-        "(e = a + d) ne se saisissent pas : l'export les calcule à partir du "
-        "coût de remplacement, du montant notionnel et de la pondération "
-        "imprimée sur le formulaire. La ligne de total non plus — elle somme "
-        "les lignes ci-dessus, colonne par colonne.",
-    ),
-    (
         "EP28",
         "Risque de marché : exigences de fonds propres au titre du risque de "
         "position sur produits de base",
@@ -235,6 +225,11 @@ MARQUEUR_DE_SECTION = re.compile(r"^[A-Z]\s*[.)]\s*")
 # case attend un resultat, pas un calcul. Les proposer a la saisie reviendrait a
 # demander trente-deux multiplications a la main, et a accepter qu'elles soient
 # fausses sans que rien ne le dise.
+#
+# L'EP11 ayant quitte le catalogue pour le registre des derives, ces deux
+# tables ne filtrent plus rien aujourd'hui. Elles restent parce que le
+# mecanisme, lui, vaut pour tout etat dont le formulaire imprime une formule :
+# le retirer obligerait a le reecrire au prochain.
 COLONNES_CALCULEES: dict[str, frozenset[str]] = {"EP11": frozenset({"F", "G"})}
 
 # Ligne de total de l'etat, sommee par l'export sur les lignes qui la precedent.

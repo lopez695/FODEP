@@ -44,7 +44,9 @@ class _GarantiesScreenState extends State<GarantiesScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchGuaranteesModule());
+      setState(() {
+        _future = _service.fetchGuaranteesModule();
+      });
     });
   }
 
@@ -344,7 +346,9 @@ class _GarantiesScreenState extends State<GarantiesScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchGuaranteesModule());
+      setState(() {
+        _future = _service.fetchGuaranteesModule();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppTheme.success,
@@ -399,7 +403,9 @@ class _GarantiesScreenState extends State<GarantiesScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _future = _service.fetchGuaranteesModule());
+      setState(() {
+        _future = _service.fetchGuaranteesModule();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppTheme.success,

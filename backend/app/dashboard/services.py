@@ -19,6 +19,11 @@ from app.core.bceao_calculations import (
 )
 from app.core.fonds_propres import REQUETE_FONDS_PROPRES_COURANTS
 from app.market.services import resolve_market_capital
+from app.rapports.fodep.service import (
+    apr_derives_courant,
+    excedents_de_limites_courants,
+    transitoires_courants,
+)
 from app.risque_operationnel.services import apr_operationnel_retenu
 from app.dashboard.models import (
     FondsPropresExercice,
@@ -468,7 +473,18 @@ def socle_pilier1() -> SoclePilier1:
         rm_data = dict(rm_row) if rm_row else {}
 
     # CALCULATIONS BCEAO
-    fp_calc = calculate_fonds_propres(fp_data)
+    # L'exces des limites prudentielles franchies sort des fonds propres de
+    # base : ce n'est pas une particularite de la declaration, c'est le
+    # dispositif. L'ecran et le FODEP le retranchent donc du meme montant, et
+    # le calcul n'existe qu'une fois -- du cote ou vivent ses trois assiettes.
+    excedents_limites = excedents_de_limites_courants()
+    # Les elements encore reconnus au titre du retrait progressif comptent dans
+    # les fonds propres, et la declaration les compte : les omettre ici ferait
+    # afficher moins de capital que le formulaire n'en declare.
+    transitoires = transitoires_courants()
+    fp_calc = calculate_fonds_propres(
+        fp_data, excedents_limites.total, transitoires
+    )
     rm_calc = resolve_market_capital(rm_data)
     # RWA Opérationnel = APR de l'Approche Indicateur de Base (AIB, art. 301
     # du dispositif prudentiel BCEAO) — c'est la méthode réglementaire UEMOA
@@ -490,6 +506,9 @@ def socle_pilier1() -> SoclePilier1:
         resultats_report=fp_data.get("resultats_report", 0.0),
         resultat_eligible=fp_data.get("resultat_eligible", 0.0),
         deductions_prud_cet1=fp_data.get("deductions_prud_cet1", 0.0),
+        deduction_limites=excedents_limites.total,
+        deduction_limites_detail=excedents_limites.par_code_dispru(),
+        exercice_limites=excedents_limites.exercice_precedent,
         cet1=fp_calc["cet1"],
         instruments_at1=fp_data.get("instruments_at1", 0.0),
         primes_emission_at1=fp_data.get("primes_emission_at1", 0.0),
@@ -502,7 +521,9 @@ def socle_pilier1() -> SoclePilier1:
         tier2=fp_calc["t2"],
         total_fp=fp_calc["total_capital"],
         exercice=fp_data.get("exercice"),
-        historique=_historique_fonds_propres(historique_rows),
+        historique=_historique_fonds_propres(
+            historique_rows, fp_data.get("exercice"), excedents_limites.total
+        ),
     )
 
     exposure_rows = [_normalize_row(item) for item in list_expositions()]
@@ -510,6 +531,9 @@ def socle_pilier1() -> SoclePilier1:
     gross_total = sum(float(row["gross_amount"]) for row in exposure_rows)
     ead_total = sum(float(row["ead"]) for row in exposure_rows)
     rwa_credit = sum(float(row["rwa"]) for row in exposure_rows)
+    # Les dérivés pèsent sur le même risque de crédit que les prêts : le
+    # formulaire les déclare sur les EP12 à EP16, et l'écran compte les mêmes.
+    rwa_credit += apr_derives_courant()
     
     # RWA Total = Crédit + Marché + Opérationnel
     rwa_total = rwa_credit + rwa_operationnel + rm_calc["rwa_marche"]
@@ -758,12 +782,23 @@ def get_dashboard_snapshot() -> DashboardSnapshot:
         grands_risques=grands_risques,
     )
 
-def _historique_fonds_propres(rows) -> list[FondsPropresExercice]:
+def _historique_fonds_propres(
+    rows,
+    exercice_courant: int | None = None,
+    deduction_limites: float = 0.0,
+) -> list[FondsPropresExercice]:
     """Les exercices deja saisis, du plus recent au plus ancien.
 
     Les agregats passent par `calculate_fonds_propres`, celle-la meme qui
     calcule les fonds propres courants : une seconde implementation de la meme
     somme finirait par diverger, et la carte contredirait son propre total.
+
+    L'exces des limites prudentielles ne s'applique qu'a l'exercice courant.
+    Les millesimes anterieurs gardent le CET1 de leur saisie : leur assiette --
+    les participations, les immobilisations, les concours aux parties liees --
+    n'est pas conservee a la date de cloture, et lui appliquer les encours
+    d'aujourd'hui donnerait un chiffre qui n'a jamais existe. L'exercice
+    courant, lui, doit afficher le meme CET1 que la carte qui le surmonte.
     """
 
     historique: list[FondsPropresExercice] = []
@@ -772,7 +807,12 @@ def _historique_fonds_propres(rows) -> list[FondsPropresExercice]:
         exercice = donnees.get("exercice")
         if exercice is None:
             continue
-        agregats = calculate_fonds_propres(donnees)
+        deduction = (
+            deduction_limites
+            if exercice_courant is not None and int(exercice) == int(exercice_courant)
+            else 0.0
+        )
+        agregats = calculate_fonds_propres(donnees, deduction)
         historique.append(FondsPropresExercice(
             exercice=int(exercice),
             capital_ordinaire=donnees.get("capital_ordinaire", 0.0) or 0.0,
@@ -780,6 +820,7 @@ def _historique_fonds_propres(rows) -> list[FondsPropresExercice]:
             resultats_report=donnees.get("resultats_report", 0.0) or 0.0,
             resultat_eligible=donnees.get("resultat_eligible", 0.0) or 0.0,
             deductions_prud_cet1=donnees.get("deductions_prud_cet1", 0.0) or 0.0,
+            deduction_limites=deduction,
             cet1=agregats["cet1"],
             instruments_at1=donnees.get("instruments_at1", 0.0) or 0.0,
             primes_emission_at1=donnees.get("primes_emission_at1", 0.0) or 0.0,
