@@ -340,14 +340,7 @@ class _DerivesScreenState extends State<DerivesScreen> {
       // ligne au lieu de déborder sur le panneau voisin ou de se faire
       // couper par une ellipse invisible sans survol.
       child: Table(
-        border: TableBorder(
-          top: BorderSide(color: c.border, width: Dash.hairline),
-          bottom: BorderSide(color: c.border, width: Dash.hairline),
-          left: BorderSide(color: c.border, width: Dash.hairline),
-          right: BorderSide(color: c.border, width: Dash.hairline),
-          horizontalInside: BorderSide(color: c.divider, width: Dash.hairline),
-          verticalInside: BorderSide(color: c.divider, width: Dash.hairline),
-        ),
+        border: _filetsTableau(c),
         columnWidths: const {
           0: FlexColumnWidth(2.4),
           1: FlexColumnWidth(1.7),
@@ -500,6 +493,19 @@ class _DerivesScreenState extends State<DerivesScreen> {
         onPressed: action,
       );
 
+  /// Les filets de la grille, communs aux deux tableaux de l'écran : le
+  /// registre des contrats et l'état qu'il remplit se lisent l'un après
+  /// l'autre, et deux grilles différentes donneraient à croire qu'ils ne
+  /// parlent pas de la même chose.
+  TableBorder _filetsTableau(DashColors c) => TableBorder(
+        top: BorderSide(color: c.border, width: Dash.hairline),
+        bottom: BorderSide(color: c.border, width: Dash.hairline),
+        left: BorderSide(color: c.border, width: Dash.hairline),
+        right: BorderSide(color: c.border, width: Dash.hairline),
+        horizontalInside: BorderSide(color: c.divider, width: Dash.hairline),
+        verticalInside: BorderSide(color: c.divider, width: Dash.hairline),
+      );
+
   /// Cellule de `Table` générique : juste le rembourrage qui écarte le
   /// contenu des filets de la grille.
   Widget _celluleTable(DashColors c, Widget enfant,
@@ -559,21 +565,39 @@ class _DerivesScreenState extends State<DerivesScreen> {
       subtitle: 'La pondération (c) est imprimée par la BCEAO sur le '
           'formulaire ; (d) = b × c et (e) = a + d sont calculés.',
       unit: AppFormatters.libelleUnite(),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      // La même grille que le registre au-dessus : un libellé du formulaire
+      // s'enroule dans sa cellule au lieu d'être coupé, et les quinze lignes
+      // se comparent d'un coup d'œil à celles qui les ont remplies.
+      child: Table(
+        border: _filetsTableau(c),
+        columnWidths: const {
+          0: FixedColumnWidth(76),
+          1: FlexColumnWidth(3.2),
+          2: FixedColumnWidth(74),
+          3: FlexColumnWidth(1.0),
+          4: FlexColumnWidth(1.0),
+          5: FixedColumnWidth(66),
+          6: FlexColumnWidth(1.0),
+          7: FlexColumnWidth(1.0),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
-          _enteteColonnes(c, const [
-            (libelle: 'Code', largeur: 62.0, alignDroite: false),
-            (libelle: 'Poste', largeur: 0, alignDroite: false),
-            (libelle: 'Contrats', largeur: 70.0, alignDroite: true),
-            (libelle: '(a)', largeur: 96.0, alignDroite: true),
-            (libelle: '(b)', largeur: 96.0, alignDroite: true),
-            (libelle: '(c)', largeur: 62.0, alignDroite: true),
-            (libelle: '(d)', largeur: 96.0, alignDroite: true),
-            (libelle: '(e)', largeur: 96.0, alignDroite: true),
-          ]),
-          for (final ligne in synthese.lignes) _ligneEp11(c, ligne),
+          TableRow(
+            decoration: const BoxDecoration(color: tableauEntete),
+            children: [
+              _teteCelluleTable(c, 'Code'),
+              _teteCelluleTable(c, 'Poste'),
+              _teteCelluleTable(c, 'Contrats', droite: true),
+              _teteCelluleTable(c, '(a)', droite: true),
+              _teteCelluleTable(c, '(b)', droite: true),
+              _teteCelluleTable(c, '(c)', droite: true),
+              _teteCelluleTable(c, '(d)', droite: true),
+              _teteCelluleTable(c, '(e)', droite: true),
+            ],
+          ),
+          for (final (index, ligne) in synthese.lignes.indexed)
+            _ligneEp11(c, ligne, paire: index.isEven),
         ],
       ),
     );
@@ -583,62 +607,58 @@ class _DerivesScreenState extends State<DerivesScreen> {
   ///
   /// Elles partent toutes dans la déclaration : voir un zéro là où on
   /// attendait un contrat est précisément ce qu'on vient vérifier ici.
-  Widget _ligneEp11(DashColors c, LigneEp11 ligne) {
+  TableRow _ligneEp11(DashColors c, LigneEp11 ligne, {required bool paire}) {
     final porte = ligne.nombreContrats > 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+    return TableRow(
+      // Une ligne qui porte un contrat se teinte de l'accent ; les autres
+      // suivent le zébrage du registre. Les quinze partent dans la
+      // déclaration, mais seules celles-là disent quelque chose.
       decoration: BoxDecoration(
-        color: porte ? c.accent.withValues(alpha: 0.04) : null,
-        border: Border(top: BorderSide(color: c.divider, width: Dash.hairline)),
+        color: porte
+            ? c.accent.withValues(alpha: 0.06)
+            : (paire ? null : c.surfaceAlt.withValues(alpha: 0.5)),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 62,
-            child: _puce(c, ligne.code, teinte: porte ? c.accent : null),
-          ),
-          Expanded(
-            // Les libellés du formulaire sont longs et la colonne les coupe :
-            // le survol les rend en entier.
-            child: Tooltip(
-              message: ligne.libelle,
-              waitDuration: const Duration(milliseconds: 300),
-              child: Text(
-                ligne.libelle,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: porte ? c.ink : c.muted,
-                  fontWeight: porte ? FontWeight.w600 : FontWeight.w400,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+      children: [
+        _celluleTable(c, _puce(c, ligne.code, teinte: porte ? c.accent : null)),
+        _celluleTable(
+          c,
+          Text(
+            ligne.libelle,
+            style: TextStyle(
+              fontSize: 11.5,
+              color: porte ? c.ink : c.muted,
+              fontWeight: porte ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
-          _nombre(c, 70, porte ? '${ligne.nombreContrats}' : '—', porte),
-          _nombre(c, 96, _montant(ligne.coutRemplacement), porte),
-          _nombre(c, 96, _montant(ligne.montantNotionnel), porte),
-          _nombre(c, 62,
-              '${(ligne.ponderation * 100).toStringAsFixed(1)} %', false),
-          _nombre(c, 96, _montant(ligne.notionnelPondere), porte),
-          _nombre(c, 96, _montant(ligne.exposition), porte, accent: porte),
-        ],
-      ),
+        ),
+        _celluleNombreTable(c, porte ? '${ligne.nombreContrats}' : '—', porte),
+        _celluleNombreTable(c, _montant(ligne.coutRemplacement), porte),
+        _celluleNombreTable(c, _montant(ligne.montantNotionnel), porte),
+        _celluleNombreTable(
+          c,
+          '${(ligne.ponderation * 100).toStringAsFixed(1)} %',
+          false,
+        ),
+        _celluleNombreTable(c, _montant(ligne.notionnelPondere), porte),
+        _celluleNombreTable(c, _montant(ligne.exposition), porte, accent: porte),
+      ],
     );
   }
 
-  Widget _nombre(DashColors c, double largeur, String texte, bool porte,
-      {bool accent = false}) {
-    return SizedBox(
-      width: largeur,
-      child: Text(
-        texte,
-        textAlign: TextAlign.right,
-        style: DashText.value(c,
-            color: accent ? c.accent : (porte ? c.ink : c.faint),
-            weight: accent ? FontWeight.w700 : FontWeight.w500),
-      ),
-    );
-  }
+  /// Un nombre dans la grille : aligné à droite, atténué quand la ligne ne
+  /// porte aucun contrat — elle déclare zéro, et l'écran le dit sans le crier.
+  Widget _celluleNombreTable(DashColors c, String texte, bool porte,
+          {bool accent = false}) =>
+      _celluleTable(
+        c,
+        Text(
+          texte,
+          textAlign: TextAlign.right,
+          style: DashText.value(c,
+              color: accent ? c.accent : (porte ? c.ink : c.faint),
+              weight: accent ? FontWeight.w700 : FontWeight.w500),
+        ),
+      );
 
   /// La ventilation de l'exposition par catégorie de contrepartie.
   ///
@@ -699,27 +719,6 @@ class _DerivesScreenState extends State<DerivesScreen> {
   }
 
   // ── Fragments communs ────────────────────────────────────────────────────
-
-  Widget _enteteColonnes(
-    DashColors c,
-    List<({String libelle, double largeur, bool alignDroite})> colonnes,
-  ) {
-    Widget cellule(({String libelle, double largeur, bool alignDroite}) col) {
-      final texte = Text(
-        col.libelle.toUpperCase(),
-        textAlign: col.alignDroite ? TextAlign.right : TextAlign.left,
-        style: DashText.eyebrow(c, color: c.faint).copyWith(fontSize: 9.5),
-      );
-      return col.largeur == 0
-          ? Expanded(child: texte)
-          : SizedBox(width: col.largeur, child: texte);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(children: [for (final col in colonnes) cellule(col)]),
-    );
-  }
 
   /// Une pastille : code DISPRU ou tranche de durée. Courte, discrète, et
   /// alignée — c'est par elle qu'on retrouve la case sur le formulaire.

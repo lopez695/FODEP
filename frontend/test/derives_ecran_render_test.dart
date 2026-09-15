@@ -160,12 +160,13 @@ void main() {
     expect(find.text('RC061'), findsOneWidget);
   });
 
-  testWidgets('le survol rend le libellé du poste en entier', (tester) async {
-    // La colonne coupe les libellés du formulaire : le texte complet doit
-    // rester lisible au survol.
+  testWidgets('le libellé du poste est rendu en entier', (tester) async {
+    // Les libellés du formulaire sont longs. La grille les enroule dans leur
+    // cellule plutôt que de les couper : rien n'est caché derrière une
+    // ellipse, et la ligne s'agrandit de ce qu'il faut.
     await _ouvrir(tester);
     expect(
-      find.byTooltip("Engagements sur instruments de taux d'intérêt "
+      find.text("Engagements sur instruments de taux d'intérêt "
           '— Durée > 5 ans'),
       findsOneWidget,
     );

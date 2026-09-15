@@ -177,7 +177,7 @@ void main() {
 
     await _afficher(tester, _ApiFictive(_socle(marge: -10000)));
 
-    expect(find.text('Déficit'), findsOneWidget);
+    expect(find.text('Déficit de fonds propres'), findsOneWidget);
   });
 
   testWidgets('un excédent ne se nomme pas déficit', (tester) async {
@@ -187,7 +187,7 @@ void main() {
 
     await _afficher(tester, _ApiFictive(_socle(marge: 4000)));
 
-    expect(find.text('Déficit'), findsNothing);
+    expect(find.textContaining('Déficit'), findsNothing);
     expect(find.text("Matelas au-delà de l'exigence"), findsOneWidget);
   });
 
@@ -206,7 +206,7 @@ void main() {
 
     expect(find.text('Données incomplètes'), findsOneWidget);
     expect(
-      find.text('• Risque opérationnel non calculé : renseignez le PNB.'),
+      find.text('Risque opérationnel non calculé : renseignez le PNB.'),
       findsOneWidget,
     );
   });
@@ -226,5 +226,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.analysesDemandees, 1);
+  });
+
+  testWidgets('la page tient dans sa fenêtre, large ou étroite', (tester) async {
+    // Flutter lève sur tout débordement de mise en page : les deux grilles et
+    // la bande de tuiles doivent se replier plutôt que de pousser la page hors
+    // de l'écran. C'est la garde que le registre des dérivés a déjà.
+    for (final taille in [const Size(1800, 2400), const Size(1280, 1800)]) {
+      tester.view.physicalSize = taille;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await _afficher(tester, _ApiFictive(_socle(marge: 4000)));
+
+      expect(tester.takeException(), isNull, reason: 'largeur ${taille.width}');
+      expect(find.text('Ratios réglementaires'), findsOneWidget);
+      expect(find.text('Exigences par type de risque'), findsOneWidget);
+    }
   });
 }
