@@ -48,6 +48,7 @@ from app.rapports.fodep.service import (
     _remplir_ep08,
     _remplir_ep22,
     _groupes_retenus_ep30,
+    _remplir_ep29,
     _remplir_ep30,
     en_millions,
     repartir_en_millions,
@@ -637,7 +638,7 @@ def test_les_etats_en_liste_ne_fabriquent_pas_de_contrepartie(classeur):
     )
 
 
-def test_les_colonnes_de_nomenclature_ne_portent_pas_de_zero(classeur):
+def test_les_colonnes_de_nomenclature_ne_portent_pas_de_zero():
     """« Groupe ou individuel » et « Catégorie de lien » sont codées.
 
     Le § 11.1 code la portée de l'EP29 sur « 1 » (client individuel) ou « 2 »
@@ -645,25 +646,53 @@ def test_les_colonnes_de_nomenclature_ne_portent_pas_de_zero(classeur):
     (contrôle) ou « b » (interdépendance économique). L'export y écrivait
     respectivement un zéro, laissé par le balayage, et le libellé en clair de
     l'application — deux valeurs hors nomenclature.
+
+    L'essai pose ses propres lignes plutôt que de lire l'export du jour : le
+    seuil des grands risques se mesure sur les fonds propres, et un portefeuille
+    dont aucune contrepartie ne l'atteint ne prouverait rien. C'est arrivé le
+    jour où les fonds propres déclarés ont doublé.
     """
 
-    def valeurs_declarees(etat: str, colonne: int, colonne_nom: int) -> set:
-        feuille = classeur[etat]
-        return {
-            feuille.cell(row=rang, column=colonne).value
-            for rang in indexer_codes_dispru(feuille).values()
-            if feuille.cell(row=rang, column=colonne_nom).value not in (None, "")
-        }
+    membre = _membre("Groupe Témoin", "SOCIETE TEMOIN")
+    # L'EP29 imprime le nom et lit l'identifiant : l'agrégat les porte, comme
+    # celui que produit `_agreger_par_contrepartie`.
+    agrege = {
+        **_agrege(9.0e9),
+        "nom": membre["nom"],
+        "identifiant": membre["identifiant"],
+    }
+    groupes = {membre["identifiant"]: agrege}
 
-    # EP29 : colonne C, en face du nom porté en D.
-    portees = valeurs_declarees("EP29", 3, 4)
-    assert portees, "aucun grand risque déclaré : le contrôle ne prouve rien"
-    assert portees <= {"1", "2"}, f"portées hors nomenclature : {portees}"
+    classeur = load_workbook(CHEMIN_MODELE)
+    try:
+        # Un T1 de 20 Md : les 9 Md de la contrepartie franchissent le seuil des
+        # grands risques, quel que soit l'état du portefeuille en base.
+        _remplir_ep29(classeur, groupes, 20.0e9)
+        with mock.patch(
+            "app.rapports.fodep.service._lire_membres_de_groupes",
+            return_value=[membre],
+        ):
+            _remplir_ep30(classeur, groupes)
 
-    # EP30 : colonne D, en face du nom porté en E.
-    liens = valeurs_declarees("EP30", 4, 5)
-    assert liens, "aucun client de groupe déclaré : le contrôle ne prouve rien"
-    assert liens <= {"a", "b"}, f"catégories de lien hors nomenclature : {liens}"
+        def valeurs_declarees(etat: str, colonne: int, colonne_nom: int) -> set:
+            feuille = classeur[etat]
+            return {
+                feuille.cell(row=rang, column=colonne).value
+                for rang in indexer_codes_dispru(feuille).values()
+                if feuille.cell(row=rang, column=colonne_nom).value not in (None, "")
+            }
+
+        # EP29 : colonne C, en face du nom porté en D.
+        portees = valeurs_declarees("EP29", 3, 4)
+        assert portees, "le grand risque posé par l'essai doit être déclaré"
+        assert portees <= {"1", "2"}, f"portées hors nomenclature : {portees}"
+
+        # EP30 : colonne D, en face du nom porté en E.
+        liens = valeurs_declarees("EP30", 4, 5)
+        assert liens, "le client de groupe posé par l'essai doit être déclaré"
+        assert liens <= {"a", "b"}, f"catégories de lien hors nomenclature : {liens}"
+    finally:
+        classeur.close()
 
 
 def test_completer_etat_a_zero_ne_materialise_pas_la_grille_vide():

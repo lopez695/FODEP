@@ -8,9 +8,13 @@ import '../models/report_models.dart';
 /// lues par la même fonction que celle d'une déclaration déposée : une norme
 /// se lit à l'identique qu'elle vienne d'un dépôt ou du portefeuille en base.
 class AnalyseIndicateurs extends StatelessWidget {
-  const AnalyseIndicateurs({required this.instantane});
+  const AnalyseIndicateurs({super.key, required this.instantane, this.onReessayer});
 
   final AsyncSnapshot<AnalyseDeclaration> instantane;
+
+  /// De quoi relancer l'analyse sans recharger la page. Absent là où l'appel
+  /// se refait de lui-même au prochain rendu.
+  final VoidCallback? onReessayer;
 
   @override
   Widget build(BuildContext context) {
@@ -35,13 +39,44 @@ class AnalyseIndicateurs extends StatelessWidget {
     }
 
     if (instantane.hasError || !instantane.hasData) {
+      // Le message vient d'`ApiException`, qui traduit le code de statut quand
+      // le serveur n'a rien dit d'intelligible. Une page d'erreur HTML ne
+      // s'affiche donc plus ici, balises comprises.
+      final motif = instantane.error is Exception
+          ? '${instantane.error}'
+          : 'aucune donnée reçue';
       return _cadre(
         theme,
-        couleur: theme.colorScheme.outline,
-        enfant: Text(
-          "L'analyse des indicateurs n'a pas pu être établie : "
-          '${instantane.error ?? 'aucune donnée'}',
-          style: theme.textTheme.bodySmall,
+        couleur: const Color(0xFFB45309),
+        enfant: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.cloud_off_outlined,
+                size: 17, color: Color(0xFFB45309)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "L'analyse des onze normes n'a pas abouti.",
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(motif, style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+            if (onReessayer != null) ...[
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: onReessayer,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Réessayer'),
+              ),
+            ],
+          ],
         ),
       );
     }

@@ -21,7 +21,6 @@ import '../../../shared/widgets/section_card.dart';
 import '../../participations/widgets/tableau_maison.dart'
     show tableauBordure, tableauEntete, tableauLigneAlternee;
 import '../../rapports/models/report_models.dart';
-import '../../rapports/widgets/analyse_indicateurs.dart';
 import '../models/icaap_models.dart';
 
 class CapitalReglementaireScreen extends StatefulWidget {
@@ -844,8 +843,10 @@ class _CarteNormes extends StatelessWidget {
           else
             FutureBuilder<AnalyseDeclaration>(
               future: future,
-              builder: (context, instantane) =>
-                  AnalyseIndicateurs(instantane: instantane),
+              builder: (context, instantane) => _ResumeNormes(
+                instantane: instantane,
+                onReessayer: onDemander,
+              ),
             ),
         ],
       ),
@@ -859,6 +860,112 @@ class _CarteNormes extends StatelessWidget {
 /// Fond de carte et filet plutôt qu'un aplat gris : quatre aplats côte à côte
 /// pèsent plus que les nombres qu'ils portent. Le rang dit l'ordre de lecture,
 /// puisque chaque tuile découle de la précédente.
+/// L'issue de la confrontation, en une ligne.
+///
+/// Le détail — chaque norme franchie, chaque réserve — vit sur la page du FODEP
+/// et dans le rapport joint à l'export, où il se lit à côté de ce qui le
+/// produit. Le répéter ici en encadré ajoutait une deuxième version de la même
+/// vérité au milieu d'une page qui parle du socle Pilier 1.
+class _ResumeNormes extends StatelessWidget {
+  const _ResumeNormes({required this.instantane, required this.onReessayer});
+
+  final AsyncSnapshot<AnalyseDeclaration> instantane;
+  final VoidCallback onReessayer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (instantane.connectionState == ConnectionState.waiting) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 10),
+          Text('Analyse de la déclaration en cours…',
+              style: theme.textTheme.bodySmall),
+        ],
+      );
+    }
+
+    if (instantane.hasError || !instantane.hasData) {
+      // Le message vient d'`ApiException`, qui traduit le code de statut quand
+      // le serveur n'a rien dit d'intelligible : une page d'erreur HTML ne
+      // s'affiche donc pas ici, balises comprises.
+      final motif = instantane.error is Exception
+          ? '${instantane.error}'
+          : 'aucune donnée reçue';
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.cloud_off_outlined,
+              size: 17, color: AppTheme.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "L'analyse des onze normes n'a pas abouti : $motif",
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: onReessayer,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Réessayer'),
+          ),
+        ],
+      );
+    }
+
+    final analyse = instantane.data!;
+    final franchies = analyse.depassees.length;
+    final conforme = franchies == 0;
+    final couleur = conforme ? AppTheme.success : AppTheme.warning;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(conforme ? Icons.verified_outlined : Icons.report_outlined,
+            size: 17, color: couleur),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: conforme
+                      ? '${analyse.normes.length} normes relues, aucune franchie. '
+                      : '${analyse.normes.length} normes relues, '
+                          '$franchies franchie(s). ',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: couleur,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Le détail des normes et des réserves accompagne '
+                      "l'export du FODEP.",
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        TextButton.icon(
+          onPressed: onReessayer,
+          icon: const Icon(Icons.refresh, size: 16),
+          label: const Text('Relancer'),
+        ),
+      ],
+    );
+  }
+}
+
 class _Tuile extends StatelessWidget {
   const _Tuile({
     required this.rang,

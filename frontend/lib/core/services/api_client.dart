@@ -17,19 +17,58 @@ class ApiException implements Exception {
   final int statusCode;
   final dynamic detail;
 
+  /// Ce que la panne veut dire pour celui qui l'a sous les yeux.
+  ///
+  /// Le serveur a la parole tant qu'il dit quelque chose : un refus métier
+  /// porte son motif, et c'est lui qu'il faut lire. Quand il se tait — une
+  /// passerelle qui répond à sa place, un corps vide — le code de statut est
+  /// traduit plutôt que recopié : « GET /... failed with 520 » n'apprend rien
+  /// à un déclarant.
   String get message {
-    if (detail is String && (detail as String).trim().isNotEmpty) {
-      return detail as String;
+    final lisible = _detailLisible();
+    if (lisible != null) return lisible;
+    return explicationDuStatut;
+  }
+
+  String? _detailLisible() {
+    if (detail is String) {
+      final texte = (detail as String).trim();
+      return texte.isEmpty ? null : texte;
     }
     if (detail is Map) {
       final detailMap = Map<String, dynamic>.from(detail as Map);
-      final payloadMessage = detailMap['message'];
-      if (payloadMessage is String && payloadMessage.trim().isNotEmpty) {
-        return payloadMessage;
+      for (final cle in const ['message', 'detail']) {
+        final valeur = detailMap[cle];
+        if (valeur is String && valeur.trim().isNotEmpty) {
+          return valeur.trim();
+        }
       }
     }
-    return '$method $path failed with $statusCode';
+    return null;
   }
+
+  /// La panne nommée par son code, en français.
+  ///
+  /// Les codes 520 à 524 sont ceux d'une passerelle placée devant le serveur :
+  /// ils disent que l'application n'a pas répondu, pas qu'elle a refusé.
+  String get explicationDuStatut => switch (statusCode) {
+        401 => 'Session expirée : reconnectez-vous.',
+        403 => "Le serveur a refusé l'accès à cette ressource.",
+        404 =>
+          "Le serveur ne connaît pas l'adresse « $path » : il est "
+              "probablement plus ancien que cette version de l'application.",
+        405 =>
+          'Le serveur refuse « $method $path » : il est probablement plus '
+              "ancien que cette version de l'application.",
+        408 || 504 =>
+          'Le serveur a mis trop de temps à répondre. Réessayez dans un '
+              'instant.',
+        500 => 'Le serveur a rencontré une erreur interne (500).',
+        502 || 503 || 520 || 521 || 522 || 523 || 524 =>
+          "Le serveur n'a pas répondu (erreur $statusCode). Il redémarre "
+              'peut-être : réessayez dans un instant.',
+        _ => 'Le serveur a répondu $statusCode à « $method $path ».',
+      };
 
   @override
   String toString() => message;
@@ -226,7 +265,25 @@ class ApiClient {
       }
       return decoded;
     } catch (_) {
-      return body;
+      return _texteLisible(body);
     }
+  }
+
+  /// Le corps d'une réponse qui n'est pas du JSON, s'il apprend quelque chose.
+  ///
+  /// Une passerelle — Cloudflare devant l'hébergeur, un répartiteur de charge —
+  /// répond par une page HTML entière. Elle s'affichait dans l'écran, balises
+  /// comprises, et n'apprenait rien que le code de statut ne dise déjà. Un
+  /// message en texte simple, lui, vient du serveur : il est gardé, sur une
+  /// seule ligne et borné, faute de quoi une trace d'exécution remplirait la
+  /// page à sa place.
+  static String? _texteLisible(String corps) {
+    final texte = corps.trim();
+    if (texte.isEmpty) return null;
+    if (texte.startsWith('<') || texte.toLowerCase().contains('<html')) {
+      return null;
+    }
+    final ligne = texte.replaceAll(RegExp(r'\s+'), ' ');
+    return ligne.length <= 200 ? ligne : '${ligne.substring(0, 199)}…';
   }
 }

@@ -323,6 +323,27 @@ def analyser_classeur(
         raise ValueError(f"Classeur illisible : {exc}") from exc
 
     try:
+        return analyser_classeur_ouvert(classeur)
+    finally:
+        classeur.close()
+
+
+def analyser_classeur_ouvert(
+    classeur,
+) -> tuple[list[NormeAnalysee], list[ControleCoherence], list[EtatRenseigne]]:
+    """La meme lecture, sur un classeur deja ouvert.
+
+    L'analyse de la declaration EN COURS renseignait le classeur, l'enregistrait
+    dans un tampon puis le rouvrait pour le relire : deux etapes lourdes -- la
+    serialisation des quarante-quatre feuilles et leur relecture -- pour
+    retrouver un objet qu'on avait deja sous la main. Sur une petite instance,
+    c'est ce qui faisait depasser le delai de la passerelle.
+
+    Le classeur reste a l'appelant : c'est lui qui l'a ouvert, c'est lui qui le
+    referme.
+    """
+
+    try:
         nom = next(
             (feuille for feuille in classeur.sheetnames if feuille.strip() == "EP01"),
             None,
@@ -364,8 +385,8 @@ def analyser_classeur(
             _controles_du_classeur(classeur),
             _inventaire_du_classeur(classeur),
         )
-    finally:
-        classeur.close()
+    except KeyError as exc:  # une feuille attendue manque au classeur
+        raise ValueError(f"Classeur illisible : {exc}") from exc
 
 
 def _lecteur_de_pdf():
@@ -530,6 +551,12 @@ def _inventaire_du_classeur(classeur) -> list[EtatRenseigne]:
             for valeur in ligne:
                 if valeur is None or valeur == "":
                     continue
+                # Un classeur lu depuis un fichier rend la valeur calculee ;
+                # un classeur encore en memoire rend la formule elle-meme. Une
+                # formule n'est pas une donnee declaree : la compter ferait
+                # varier l'inventaire selon le chemin de lecture.
+                if isinstance(valeur, str) and valeur.startswith("="):
+                    continue
                 porteuse = True
                 if isinstance(valeur, (int, float)) and not isinstance(valeur, bool):
                     des_nombres = True
@@ -685,14 +712,12 @@ def analyser_declaration_en_cours(date_arrete=None) -> AnalyseDeclaration:
 
     produit = renseigner_classeur_fodep(date_arrete)
     try:
-        tampon = BytesIO()
-        produit.classeur.save(tampon)
-        octets = tampon.getvalue()
+        # Le classeur est la : l'enregistrer pour le relire coutait une
+        # serialisation complete et autant de memoire, sans rien apprendre.
+        normes, controles, inventaire = analyser_classeur_ouvert(produit.classeur)
         reserves = list(produit.anomalies)
     finally:
         produit.classeur.close()
-
-    normes, controles, inventaire = analyser_classeur(octets)
     return AnalyseDeclaration(
         nom_fichier="Declaration en cours",
         pages=0,
